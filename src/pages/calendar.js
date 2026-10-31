@@ -129,8 +129,8 @@ export async function calendarView() {
     ${view === 'list' ? `<select class="input" data-input="cal-sort" aria-label="Sort by"><option value="date">Sort: date</option><option value="color" ${sortBy === 'color' ? 'selected' : ''}>Sort: color</option></select>` : ''}</div>`;
   const handoff = takeHandoff();
   if (handoff?.type === 'event') setTimeout(() => actions['event-detail']({ dataset: { id: String(handoff.id) } }), 60);
-  return `${head}<div class="split cal">
-    <section class="card" id="cal-main"><div class="stack">${filters}<div>${view === 'list' ? listView() : monthView()}</div></div></section>
+  return `${head}<div class="page-controls">${filters}</div><div class="page-content split cal">
+    <section class="card" id="cal-main"><div>${view === 'list' ? listView() : monthView()}</div></section>
     <section class="card board" data-board>${boardInner(false)}</section></div>`;
 }
 actions['cal-view'] = (el) => { view = el.dataset.value; refresh(); };

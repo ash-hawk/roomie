@@ -52,7 +52,7 @@ export async function homeView() {
   queueMicrotask(() => setTimeout(fillAi, 0));
   return `${phead(esc(household().householdName), `${greeting(hourIn())}, ${esc(first)}`, dateLine)}
     <div id="ai-line" class="ai hidden" role="status" aria-live="polite"></div>
-    ${waiting.length || week.overdue.length ? `<section class="card stack"><h2>Waiting on you</h2><div class="stack" style="gap:8px">
+    <div class="page-content stack">${waiting.length || week.overdue.length ? `<section class="card stack"><h2>Waiting on you</h2><div class="stack" style="gap:8px">
       ${waiting.map((n) => `<a class="item click row" href="#/notifications"><span class="evdot" style="background:#dc2626"></span><div class="grow">${esc(n.message)}</div><span class="badge">Answer</span></a>`).join('')}
       ${week.overdue.slice(0, 3).map((x) => `<a class="item click row" href="#/chores"><span class="evdot" style="background:#d97706"></span><div class="grow"><b>${esc(x.c.choreName)}</b> is overdue</div><span class="badge warn">Overdue</span></a>`).join('')}</div></section>` : ''}
     <div class="split cal">
@@ -63,7 +63,7 @@ export async function homeView() {
           ${mine.length ? mine.slice(0, 4).map((n) => `<a class="item click row" href="#/notifications"><span class="evdot" style="background:${n.isRead ? 'transparent' : 'var(--accent)'}"></span><div class="grow">${esc(n.message)}<div class="hint">${ago(n.createdAt, tz())}</div></div></a>`).join('') : '<p class="mute">You are all caught up.</p>'}</section>
         <section class="card stack"><div class="row" style="justify-content:space-between"><h2>On the board</h2><a class="btn s" href="#/calendar">Open board</a></div>
           ${recent.length ? recent.map((n) => `<a class="item click row t" href="#/calendar" style="gap:8px">${avatar(who(n.senderUserId), 'sm')}<div class="grow"><b>${esc(n.senderUserId === S.user.userId ? 'You' : who(n.senderUserId)?.firstName ?? 'Someone')}</b> <span class="hint">${ago(n.postedDate, tz())}${n.parentMessageId ? ' · reply' : ''}</span><div>${esc(n.messageText.length > 110 ? `${n.messageText.slice(0, 107)}...` : n.messageText)}</div></div></a>`).join('') : '<p class="mute">No notes yet.</p>'}</section>
-      </div></div>`;
+      </div></div></div>`;
 }
 
 // An event row opens the event's detail on the Calendar page, the same way "Check it out" does.

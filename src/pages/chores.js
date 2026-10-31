@@ -31,7 +31,7 @@ export async function choresView() {
   D = { members, ...data };
   const people = active();
   return `${phead('Shared responsibilities', 'Chores', 'A clear view of what needs doing, and whose turn it is.', `<button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
-  <div class="filters">${seg([['schedule', 'Schedule'], ['chart', 'Chore chart']], tab, 'chore-tab')}
+  <div class="page-controls filters">${seg([['schedule', 'Schedule'], ['chart', 'Chore chart']], tab, 'chore-tab')}
     <select class="input" data-input="chore-filter" aria-label="Show chores for"><option value="all">Everyone</option><option value="me" ${filter === 'me' ? 'selected' : ''}>Just mine</option>${people.filter((m) => m.userId !== S.user.userId).map((m) => `<option value="${m.userId}" ${String(filter) === String(m.userId) ? 'selected' : ''}>${esc(m.firstName)}</option>`).join('')}</select>
     ${tab === 'chart' ? `<select class="input" data-input="chore-sort" aria-label="Sort by"><option value="added" ${sortBy === 'added' ? 'selected' : ''}>Sort: date added</option><option value="az" ${sortBy === 'az' ? 'selected' : ''}>Sort: A to Z</option><option value="assignee" ${sortBy === 'assignee' ? 'selected' : ''}>Sort: assignee</option></select>` : ''}</div>
   ${tab === 'schedule' ? scheduleView() : chartView()}`;
@@ -74,7 +74,7 @@ function scheduleView() {
   const people = active(); const openCounts = people.map((m) => [m, D.assignments.filter((a) => !a.isCompleted && a.assignedUserId === m.userId).length]); const mx = Math.max(1, ...openCounts.map((x) => x[1]));
   const load = D.chores.length ? `<section class="card"><div class="row sp"><h2>Household workload</h2><span class="eyebrow">open chores</span></div>${openCounts.map(([m, n]) => `<div class="row" style="padding:7px 0">${avatar(m, 'sm')}<span class="truncate" style="width:74px">${esc(first(m.userId))}</span><div class="bar grow" style="--w:${Math.round((n / mx) * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${n}</b></div>`).join('')}</section>` : '';
 
-  return `<div class="split"><section class="card">${main}</section><aside class="stack">${reqCard}${load}</aside></div>`;
+  return `<div class="page-content stack"><section class="card">${main}</section>${reqCard || load ? `<aside class="grid2 support-grid">${reqCard}${load}</aside>` : ''}</div>`;
 }
 
 // ---- chore chart (the rules) ------------------------------------------------------------------
@@ -82,13 +82,13 @@ function chartView() {
   let list = D.chores.filter((c) => { const next = nextAsg(c); return filter === 'all' || c.rotation.some((u) => passes(u)) || (next && passes(next.assignedUserId)); });
   const nm = (c) => (nextAsg(c) ? first(nextAsg(c).assignedUserId) : 'zzz');
   list = [...list].sort(sortBy === 'az' ? (a, b) => a.choreName.localeCompare(b.choreName) : sortBy === 'assignee' ? (a, b) => nm(a).localeCompare(nm(b)) || a.choreName.localeCompare(b.choreName) : (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  if (!list.length) return `<section class="card">${empty('🧹', D.chores.length ? 'Nothing matches' : 'No chores yet', D.chores.length ? 'Try a different person.' : 'Add the first one and choose who does it, or let it rotate through the house.', D.chores.length ? '' : '<button class="btn p" data-action="add-chore">Add your first chore</button>')}</section>`;
-  return `<section class="card"><div class="row sp"><h2>All chores</h2>${badge(`${list.length}`, 'gray')}</div>${list.map((c) => {
+  if (!list.length) return `<div class="page-content"><section class="card">${empty('🧹', D.chores.length ? 'Nothing matches' : 'No chores yet', D.chores.length ? 'Try a different person.' : 'Add the first one and choose who does it, or let it rotate through the house.', D.chores.length ? '' : '<button class="btn p" data-action="add-chore">Add your first chore</button>')}</section></div>`;
+  return `<div class="page-content"><section class="card"><div class="row sp"><h2>All chores</h2>${badge(`${list.length}`, 'gray')}</div>${list.map((c) => {
     const next = nextAsg(c); const rot = c.rotation.filter((u) => who(u) && !who(u).leftDate);
     return `<div class="item cr" data-action="chore-rule" data-id="${c.choreId}" style="cursor:pointer"><div class="grow" style="min-width:0"><b class="truncate">${esc(c.choreName)}</b>
       <div class="hint">${esc(c.schedule)}${c.repeats !== 'none' && rot.length > 1 ? ` · takes turns: ${rot.map((u) => esc(first(u))).join(', ')}` : ''}</div>
       <div class="hint">${next ? `Next: ${esc(first(next.assignedUserId))}, ${whenFmt(next.dueAt)}` : c.repeats === 'none' ? 'Done' : 'Nobody to assign (everyone moved out)'}</div></div>${effortChip(c.effort)}</div>`;
-  }).join('')}</section>`;
+  }).join('')}</section></div>`;
 }
 const nextAsg = (c) => D.assignments.filter((a) => a.choreId === c.choreId && !a.isCompleted).sort((x, y) => Date.parse(x.dueAt) - Date.parse(y.dueAt))[0] ?? null;
 
