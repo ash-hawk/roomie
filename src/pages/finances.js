@@ -44,13 +44,13 @@ function settleView() {
     const note = toCents(b.pendingAmount) > 0 ? `<div class="hint">${$m(b.pendingAmount)} sent, waiting for ${owe ? esc(nm(b.otherUserId)) : 'you'} to confirm</div>` : '';
     const dis = toCents(b.disputedAmount) > 0 ? `<div class="hint" style="color:var(--bad)">${$m(b.disputedAmount)} is disputed</div>` : '';
     return `<div class="item row">${person(b.otherUserId, `<div class="${owe ? 'bad' : 'good'}" style="font-size:13px">${owe ? 'you owe' : 'owes you'} <b class="amount">${money(Math.abs(cents))}</b></div>${note}${dis}`)}
-      <div class="grow"></div>${owe && payable ? `<button class="btn p s" data-action="pay" data-payee="${b.otherUserId}">Pay back</button>` : ''}</div>`;
+      <div class="grow"></div>${owe && payable ? `<button class="btn s" data-action="pay" data-payee="${b.otherUserId}">Pay back</button>` : ''}</div>`;
   }).join('');
 
   const incoming = bal.incoming.map((p) => `<div class="item"><div class="row t">${avatar(who(p.payerUserId))}<div class="grow"><b>${esc(first(p.payerUserId))}</b> says they paid you <b class="amount">${$m(p.amount)}</b> via ${APP_LABEL[p.paidWith]}
       <div class="hint">${p.items.map((i) => esc(i.itemName)).join(', ')}</div>
       ${p.status === 'disputed' ? '<div style="margin-top:2px">' + stChip('disputed') + '</div>' : ''}
-      <div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn p s" data-action="review" data-payment="${p.paymentId}" data-status="confirmed">${p.status === 'disputed' ? 'Mark received' : 'Got it'}</button>${p.status === 'sent' ? `<button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="disputed">Did not get it</button>` : ''}</div></div></div></div>`).join('');
+      <div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="confirmed">${p.status === 'disputed' ? 'Mark received' : 'Got it'}</button>${p.status === 'sent' ? `<button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="disputed">Did not get it</button>` : ''}</div></div></div></div>`).join('');
   const outgoing = bal.outgoing.map((p) => `<div class="item row">${person(p.payeeUserId, `<div class="hint">You sent ${$m(p.amount)} via ${APP_LABEL[p.paidWith]}</div>`)}<div class="grow"></div>${stChip(p.status === 'sent' ? 'pending' : 'disputed')}</div>`).join('');
 
   const pairs = bal.pairs.map((p) => `<div class="item row">${avatar(who(p.debtorUserId), 'sm')}<span class="grow"><b>${esc(first(p.debtorUserId))}</b> ${p.debtorUserId === S.user.userId ? 'owe' : 'owes'} <b>${esc(first(p.creditorUserId))}</b></span><b class="amount">${$m(p.amount)}</b></div>`).join('');
@@ -65,7 +65,7 @@ function settleView() {
     ${incoming ? `<section class="card"><h2>Waiting on you</h2>${incoming}</section>` : ''}
     ${outgoing ? `<section class="card"><h2>You sent</h2>${outgoing}</section>` : ''}</div>` : ''}
   <section class="card"><div class="row sp"><h2>Past purchases</h2>${badge(`${D.expenses.length}`, 'gray')}</div>
-    ${D.expenses.length ? D.expenses.map(expenseRow).join('') : empty('🧾', 'No purchases yet', 'Log the first shared purchase and the split is figured out for you.', '<button class="btn p" data-action="add-expense">Log expense</button>')}</section>`;
+    ${D.expenses.length ? D.expenses.map(expenseRow).join('') : empty('🧾', 'No purchases yet', 'Use Log expense above and the split is figured out for you.')}</section>`;
 }
 
 function expenseRow(e) {

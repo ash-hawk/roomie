@@ -60,7 +60,7 @@ function scheduleView() {
     ['This week', open.filter((a) => a.status !== 'overdue' && daysFromToday(a.dueAt) >= 1 && daysFromToday(a.dueAt) <= 7)], ['Later', open.filter((a) => a.status !== 'overdue' && daysFromToday(a.dueAt) > 7)]];
   const recent = D.assignments.filter((a) => a.isCompleted && mineOnly(a) && Date.now() - Date.parse(a.completedAt) < 7 * 86400000).sort((x, y) => Date.parse(y.completedAt) - Date.parse(x.completedAt));
   const main = D.chores.length === 0
-    ? empty('🧹', 'No chores yet', 'Add the first one and choose who does it, or let it rotate through the house.', '<button class="btn p" data-action="add-chore">Add your first chore</button>')
+    ? empty('🧹', 'No chores yet', 'Use Add chore above to create the first one and choose who does it.')
     : (open.length || recent.length ? `${groups.filter(([, l]) => l.length).map(([n, l]) => `<div class="grp">${n}</div>${l.map(row).join('')}`).join('')}${recent.length ? `<div class="grp">Done this week</div>${recent.map(row).join('')}` : ''}` : '<p class="mute" style="padding:10px 0">Nothing due. Enjoy it.</p>');
 
   // open requests that need an answer from you, plus the ones you are waiting on
@@ -68,7 +68,7 @@ function scheduleView() {
   const reqCard = reqs.length ? `<section class="card"><div class="row sp"><h2>Swap requests</h2>${badge(`${reqs.length}`, 'warn')}</div>${reqs.map((r) => {
     const ra = asgOf(r.requesterAssignmentId), ta = r.targetAssignmentId ? asgOf(r.targetAssignmentId) : null, mineReq = r.requesterUserId === S.user.userId;
     const text = r.type === 'swap' ? `<b>${esc(first(r.requesterUserId))}</b> ${mineReq ? 'asked' : 'asks'} <b>${esc(first(r.targetUserId))}</b> to swap <b>${esc(choreOf(ra?.choreId)?.choreName ?? 'a chore')}</b> for <b>${esc(choreOf(ta?.choreId)?.choreName ?? 'a chore')}</b>` : `<b>${esc(first(r.requesterUserId))}</b> ${mineReq ? 'asked' : 'asks'} someone to cover <b>${esc(choreOf(ra?.choreId)?.choreName ?? 'a chore')}</b>`;
-    return `<div class="item"><div style="font-size:14px">${text}</div><div class="hint">“${esc(r.requestMessage ?? '')}”</div><div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn ${mineReq ? '' : 'p'} s" data-action="open-request" data-id="${r.swapId}">${mineReq ? 'Withdraw' : 'Respond'}</button></div></div>`;
+    return `<div class="item"><div style="font-size:14px">${text}</div><div class="hint">“${esc(r.requestMessage ?? '')}”</div><div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn s" data-action="open-request" data-id="${r.swapId}">${mineReq ? 'Withdraw' : 'Respond'}</button></div></div>`;
   }).join('')}</section>` : '';
 
   const people = active(); const openCounts = people.map((m) => [m, D.assignments.filter((a) => !a.isCompleted && a.assignedUserId === m.userId).length]); const mx = Math.max(1, ...openCounts.map((x) => x[1]));
@@ -82,7 +82,7 @@ function chartView() {
   let list = D.chores.filter((c) => { const next = nextAsg(c); return filter === 'all' || c.rotation.some((u) => passes(u)) || (next && passes(next.assignedUserId)); });
   const nm = (c) => (nextAsg(c) ? first(nextAsg(c).assignedUserId) : 'zzz');
   list = [...list].sort(sortBy === 'az' ? (a, b) => a.choreName.localeCompare(b.choreName) : sortBy === 'assignee' ? (a, b) => nm(a).localeCompare(nm(b)) || a.choreName.localeCompare(b.choreName) : (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  if (!list.length) return `<div class="page-content"><section class="card">${empty('🧹', D.chores.length ? 'Nothing matches' : 'No chores yet', D.chores.length ? 'Try a different person.' : 'Add the first one and choose who does it, or let it rotate through the house.', D.chores.length ? '' : '<button class="btn p" data-action="add-chore">Add your first chore</button>')}</section></div>`;
+  if (!list.length) return `<div class="page-content"><section class="card">${empty('🧹', D.chores.length ? 'Nothing matches' : 'No chores yet', D.chores.length ? 'Try a different person.' : 'Use Add chore above to create the first one.')}</section></div>`;
   return `<div class="page-content"><section class="card"><div class="row sp"><h2>All chores</h2>${badge(`${list.length}`, 'gray')}</div>${list.map((c) => {
     const next = nextAsg(c); const rot = c.rotation.filter((u) => who(u) && !who(u).leftDate);
     return `<div class="item cr" data-action="chore-rule" data-id="${c.choreId}" style="cursor:pointer"><div class="grow" style="min-width:0"><b class="truncate">${esc(c.choreName)}</b>

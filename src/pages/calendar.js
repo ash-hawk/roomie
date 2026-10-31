@@ -85,7 +85,7 @@ function row(it) {
 function listView() {
   const today = ymdIn(Date.now()), end = addDays(today, 90);
   let list = items().filter((i) => i.ymd >= today && i.ymd <= end);
-  if (!list.length) return empty('📅', 'Nothing coming up', 'Add an event, or add a chore on the Chores page, and it shows up here.', '<button class="btn p" data-action="add-event">Add event</button>');
+  if (!list.length) return empty('📅', 'Nothing coming up', 'Use Add event above, or add a chore on the Chores page.');
   if (sortBy === 'color') {
     list = [...list].sort((x, y) => (x.color === y.color ? Date.parse(x.at) - Date.parse(y.at) : x.color < y.color ? -1 : 1));
     return list.map((i) => `${row(i)}`).join('');
