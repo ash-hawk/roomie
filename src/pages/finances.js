@@ -70,10 +70,10 @@ function settleView() {
 
 function expenseRow(e) {
   const others = e.shares.filter((s) => s.userId !== e.paidByUserId);
-  return `<div class="item exp" data-action="expense" data-id="${e.expenseId}"><div class="grow"><b class="truncate">${esc(e.itemName)}</b>
-    <div class="hint">${fmtDay(e.purchaseDate)} · ${esc(first(e.paidByUserId))} paid</div>
+  return `<div class="item exp click click-row" data-action="expense" data-id="${e.expenseId}" tabindex="0"><div class="grow"><b class="truncate">${esc(e.itemName)}</b>
+    <div class="hint expense-detail">${fmtDay(e.purchaseDate)} · ${esc(first(e.paidByUserId))} paid</div>
     <div class="chips">${others.map((s) => `<span class="sharechip">${avatar(who(s.userId), 'sm')}${$m(s.amountOwed)} ${stChip(s.status)}</span>`).join('')}</div></div>
-    <div class="amt">${$m(e.totalAmount)}</div></div>`;
+    <div class="amt">${$m(e.totalAmount)}</div><span class="row-chevron">${ico('chevron', 16)}</span></div>`;
 }
 
 actions.review = async (el) => {

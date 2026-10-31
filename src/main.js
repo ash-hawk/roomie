@@ -73,6 +73,13 @@ document.addEventListener('click', async (e) => {
   e.preventDefault();
   try { await fn(el, e); } catch (err) { toast(err.message || 'Something went wrong'); }
 });
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest?.('[data-action][tabindex="0"]');
+  if (!row || e.target.closest('button,a,input,select,textarea')) return;
+  e.preventDefault(); row.click();
+});
 document.addEventListener('submit', async (e) => {
   const form = e.target.closest('form[data-form]');
   const fn = form && forms[form.dataset.form];

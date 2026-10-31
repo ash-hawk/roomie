@@ -12,9 +12,9 @@ export async function settingsView() {
   return `${phead('Your space', 'Settings', `The people and details behind ${esc(h.householdName)}.`)}
   <div class="page-content stack"><div class="grid2 equal-cards">
     <section class="card"><h2>Invite roommates</h2>
-      <p class="mute" style="margin:6px 0 12px">Share this code. Anyone who signs up can join with it.</p>
+      <p class="body-copy">Share this code with the people you live with. Anyone who signs up can join with it.</p>
       <div class="rowline"><span class="code">${esc(h.joinCode)}</span><button class="btn s" data-action="copy-code" data-code="${esc(h.joinCode)}">Copy</button></div>
-      <hr class="hr"><div class="rowline"><span class="mute">Household timezone</span><b>${esc(h.timezone)}</b></div>
+      <hr class="hr"><div class="rowline timezone-row"><span class="mute">Household timezone</span><span>${esc(h.timezone)}</span></div>
     </section>
     <section class="card"><h2>You</h2>
       <div class="item row">${avatar(S.user)}<div class="grow"><b>${esc(fullName(S.user))}</b><div class="mute" style="font-size:13px">${esc(S.user.email)}</div></div></div>

@@ -47,11 +47,11 @@ function row(a) {
   const mine = a.assignedUserId === S.user.userId, d = daysFromToday(a.dueAt);
   const chip = a.isCompleted ? `<span class="st paid">Done ${doneFmt(a.completedAt)}</span>` : a.status === 'overdue' ? '<span class="st overdue">Overdue</span>' : d <= 1 ? `<span class="st today">${d === 0 ? 'Now' : 'Due soon'}</span>` : '<span class="st later">Later</span>';
   const req = openRequestOn(a.assignmentId);
-  return `<div class="item cr ${a.isCompleted ? 'isdone' : ''}">
+  return `<div class="item cr click click-row ${a.isCompleted ? 'isdone' : ''}" data-action="chore-detail" data-id="${a.assignmentId}" tabindex="0">
     ${mine ? `<button class="doneb ${a.isCompleted ? 'on' : ''}" data-action="${a.isCompleted ? 'undo-chore' : 'done-chore'}" data-id="${a.assignmentId}" aria-label="${a.isCompleted ? 'Mark not done' : 'Mark done'}">${ico('check', 16)}</button>` : avatar(who(a.assignedUserId), '')}
-    <div class="grow" data-action="chore-detail" data-id="${a.assignmentId}" style="cursor:pointer;min-width:0"><b class="nm truncate">${esc(c.choreName)}${c.repeats !== 'none' ? ' <span class="mute" title="Repeats">↻</span>' : ''}</b>
+    <div class="grow" style="min-width:0"><b class="nm truncate">${esc(c.choreName)}${c.repeats !== 'none' ? ' <span class="mute" title="Repeats">↻</span>' : ''}</b>
       <div class="hint">${mine ? 'You' : esc(first(a.assignedUserId))} · ${whenFmt(a.dueAt)}</div></div>
-    ${req ? '<span class="st pending">Swap asked</span>' : ''}${chip}${effortChip(c.effort)}</div>`;
+    ${req ? '<span class="st pending">Swap asked</span>' : ''}${chip}${effortChip(c.effort)}<span class="row-chevron">${ico('chevron', 16)}</span></div>`;
 }
 function scheduleView() {
   const mineOnly = (a) => passes(a.assignedUserId);
@@ -72,7 +72,7 @@ function scheduleView() {
   }).join('')}</section>` : '';
 
   const people = active(); const openCounts = people.map((m) => [m, D.assignments.filter((a) => !a.isCompleted && a.assignedUserId === m.userId).length]); const mx = Math.max(1, ...openCounts.map((x) => x[1]));
-  const load = D.chores.length ? `<section class="card"><div class="row sp"><h2>Household workload</h2><span class="eyebrow">open chores</span></div>${openCounts.map(([m, n]) => `<div class="row" style="padding:7px 0">${avatar(m, 'sm')}<span class="truncate" style="width:74px">${esc(first(m.userId))}</span><div class="bar grow" style="--w:${Math.round((n / mx) * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${n}</b></div>`).join('')}</section>` : '';
+  const load = D.chores.length ? `<section class="card"><div class="row sp"><h2>Household workload</h2><span class="hint workload-label">Open chores</span></div>${openCounts.map(([m, n]) => `<div class="row" style="padding:7px 0">${avatar(m, 'sm')}<span class="truncate" style="width:74px">${esc(first(m.userId))}</span><div class="bar grow" style="--w:${Math.round((n / mx) * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${n}</b></div>`).join('')}</section>` : '';
 
   return `<div class="page-content stack"><section class="card">${main}</section>${reqCard || load ? `<aside class="grid2 support-grid">${reqCard}${load}</aside>` : ''}</div>`;
 }
@@ -85,9 +85,9 @@ function chartView() {
   if (!list.length) return `<div class="page-content"><section class="card">${empty('🧹', D.chores.length ? 'Nothing matches' : 'No chores yet', D.chores.length ? 'Try a different person.' : 'Use Add chore above to create the first one.')}</section></div>`;
   return `<div class="page-content"><section class="card"><div class="row sp"><h2>All chores</h2>${badge(`${list.length}`, 'gray')}</div>${list.map((c) => {
     const next = nextAsg(c); const rot = c.rotation.filter((u) => who(u) && !who(u).leftDate);
-    return `<div class="item cr" data-action="chore-rule" data-id="${c.choreId}" style="cursor:pointer"><div class="grow" style="min-width:0"><b class="truncate">${esc(c.choreName)}</b>
+    return `<div class="item cr click click-row" data-action="chore-rule" data-id="${c.choreId}" tabindex="0"><div class="grow" style="min-width:0"><b class="truncate">${esc(c.choreName)}</b>
       <div class="hint">${esc(c.schedule)}${c.repeats !== 'none' && rot.length > 1 ? ` · takes turns: ${rot.map((u) => esc(first(u))).join(', ')}` : ''}</div>
-      <div class="hint">${next ? `Next: ${esc(first(next.assignedUserId))}, ${whenFmt(next.dueAt)}` : c.repeats === 'none' ? 'Done' : 'Nobody to assign (everyone moved out)'}</div></div>${effortChip(c.effort)}</div>`;
+      <div class="hint">${next ? `Next: ${esc(first(next.assignedUserId))}, ${whenFmt(next.dueAt)}` : c.repeats === 'none' ? 'Done' : 'Nobody to assign (everyone moved out)'}</div></div>${effortChip(c.effort)}<span class="row-chevron">${ico('chevron', 16)}</span></div>`;
   }).join('')}</section></div>`;
 }
 const nextAsg = (c) => D.assignments.filter((a) => a.choreId === c.choreId && !a.isCompleted).sort((x, y) => Date.parse(x.dueAt) - Date.parse(y.dueAt))[0] ?? null;

@@ -309,6 +309,8 @@ body::before{background:radial-gradient(60% 60% at 80% 0,color-mix(in srgb,var(-
 .spin{width:26px;height:26px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite}
 button.link-btn{background:none;border:0;padding:0;color:var(--accent);font-weight:600;cursor:pointer}
 .code{font-family:var(--mono,"JetBrains Mono",monospace);font-size:22px;font-weight:600;letter-spacing:.12em}
+.body-copy{font-size:14.5px;margin:6px 0 14px;max-width:46ch}
+.timezone-row{font-size:14px}
 .err:not(:empty){margin-top:2px}
 a.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
 select.input{appearance:none;-webkit-appearance:none;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235f6378' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
@@ -328,6 +330,7 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .st.buyer{background:var(--line);color:var(--mute)}
 .exp{display:flex;align-items:center;gap:12px;cursor:pointer}
 .exp .amt{font-variant-numeric:tabular-nums;font-weight:650}
+.expense-detail{font-size:14px;line-height:1.45}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .sharechip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--mute)}
 .sharechip .av{width:20px;height:20px;font-size:10px;border-radius:6px}
@@ -369,6 +372,10 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 @media(max-width:767px){.inline-grid{grid-template-columns:1fr}}
 .split>*{min-width:0}
 .item>*{min-width:0}
+.click-row{cursor:pointer;transition:background .18s,border-color .18s}
+.click-row:hover,.click-row:focus-visible{background:var(--soft)!important;border-color:color-mix(in srgb,var(--accent) 32%,var(--line))!important;outline:none}
+.row-chevron{color:var(--mute);display:grid;place-items:center;flex:none}
+.workload-label{font-size:13px;text-transform:none;letter-spacing:normal}
 .calendar-controls{padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--card) 76%,transparent)}
 @media(max-width:600px){
 .calendar-controls{flex-direction:column;align-items:flex-start;padding:14px}
