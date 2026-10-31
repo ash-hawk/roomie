@@ -131,7 +131,7 @@ export async function calendarView() {
   if (handoff?.type === 'event') setTimeout(() => actions['event-detail']({ dataset: { id: String(handoff.id) } }), 60);
   return `${head}${filters}<div class="page-content split cal">
     <section class="card" id="cal-main"><div>${view === 'list' ? listView() : monthView()}</div></section>
-    <section class="card board" data-board>${boardInner(false)}</section></div>`;
+    <section class="card board" data-board>${boardInner()}</section></div>`;
 }
 actions['cal-view'] = (el) => { view = el.dataset.value; refresh(); };
 inputs['cal-show'] = (el) => { show = el.value; refresh(); };
@@ -201,23 +201,23 @@ function noteHtml(n) {
   return `<article class="sticky ${n.isPinned ? 'pinned' : ''}">
     <div class="row t" style="gap:8px">${avatar(who(n.senderUserId), 'sm')}<div class="grow"><b>${esc(first(n.senderUserId))}</b> <span class="hint">${ago(n.postedDate)}</span></div>
       ${n.canEdit ? `<button class="x" data-action="note-pin" data-id="${n.messageId}" data-pinned="${n.isPinned ? '' : '1'}" aria-label="${n.isPinned ? 'Unpin' : 'Pin'}" title="${n.isPinned ? 'Unpin' : 'Pin'}">📌</button><button class="x" data-action="note-delete" data-id="${n.messageId}" aria-label="Delete note">✕</button>` : (n.isPinned ? '<span title="Pinned">📌</span>' : '')}</div>
+    ${n.isPinned ? '<div class="pin-mark"><span aria-hidden="true">📌</span> Pinned</div>' : ''}
     <p>${esc(n.messageText)}</p>
     ${ev ? `<button class="chip" data-action="event-detail" data-id="${ev.eventId}">${ico('calendar', 13)} ${esc(ev.eventName)}</button>` : ''}
     ${n.replies.map((r) => `<div class="reply row t" style="gap:8px">${avatar(who(r.senderUserId), 'sm')}<div class="grow"><b>${esc(first(r.senderUserId))}</b> <span class="hint">${ago(r.postedDate)}</span><div>${esc(r.messageText)}</div></div>
       ${r.canEdit ? `<button class="x" data-action="note-delete" data-id="${r.messageId}" aria-label="Delete reply">✕</button>` : ''}</div>`).join('')}
     <form class="row replyf" data-form="note-reply" data-id="${n.messageId}"><input class="input" name="messageText" maxlength="500" placeholder="Reply" aria-label="Reply" required><button class="btn s" type="submit">Send</button></form></article>`;
 }
-function boardInner(big) {
+function boardInner() {
   const upcoming = D.events.filter((e) => Date.parse(e.eventDate) > Date.now() - 86400000);
-  return `<div class="row" style="justify-content:space-between"><h2>Board</h2>${big ? '' : '<button class="btn s" data-action="board-expand">Expand</button>'}</div>
+  return `<div class="row" style="justify-content:space-between"><h2>Board</h2></div>
     <form class="stack" data-form="note-new"><textarea class="input" name="messageText" rows="2" maxlength="500" placeholder="Share a plan or check with everyone before hosting" aria-label="New note" required></textarea>
       <div class="row" style="gap:8px;flex-wrap:wrap"><select class="input" name="eventId" aria-label="Link to an event" style="flex:1;min-width:0"><option value="">No linked event</option>${upcoming.map((e) => `<option value="${e.eventId}">${esc(e.eventName)}</option>`).join('')}</select>
       <button class="btn p" type="submit">Post</button></div><div class="err" role="alert"></div></form>
-    <div class="notes ${big ? 'big' : ''}">${D.notes.length ? D.notes.map(noteHtml).join('') : '<p class="mute" style="text-align:center;padding:14px">No notes yet. Post the first one.</p>'}</div>`;
+    <div class="notes">${D.notes.length ? D.notes.map(noteHtml).join('') : '<p class="board-empty">No notes yet — share a plan or check with everyone before hosting.</p>'}</div>`;
 }
-const paintBoard = () => document.querySelectorAll('[data-board]').forEach((el) => { el.innerHTML = boardInner(el.dataset.board === 'big'); });
+const paintBoard = () => document.querySelectorAll('[data-board]').forEach((el) => { el.innerHTML = boardInner(); });
 async function reloadBoard() { const [{ notes }, { events }] = await Promise.all([api(path('/board')), api(path('/events'))]); D.notes = notes; D.events = events; paintBoard(); }
-actions['board-expand'] = () => { openModal(`${mhead('Board')}<section data-board="big">${boardInner(true)}</section>`); document.querySelector('#modal .sheet')?.classList.add('wide'); };
 forms['note-new'] = async (form) => {
   const f = new FormData(form), body = { messageText: f.get('messageText') }; if (f.get('eventId')) body.eventId = Number(f.get('eventId'));
   try { await api(path('/board'), { method: 'POST', body }); } catch (err) { return showError(form, err.message); }
