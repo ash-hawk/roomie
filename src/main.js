@@ -10,7 +10,7 @@ import { financesView } from './pages/finances.js';
 import { choresView } from './pages/chores.js';
 import { calendarView } from './pages/calendar.js';
 import { bellHtml, loadAlerts, notificationsView, paintBell } from './pages/notifications.js';
-import { clearAi, homeView } from './pages/home.js';
+import { homeView } from './pages/home.js';
 import { soonView } from './pages/soon.js';
 
 const NAV = [['home', 'home', 'Home'], ['calendar', 'calendar', 'Calendar'], ['finances', 'money', 'Finances'], ['chores', 'check', 'Chores'], ['settings', 'settings', 'Settings']];
@@ -93,7 +93,7 @@ for (const type of ['input', 'change']) document.addEventListener(type, (e) => {
 
 actions['close-modal'] = () => closeModal();
 actions.retry = () => render();
-actions.signout = async () => { closeModal(); clearAi(); await signOut(); resetState(); localStorage.removeItem('roomie.hid'); location.hash = ''; render(); };
+actions.signout = async () => { closeModal(); await signOut(); resetState(); localStorage.removeItem('roomie.hid'); location.hash = ''; render(); };
 actions.account = () => openModal(`${mhead('Your account')}
   <div class="item row">${avatar(S.user)}<div class="grow"><b>${esc(fullName(S.user))}</b><div class="mute" style="font-size:13px">${esc(S.user.email)}</div></div></div>
   <div class="acts"><button class="btn d" data-action="signout">Sign out</button></div>`);

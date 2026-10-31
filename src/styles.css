@@ -409,5 +409,22 @@ select.input{appearance:auto}
 .nt .acts .ghost{background:transparent;box-shadow:none;color:var(--mute)}
 
 /* ---- slice (e): home ---- */
-.ai{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 12%,var(--card)),var(--card));border:1px solid color-mix(in srgb,var(--accent) 25%,var(--line));border-radius:14px;padding:14px 16px;margin-bottom:16px;font-weight:550}
-.ai::before{content:"\2728  ";}
+.home-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+.home-cards>.card{height:100%}
+.compact-empty{min-height:112px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:12px;padding:14px 0}
+.compact-empty p{color:var(--mute);font-size:14px}
+.setup-card{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 8%,var(--card)),var(--card) 70%)}
+.setup-progress{font-size:14px;color:var(--accent);white-space:nowrap}
+.setup-track{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin:16px 0}
+.setup-track i{display:block;width:var(--w);height:100%;background:var(--accent);border-radius:inherit}
+.setup-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.setup-step{display:flex;align-items:flex-start;gap:8px;padding:10px;border:1px solid var(--line);border-radius:9px;color:var(--ink);text-decoration:none;font-size:13.5px;line-height:1.35;background:var(--card)}
+.setup-step:hover{border-color:var(--accent);background:var(--soft)}
+.setup-step>span:first-child{color:var(--accent);font-weight:700}
+.setup-step.done{color:var(--mute);background:color-mix(in srgb,var(--bg) 55%,var(--card))}
+.finance-snapshot{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-top:8px}
+.finance-snapshot>div{padding:14px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--bg) 50%,var(--card));display:flex;flex-direction:column;gap:5px}
+.finance-snapshot span{font-size:13px;color:var(--mute)}
+.finance-snapshot b{font-size:22px;font-variant-numeric:tabular-nums}
+@media(max-width:900px){.home-cards{grid-template-columns:1fr}.setup-steps{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.setup-steps,.finance-snapshot{grid-template-columns:1fr}}
