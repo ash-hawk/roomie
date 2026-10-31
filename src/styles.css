@@ -348,9 +348,10 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .st.overdue{background:color-mix(in srgb,var(--bad) 13%,transparent);color:var(--bad)}
 .st.today{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)}
 .st.later{background:var(--line);color:var(--mute)}
-.st.effort-easy{background:color-mix(in srgb,var(--good) 13%,transparent);color:var(--good)}
-.st.effort-medium{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)}
-.st.effort-hard{background:color-mix(in srgb,var(--bad) 13%,transparent);color:var(--bad)}
+.st.effort{background:color-mix(in srgb,var(--ink) 7%,var(--card));color:var(--mute);border:1px solid var(--line);font-weight:600}
+.st.effort-easy{opacity:.78}
+.st.effort-medium{opacity:.9}
+.st.effort-hard{color:var(--ink)}
 .cr{display:flex;align-items:center;gap:12px}
 .cr .doneb{flex:none;width:28px;height:28px;border-radius:9px;border:2px solid var(--line);background:var(--card);display:grid;place-items:center;cursor:pointer;color:transparent;transition:all .15s}
 .cr .doneb:hover{border-color:var(--accent);color:var(--accent)}

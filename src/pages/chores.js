@@ -22,7 +22,7 @@ const ymdIn = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: tz() }).format
 const daysFromToday = (iso) => Math.round((Date.parse(`${ymdIn(iso)}T12:00:00Z`) - Date.parse(`${ymdIn(Date.now())}T12:00:00Z`)) / 86400000);
 const whenFmt = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: tz(), weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '').replace(/(\d) (\d)/, '$1 · $2');
 const doneFmt = (iso) => new Date(iso).toLocaleDateString('en-US', { timeZone: tz(), month: 'short', day: 'numeric' });
-const effortChip = (e) => `<span class="st effort-${e}">${e}</span>`;
+const effortChip = (e) => `<span class="st effort effort-${e}" title="${e[0].toUpperCase() + e.slice(1)} effort">${e[0].toUpperCase() + e.slice(1)} ${e === 'easy' ? '·' : e === 'medium' ? '··' : '···'}</span>`;
 const openRequestOn = (aid) => D.swapRequests.find((r) => r.requesterAssignmentId === aid || r.targetAssignmentId === aid);
 
 export async function choresView() {
@@ -45,7 +45,7 @@ const passes = (userId) => filter === 'all' || (filter === 'me' ? userId === S.u
 function row(a) {
   const c = choreOf(a.choreId); if (!c) return '';
   const mine = a.assignedUserId === S.user.userId, d = daysFromToday(a.dueAt);
-  const chip = a.isCompleted ? `<span class="st paid">Done ${doneFmt(a.completedAt)}</span>` : a.status === 'overdue' ? '<span class="st overdue">Overdue</span>' : d === 0 ? '<span class="st today">Today</span>' : '';
+  const chip = a.isCompleted ? `<span class="st paid">Done ${doneFmt(a.completedAt)}</span>` : a.status === 'overdue' ? '<span class="st overdue">Overdue</span>' : d <= 1 ? `<span class="st today">${d === 0 ? 'Now' : 'Due soon'}</span>` : '<span class="st later">Later</span>';
   const req = openRequestOn(a.assignmentId);
   return `<div class="item cr ${a.isCompleted ? 'isdone' : ''}">
     ${mine ? `<button class="doneb ${a.isCompleted ? 'on' : ''}" data-action="${a.isCompleted ? 'undo-chore' : 'done-chore'}" data-id="${a.assignmentId}" aria-label="${a.isCompleted ? 'Mark not done' : 'Mark done'}">${ico('check', 16)}</button>` : avatar(who(a.assignedUserId), '')}
