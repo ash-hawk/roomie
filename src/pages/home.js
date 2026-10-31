@@ -1,9 +1,9 @@
 // Home is a dependable three-part snapshot plus a setup checklist for new households.
 // It composes existing endpoints; setup progress is derived from data Roomie already stores.
-import { actions } from '../lib/events.js';
+import { actions, forms } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { avatar, esc, ico, money, phead } from '../lib/dom.js';
+import { avatar, closeModal, esc, ico, mhead, money, openModal, phead, toast } from '../lib/dom.js';
 import { greeting, pickWeek } from '../../shared/home.ts';
 import { toCents } from '../../shared/money.ts';
 
@@ -34,20 +34,22 @@ function weekRows(events, chores, members) {
 
 const cardHead = (title, href, label) => `<div class="row sp"><h2>${title}</h2><a class="btn s" href="${href}">${label}</a></div>`;
 const compactEmpty = (text, href, action) => `<div class="compact-empty"><p>${text}</p><a class="btn s" href="${href}">${action}</a></div>`;
+const prefKey = () => `roomie.home.${S.user.userId}.${hid()}`;
+const getPrefs = () => { try { return { order: ['week', 'chores', 'finances'], showSetup: true, setupCollapsed: false, ...JSON.parse(localStorage.getItem(prefKey()) || '{}') }; } catch { return { order: ['week', 'chores', 'finances'], showSetup: true, setupCollapsed: false }; } };
+const savePrefs = (prefs) => { try { localStorage.setItem(prefKey(), JSON.stringify(prefs)); } catch { /* personalization is optional */ } };
 
-function setupCard(members, chores) {
-  const me = members.find((m) => m.userId === S.user.userId);
+function setupCard(members, chores, prefs) {
   const steps = [
     { done: Boolean(household()), label: 'Join or create a household', href: '#/settings' },
-    { done: Boolean(S.user.profilePhoto) && Boolean(me?.paymentMethods?.length), label: 'Add a profile photo and payment app', href: '#/settings' },
+    { done: Boolean(S.user.profilePhoto) && Boolean(S.user.paymentMethods?.length), label: 'Add a profile photo and payment app', href: '#/settings' },
     { done: members.filter((m) => !m.leftDate).length > 1, label: 'Invite your roommates', href: '#/settings' },
     { done: chores.chores.length > 0, label: 'Add your first chore', href: '#/chores' },
   ];
   const complete = steps.filter((s) => s.done).length;
-  if (complete === steps.length) return '';
-  return `<section class="card setup-card"><div class="row sp"><div><div class="eyebrow">Get set up</div><h2>Make Roomie yours</h2></div><b class="setup-progress">${complete} of ${steps.length}</b></div>
-    <div class="setup-track" aria-label="${complete} of ${steps.length} setup steps complete"><i style="--w:${complete / steps.length * 100}%"></i></div>
-    <div class="setup-steps">${steps.map((s) => `<a class="setup-step ${s.done ? 'done' : ''}" href="${s.href}"><span aria-hidden="true">${s.done ? '✓' : '○'}</span><span>${esc(s.label)}</span></a>`).join('')}</div></section>`;
+  if (complete === steps.length || !prefs.showSetup) return '';
+  return `<section class="card setup-card ${prefs.setupCollapsed ? 'collapsed' : ''}"><div class="row sp"><div><div class="eyebrow">Get set up</div><h2>Make Roomie yours</h2></div><div class="row setup-actions"><b class="setup-progress">${complete} of ${steps.length}</b><button class="btn s" data-action="setup-collapse">${prefs.setupCollapsed ? 'Expand' : 'Collapse'}</button><button class="x" data-action="setup-dismiss" aria-label="Dismiss setup checklist">✕</button></div></div>
+    <div class="setup-details"><div class="setup-track" aria-label="${complete} of ${steps.length} setup steps complete"><i style="--w:${complete / steps.length * 100}%"></i></div>
+    <div class="setup-steps">${steps.map((s) => `<a class="setup-step ${s.done ? 'done' : ''}" href="${s.href}"><span aria-hidden="true">${s.done ? '✓' : '○'}</span><span>${esc(s.label)}</span></a>`).join('')}</div></div></section>`;
 }
 
 export async function homeView() {
@@ -62,18 +64,32 @@ export async function homeView() {
     .sort((x, y) => Date.parse(x.a.dueAt) - Date.parse(y.a.dueAt)).slice(0, 4);
   const owed = balances.mine.reduce((sum, b) => sum + Math.max(0, -toCents(b.signedAmount)), 0);
   const owingMe = balances.mine.reduce((sum, b) => sum + Math.max(0, toCents(b.signedAmount)), 0);
+  const prefs = getPrefs();
+  const cards = {
+    week: `<section class="card stack">${cardHead('This week', '#/calendar', 'Open calendar')}${week || compactEmpty('No plans yet this week.', '#/calendar', 'Add an event')}</section>`,
+    chores: `<section class="card stack">${cardHead('My chores', '#/chores', 'Open chores')}${mine.length ? mine.map(({ a, c }) => `<a class="item click row" href="#/chores"><div class="grow"><b>${esc(c.choreName)}</b><div class="hint">${dayLabel(ymdIn(a.dueAt))} · ${timeFmt(a.dueAt)}</div></div>${a.status === 'overdue' ? '<span class="st overdue">Overdue</span>' : ''}</a>`).join('') : compactEmpty('No chores assigned to you yet.', '#/chores', 'Add a chore')}</section>`,
+    finances: `<section class="card stack">${cardHead('Finances', '#/finances', 'Open finances')}${owed || owingMe ? `<div class="finance-snapshot"><div><span>You owe</span><b>${money(owed)}</b></div><div><span>Owed to you</span><b>${money(owingMe)}</b></div></div>` : compactEmpty('No shared expenses yet.', '#/finances', 'Log an expense')}</section>`,
+  };
+  const order = prefs.order.filter((k) => cards[k]); for (const key of Object.keys(cards)) if (!order.includes(key)) order.push(key);
 
-  return `${phead(esc(household().householdName), `${greeting(hourIn())}, ${esc(first)}`, dateLine)}
-    <div class="page-content stack">${setupCard(members, chores)}
-      <div class="home-cards">
-        <section class="card stack">${cardHead('This week', '#/calendar', 'Open calendar')}
-          ${week || compactEmpty('No plans yet this week.', '#/calendar', 'Add an event')}</section>
-        <section class="card stack">${cardHead('My chores', '#/chores', 'Open chores')}
-          ${mine.length ? mine.map(({ a, c }) => `<a class="item click row" href="#/chores"><div class="grow"><b>${esc(c.choreName)}</b><div class="hint">${dayLabel(ymdIn(a.dueAt))} · ${timeFmt(a.dueAt)}</div></div>${a.status === 'overdue' ? '<span class="st overdue">Overdue</span>' : ''}</a>`).join('') : compactEmpty('No chores assigned to you yet.', '#/chores', 'Add a chore')}</section>
-        <section class="card stack">${cardHead('Finances', '#/finances', 'Open finances')}
-          ${owed || owingMe ? `<div class="finance-snapshot"><div><span>You owe</span><b>${money(owed)}</b></div><div><span>Owed to you</span><b>${money(owingMe)}</b></div></div>` : compactEmpty('No shared expenses yet.', '#/finances', 'Log an expense')}</section>
-      </div>
+  return `${phead(esc(household().householdName), `${greeting(hourIn())}, ${esc(first)}`, dateLine, '<button class="btn s" data-action="customize-home">Customize</button>')}
+    <div class="page-content stack">${setupCard(members, chores, prefs)}
+      <div class="home-cards">${order.map((key) => cards[key]).join('')}</div>
     </div>`;
 }
 
 actions['home-event'] = (el) => { try { sessionStorage.setItem('roomie.open', JSON.stringify({ type: 'event', id: Number(el.dataset.id) })); } catch { /* the page still opens */ } location.hash = '#/calendar'; };
+actions['setup-collapse'] = () => { const prefs = getPrefs(); prefs.setupCollapsed = !prefs.setupCollapsed; savePrefs(prefs); window.dispatchEvent(new Event('roomie:render')); };
+actions['setup-dismiss'] = () => { const prefs = getPrefs(); prefs.showSetup = false; savePrefs(prefs); window.dispatchEvent(new Event('roomie:render')); };
+actions['customize-home'] = () => {
+  const prefs = getPrefs(), labels = { week: 'This week', chores: 'My chores', finances: 'Finances' };
+  openModal(`${mhead('Customize Home')}<form class="stack" data-form="home-customize"><p class="hint">Choose the order of your snapshot cards.</p>
+    ${[0, 1, 2].map((i) => `<label class="fld"><span>${i + 1}${i === 0 ? 'st' : i === 1 ? 'nd' : 'rd'} card</span><select class="input" name="card${i}">${Object.entries(labels).map(([k, label]) => `<option value="${k}" ${prefs.order[i] === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>`).join('')}
+    <label class="chk"><input type="checkbox" name="showSetup" ${prefs.showSetup ? 'checked' : ''}> Show the setup checklist until it is complete</label><div class="err" role="alert"></div>
+    <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Save</button></div></form>`);
+};
+forms['home-customize'] = (form) => {
+  const data = new FormData(form), order = [0, 1, 2].map((i) => String(data.get(`card${i}`)));
+  if (new Set(order).size !== 3) { form.querySelector('.err').textContent = 'Choose each card exactly once.'; return; }
+  const prefs = getPrefs(); prefs.order = order; prefs.showSetup = data.get('showSetup') === 'on'; savePrefs(prefs); closeModal(); toast('Home updated'); window.dispatchEvent(new Event('roomie:render'));
+};

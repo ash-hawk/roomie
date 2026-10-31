@@ -13,7 +13,14 @@ export type ProfileUpdate = {
 };
 
 function photoUrl(value: unknown): string | null {
-  const raw = optStr(value, 500, 'Profile photo URL');
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string') throw new HttpError(400, 'Profile photo is invalid');
+  const raw = value.trim();
+  if (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(raw)) {
+    if (raw.length > 400_000) throw new HttpError(400, 'Profile photo is too large');
+    return raw;
+  }
+  if (raw.length > 500) throw new HttpError(400, 'Profile photo URL is too long');
   if (!raw) return null;
   let url: URL;
   try { url = new URL(raw); } catch { throw new HttpError(400, 'Profile photo must be a valid HTTPS URL'); }

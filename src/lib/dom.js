@@ -41,7 +41,7 @@ export const ago = (iso, tz) => {
 };
 
 export function toast(msg) {
-  const t = document.createElement('div'); t.className = 'tst'; t.textContent = msg;
+  const t = document.createElement('div'); t.className = 'tst'; t.textContent = msg; t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite');
   $('#toast').appendChild(t); setTimeout(() => t.remove(), 3200);
 }
 
@@ -55,15 +55,43 @@ export const seg = (options, current, action) =>
 // ---- modal ---------------------------------------------------------------------------------
 export function openModal(inner) {
   closeModal();
+  const restore = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const o = document.createElement('div');
   o.className = 'ovl pop'; o.id = 'modal';
-  o.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${inner}</div>`;
+  o.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modal-title">${inner}</div>`;
+  o._restoreFocus = restore;
   o.addEventListener('click', (e) => { if (e.target === o) closeModal(); });
   document.body.appendChild(o);
   o.querySelector('input,select,textarea,button')?.focus();
 }
-export const closeModal = () => document.getElementById('modal')?.remove();
-export const mhead = (title) => `<div class="mh"><h3>${title}</h3><button class="x" data-action="close-modal" aria-label="Close">✕</button></div>`;
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+export const closeModal = () => { const modal = document.getElementById('modal'); if (!modal) return; const restore = modal._restoreFocus; modal.remove(); window.dispatchEvent(new Event('roomie:modal-close')); restore?.focus?.(); };
+export const mhead = (title) => `<div class="mh"><h3 id="modal-title">${title}</h3><button class="x" data-action="close-modal" aria-label="Close">✕</button></div>`;
+document.addEventListener('keydown', (e) => {
+  if (document.querySelector('.confirm-ovl')) return;
+  const modal = document.getElementById('modal'); if (!modal) return;
+  if (e.key === 'Escape') { closeModal(); return; }
+  if (e.key !== 'Tab') return;
+  const focusable = [...modal.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')];
+  if (!focusable.length) return; const first = focusable[0], last = focusable.at(-1);
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
+export function confirmDialog(title, message, confirmLabel = 'Delete') {
+  return new Promise((resolve) => {
+    const restore = document.activeElement, overlay = document.createElement('div'); overlay.className = 'ovl pop confirm-ovl';
+    overlay.innerHTML = `<div class="sheet confirm-sheet" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title"><div class="mh"><h3 id="confirm-title">${esc(title)}</h3></div><p>${esc(message)}</p><div class="acts"><button class="btn" data-confirm="no">Cancel</button><button class="btn d" data-confirm="yes">${esc(confirmLabel)}</button></div></div>`;
+    const finish = (value) => { overlay.remove(); restore?.focus?.(); resolve(value); };
+    overlay.addEventListener('click', (event) => { const choice = event.target.closest('[data-confirm]')?.dataset.confirm; if (choice) finish(choice === 'yes'); else if (event.target === overlay) finish(false); });
+    overlay.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); finish(false); return; }
+      if (event.key !== 'Tab') return;
+      const focusable = [...overlay.querySelectorAll('button:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')];
+      const first = focusable[0], last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    });
+    document.body.appendChild(overlay); overlay.querySelector('[data-confirm=no]').focus();
+  });
+}
 
 export const showError = (form, message) => { const b = form.querySelector('.err'); if (b) b.textContent = message; };

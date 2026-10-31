@@ -4,7 +4,7 @@
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { avatar, badge, closeModal, empty, esc, fmtDay, fullName, ico, mhead, money, openModal, phead, seg, showError, toast } from '../lib/dom.js';
+import { avatar, badge, closeModal, confirmDialog, empty, esc, fmtDay, fullName, ico, mhead, money, openModal, phead, seg, showError, toast } from '../lib/dom.js';
 import { fromCents, splitCents, toCents } from '../../shared/money.ts';
 
 let tab = 'settle';
@@ -93,7 +93,7 @@ actions.expense = (el) => {
     ${e.canDelete ? `<div class="acts"><button class="btn d" data-action="delete-expense" data-id="${e.expenseId}">Delete</button></div>` : ''}`);
 };
 actions['delete-expense'] = async (el) => {
-  if (el.dataset.sure !== '1') { el.dataset.sure = '1'; el.textContent = 'Really delete? Tap again'; return; }
+  if (!await confirmDialog('Delete purchase?', 'This removes the purchase and its unpaid shares for everyone.')) return;
   await api(`/households/${hid()}/expenses/${el.dataset.id}`, { method: 'DELETE' });
   closeModal(); toast('Expense deleted'); window.dispatchEvent(new Event('roomie:render'));
 };
@@ -233,7 +233,7 @@ actions['edit-wish'] = (el) => {
 };
 forms['wish-edit'] = async (form) => { try { await api(`/households/${hid()}/wishlist/${form.dataset.id}`, { method: 'PATCH', body: wishBody(form) }); } catch (e) { return showError(form, e.message); } closeModal(); toast('Saved'); window.dispatchEvent(new Event('roomie:render')); };
 actions['delete-wish'] = async (el) => {
-  if (el.dataset.sure !== '1') { el.dataset.sure = '1'; el.textContent = 'Really delete? Tap again'; return; }
+  if (!await confirmDialog('Delete wish-list item?', 'This removes the item from the household list.')) return;
   await api(`/households/${hid()}/wishlist/${el.dataset.id}`, { method: 'DELETE' });
   closeModal(); toast('Deleted'); window.dispatchEvent(new Event('roomie:render'));
 };

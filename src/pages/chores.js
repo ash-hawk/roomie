@@ -3,13 +3,19 @@
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { avatar, badge, closeModal, empty, esc, fullName, ico, mhead, openModal, phead, seg, showError, toast } from '../lib/dom.js';
+import { avatar, badge, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, phead, seg, showError, toast } from '../lib/dom.js';
 import { dayName } from '../../shared/chore-dates.ts';
 
 let tab = 'schedule';
 let filter = 'all';     // 'all' | 'me' | userId
 let sortBy = 'added';   // chart: 'added' | 'az' | 'assignee'
 let D = null;           // { members, chores, assignments, swapRequests }
+const STARTERS = [
+  { key: 'trash', name: 'Take out the trash', description: 'Empty the kitchen and bathroom bins.', dayOfWeek: 1, dueTime: '19:00', effort: 'easy' },
+  { key: 'dishes', name: 'Kitchen reset', description: 'Load dishes and wipe the counters.', dayOfWeek: 3, dueTime: '20:00', effort: 'medium' },
+  { key: 'bathroom', name: 'Clean the bathroom', description: 'Sink, toilet, mirror, shower, and floor.', dayOfWeek: 6, dueTime: '10:00', effort: 'hard' },
+  { key: 'vacuum', name: 'Vacuum shared spaces', description: 'Living room, hallway, and entry.', dayOfWeek: 0, dueTime: '16:00', effort: 'medium' },
+];
 
 const hid = () => household().householdId;
 const tz = () => household().timezone;
@@ -60,7 +66,7 @@ function scheduleView() {
     ['This week', open.filter((a) => a.status !== 'overdue' && daysFromToday(a.dueAt) >= 1 && daysFromToday(a.dueAt) <= 7)], ['Later', open.filter((a) => a.status !== 'overdue' && daysFromToday(a.dueAt) > 7)]];
   const recent = D.assignments.filter((a) => a.isCompleted && mineOnly(a) && Date.now() - Date.parse(a.completedAt) < 7 * 86400000).sort((x, y) => Date.parse(y.completedAt) - Date.parse(x.completedAt));
   const main = D.chores.length === 0
-    ? empty('🧹', 'No chores yet', 'Use Add chore above to create the first one and choose who does it.')
+    ? empty('🧹', 'No chores yet', 'Add one yourself or start with a few common household chores.', '<button class="btn s" data-action="starter-chores">Add common chores</button>')
     : (open.length || recent.length ? `${groups.filter(([, l]) => l.length).map(([n, l]) => `<div class="grp">${n}</div>${l.map(row).join('')}`).join('')}${recent.length ? `<div class="grp">Done this week</div>${recent.map(row).join('')}` : ''}` : '<p class="mute" style="padding:10px 0">Nothing due. Enjoy it.</p>');
 
   // open requests that need an answer from you, plus the ones you are waiting on
@@ -82,7 +88,7 @@ function chartView() {
   let list = D.chores.filter((c) => { const next = nextAsg(c); return filter === 'all' || c.rotation.some((u) => passes(u)) || (next && passes(next.assignedUserId)); });
   const nm = (c) => (nextAsg(c) ? first(nextAsg(c).assignedUserId) : 'zzz');
   list = [...list].sort(sortBy === 'az' ? (a, b) => a.choreName.localeCompare(b.choreName) : sortBy === 'assignee' ? (a, b) => nm(a).localeCompare(nm(b)) || a.choreName.localeCompare(b.choreName) : (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  if (!list.length) return `<div class="page-content"><section class="card">${empty('🧹', D.chores.length ? 'Nothing matches' : 'No chores yet', D.chores.length ? 'Try a different person.' : 'Use Add chore above to create the first one.')}</section></div>`;
+  if (!list.length) return `<div class="page-content"><section class="card">${empty('🧹', D.chores.length ? 'Nothing matches' : 'No chores yet', D.chores.length ? 'Try a different person.' : 'Add one yourself or start with common chores.', D.chores.length ? '' : '<button class="btn s" data-action="starter-chores">Add common chores</button>')}</section></div>`;
   return `<div class="page-content"><section class="card"><div class="row sp"><h2>All chores</h2>${badge(`${list.length}`, 'gray')}</div>${list.map((c) => {
     const next = nextAsg(c); const rot = c.rotation.filter((u) => who(u) && !who(u).leftDate);
     return `<div class="item cr click click-row" data-action="chore-rule" data-id="${c.choreId}" tabindex="0"><div class="grow" style="min-width:0"><b class="truncate">${esc(c.choreName)}</b>
@@ -94,7 +100,13 @@ const nextAsg = (c) => D.assignments.filter((a) => a.choreId === c.choreId && !a
 
 // ---- done / undo ------------------------------------------------------------------------------
 const refresh = () => window.dispatchEvent(new Event('roomie:render'));
-actions['done-chore'] = async (el) => { await api(`/households/${hid()}/assignments/${el.dataset.id}/complete`, { method: 'POST' }); closeModal(); toast('Nice. Marked done.'); refresh(); };
+actions['done-chore'] = async (el) => {
+  const row = el.closest('.cr'); row?.classList.add('completing');
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  try { await api(`/households/${hid()}/assignments/${el.dataset.id}/complete`, { method: 'POST' }); }
+  catch (error) { row?.classList.remove('completing'); throw error; }
+  closeModal(); toast('Nice work — chore complete.'); refresh();
+};
 actions['undo-chore'] = async (el) => { await api(`/households/${hid()}/assignments/${el.dataset.id}/uncomplete`, { method: 'POST' }); closeModal(); toast('Marked not done'); refresh(); };
 actions['remind-chore'] = async (el) => { await api(`/households/${hid()}/assignments/${el.dataset.id}/remind`, { method: 'POST' }); closeModal(); toast('Reminder sent'); refresh(); };
 
@@ -145,6 +157,21 @@ actions['add-chore'] = () => {
     </form>`);
   inputs['chore-type'](); inputs['chore-who']();
 };
+actions['starter-chores'] = () => openModal(`${mhead('Add common chores')}<form class="stack" data-form="starter-chores"><p class="hint">Pick a starter set. Repeating chores rotate through the current household.</p>
+  <div class="opt-list starter-list">${STARTERS.map((item) => `<label class="chk"><input type="checkbox" name="starter" value="${item.key}" checked><span class="grow"><b>${item.name}</b><span class="hint">${dayName(item.dayOfWeek)} · ${item.dueTime.replace(/^0/, '')}</span></span>${effortChip(item.effort)}</label>`).join('')}</div>
+  <div class="err" role="alert"></div><div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Add selected</button></div></form>`);
+forms['starter-chores'] = async (form) => {
+  const picked = new Set(new FormData(form).getAll('starter').map(String));
+  if (!picked.size) return showError(form, 'Choose at least one chore.');
+  const people = active(), date = new Intl.DateTimeFormat('en-CA', { timeZone: tz() }).format(new Date());
+  const assignment = people.length > 1 ? { mode: 'rotate', userIds: people.map((m) => m.userId) } : { mode: 'person', userId: S.user.userId };
+  try {
+    await Promise.all(STARTERS.filter((item) => picked.has(item.key)).map((item) => api(`/households/${hid()}/chores`, { method: 'POST', body: {
+      choreName: item.name, description: item.description, repeats: 'weekly', dayOfWeek: item.dayOfWeek, date, dueTime: item.dueTime, effort: item.effort, assignment,
+    } })));
+  } catch (error) { return showError(form, error.message); }
+  closeModal(); toast(`Added ${picked.size} starter ${picked.size === 1 ? 'chore' : 'chores'}.`); refresh();
+};
 inputs['chore-type'] = () => {
   const f = document.querySelector('form[data-form=chore-add]'); if (!f) return;
   const r = f.repeats.value;
@@ -186,7 +213,7 @@ forms['chore-edit'] = async (form) => {
   closeModal(); toast('Saved'); refresh();
 };
 actions['delete-chore'] = async (el) => {
-  if (el.dataset.sure !== '1') { el.dataset.sure = '1'; el.textContent = 'Really delete? Tap again'; return; }
+  if (!await confirmDialog('Delete chore?', 'This removes its schedule, upcoming turns, and open requests.')) return;
   await api(`/households/${hid()}/chores/${el.dataset.id}`, { method: 'DELETE' });
   closeModal(); toast('Chore deleted'); refresh();
 };

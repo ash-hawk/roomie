@@ -24,4 +24,10 @@ describe('profile updates', () => {
   it('uses a clean 400 error for malformed input', () => {
     try { parseProfileUpdate(null); } catch (error) { expect(error).toBeInstanceOf(HttpError); expect((error as HttpError).status).toBe(400); }
   });
+
+  it('accepts a small processed image and rejects oversized image data', () => {
+    const image = `data:image/jpeg;base64,${'A'.repeat(200)}`;
+    expect(parseProfileUpdate({ ...base, profilePhoto: image }).profilePhoto).toBe(image);
+    expect(() => parseProfileUpdate({ ...base, profilePhoto: `data:image/jpeg;base64,${'A'.repeat(400_001)}` })).toThrow(/too large/i);
+  });
 });

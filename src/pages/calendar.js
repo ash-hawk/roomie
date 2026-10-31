@@ -5,15 +5,16 @@
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { ago as agoIn, avatar, closeModal, empty, esc, fullName, ico, mhead, openModal, phead, seg, showError, toast } from '../lib/dom.js';
+import { ago as agoIn, avatar, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, phead, seg, showError, toast } from '../lib/dom.js';
 
 const COLORS = ['#4338ca', '#db2777', '#0d9488', '#d97706', '#7c3aed', '#0284c7', '#475569'];
 const CATS = [['meeting', 'Meeting'], ['hosting', 'Hosting guests'], ['other', 'Other']];
 const CHORE_COLOR = '#94a3b8';
 
-let view = 'list';        // 'list' | 'month'
-let sortBy = 'date';      // 'date' | 'color'
-let show = 'all';         // 'all' | 'events' | 'chores'
+const savedPrefs = (() => { try { return JSON.parse(localStorage.getItem('roomie.calendar') || '{}'); } catch { return {}; } })();
+let view = ['list', 'month'].includes(savedPrefs.view) ? savedPrefs.view : 'list';
+let sortBy = ['date', 'color'].includes(savedPrefs.sortBy) ? savedPrefs.sortBy : 'date';
+let show = ['all', 'events', 'chores'].includes(savedPrefs.show) ? savedPrefs.show : 'all';
 let monthStart = null;    // 'YYYY-MM-01' being shown in the month view
 let D = null;             // { members, events, notes, chores, assignments }
 let seen = '';            // what the last poll saw, to repaint only on change
@@ -39,6 +40,7 @@ const ago = (iso) => agoIn(iso, tz());
 const takeHandoff = () => { try { const v = JSON.parse(sessionStorage.getItem('roomie.open') || 'null'); sessionStorage.removeItem('roomie.open'); return v; } catch { return null; } };
 const refresh = () => window.dispatchEvent(new Event('roomie:render'));
 const path = (p) => `/households/${hid()}${p}`;
+const savePrefs = () => { try { localStorage.setItem('roomie.calendar', JSON.stringify({ view, sortBy, show })); } catch { /* preferences are optional */ } };
 
 // ---- data -------------------------------------------------------------------------------------
 async function load() {
@@ -110,10 +112,11 @@ function monthView() {
     cells.push(`<button class="day2 ${d.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${d === today ? 'today' : ''}" data-action="day-detail" data-day="${d}" aria-label="${esc(dayLabel(d))}, ${todays.length} items">
       <span class="dn">${Number(d.slice(8))}</span>${todays.slice(0, 3).map((x) => `<i class="dpill" style="background:${esc(x.color)}">${esc(x.kind === 'event' ? x.e.eventName : x.c.choreName)}</i>`).join('')}${todays.length > 3 ? `<small>+${todays.length - 3} more</small>` : ''}</button>`);
   }
-  return `<div class="row" style="justify-content:space-between;margin-bottom:10px"><button class="btn s" data-action="month-nav" data-n="-1" aria-label="Previous month">‹</button><b>${title}</b><button class="btn s" data-action="month-nav" data-n="1" aria-label="Next month">›</button></div>
+  return `<div class="month-nav"><button class="btn s" data-action="month-nav" data-n="-1" aria-label="Previous month">‹</button><div class="row"><b>${title}</b><button class="btn s" data-action="calendar-today">Today</button></div><button class="btn s" data-action="month-nav" data-n="1" aria-label="Next month">›</button></div>
     <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div><div class="mgrid">${cells.join('')}</div>`;
 }
 actions['month-nav'] = (el) => { const t = new Date(`${monthStart}T12:00:00Z`); t.setUTCMonth(t.getUTCMonth() + Number(el.dataset.n)); monthStart = t.toISOString().slice(0, 7) + '-01'; refresh(); };
+actions['calendar-today'] = () => { monthStart = `${ymdIn(Date.now()).slice(0, 7)}-01`; refresh(); };
 actions['day-detail'] = (el) => {
   const d = el.dataset.day, todays = items().filter((x) => x.ymd === d);
   openModal(`${mhead(esc(dayLabel(d)))}<div class="stack">${todays.length ? todays.map(row).join('') : '<p class="mute">Nothing on this day.</p>'}</div>
@@ -133,9 +136,9 @@ export async function calendarView() {
     <section class="card" id="cal-main"><div>${view === 'list' ? listView() : monthView()}</div></section>
     <section class="card board" data-board>${boardInner()}</section></div>`;
 }
-actions['cal-view'] = (el) => { view = el.dataset.value; refresh(); };
-inputs['cal-show'] = (el) => { show = el.value; refresh(); };
-inputs['cal-sort'] = (el) => { sortBy = el.value; refresh(); };
+actions['cal-view'] = (el) => { view = el.dataset.value; savePrefs(); refresh(); };
+inputs['cal-show'] = (el) => { show = el.value; savePrefs(); refresh(); };
+inputs['cal-sort'] = (el) => { sortBy = el.value; savePrefs(); refresh(); };
 
 // ---- event detail -----------------------------------------------------------------------------
 actions['event-detail'] = (el) => {
@@ -154,7 +157,7 @@ actions['event-detail'] = (el) => {
     ${e.canEdit ? `<div class="acts" style="justify-content:flex-start"><button class="btn" data-action="edit-event" data-id="${e.eventId}">Edit</button><button class="btn d" data-action="delete-event" data-id="${e.eventId}">Delete</button></div>` : ''}`);
 };
 actions['event-answer'] = async (el) => { await api(path(`/events/${el.dataset.id}/respond`), { method: 'POST', body: { response: el.dataset.response } }); closeModal(); toast('Answer sent'); refresh(); };
-actions['delete-event'] = async (el) => { if (el.dataset.sure !== '1') { el.dataset.sure = '1'; el.textContent = 'Really delete? Tap again'; return; }
+actions['delete-event'] = async (el) => { if (!await confirmDialog('Delete event?', 'This removes the event for everyone in the household.')) return;
   await api(path(`/events/${el.dataset.id}`), { method: 'DELETE' }); closeModal(); toast('Event deleted'); refresh(); };
 
 // ---- add / edit ---------------------------------------------------------------------------------
@@ -228,7 +231,7 @@ forms['note-reply'] = async (form) => {
   await reloadBoard();
 };
 actions['note-pin'] = async (el) => { await api(path(`/board/${el.dataset.id}`), { method: 'PATCH', body: { isPinned: el.dataset.pinned === '1' } }); await reloadBoard(); };
-actions['note-delete'] = async (el) => { if (el.dataset.sure !== '1') { el.dataset.sure = '1'; el.title = 'Tap again to delete'; el.textContent = '?'; return; }
+actions['note-delete'] = async (el) => { if (!await confirmDialog('Delete this note?', 'Replies to this note will also be removed.')) return;
   await api(path(`/board/${el.dataset.id}`), { method: 'DELETE' }); await reloadBoard(); };
 
 // ---- near-real-time: poll while the calendar is on screen and nobody is typing -------------------
