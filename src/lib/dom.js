@@ -21,7 +21,8 @@ const PALETTE = ['#4338ca', '#db2777', '#0d9488', '#d97706', '#7c3aed', '#0284c7
 export function avatar(u, sz = '') {
   if (!u) return '';
   const first = (u.firstName || '?')[0];
-  return `<span class="av ${sz}" style="background:${PALETTE[(u.userId ?? 0) % PALETTE.length]}" title="${esc(`${u.firstName ?? ''} ${u.lastName ?? ''}`.trim())}">${esc(first.toUpperCase())}</span>`;
+  const photo = u.profilePhoto ? `<img src="${esc(u.profilePhoto)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc(first.toUpperCase());
+  return `<span class="av ${sz}" style="background:${PALETTE[(u.userId ?? 0) % PALETTE.length]}" title="${esc(`${u.firstName ?? ''} ${u.lastName ?? ''}`.trim())}">${photo}</span>`;
 }
 export const fullName = (u) => (u ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() : 'Someone');
 
