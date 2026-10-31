@@ -124,12 +124,12 @@ actions['day-detail'] = (el) => {
 export async function calendarView() {
   await load();
   const head = phead('Shared schedule', 'Calendar', 'Events, chores and notes for your house.', `<button class="btn p" data-action="add-event">${ico('plus', 16)} Add event</button>`);
-  const filters = `<div class="filters">${seg([['list', 'List'], ['month', 'Month']], view, 'cal-view')}
+  const filters = `<div class="page-controls filters calendar-controls">${seg([['list', 'List'], ['month', 'Month']], view, 'cal-view')}
     <select class="input" data-input="cal-show" aria-label="Show"><option value="all">Events and chores</option><option value="events" ${show === 'events' ? 'selected' : ''}>Events only</option><option value="chores" ${show === 'chores' ? 'selected' : ''}>Chores only</option></select>
     ${view === 'list' ? `<select class="input" data-input="cal-sort" aria-label="Sort by"><option value="date">Sort: date</option><option value="color" ${sortBy === 'color' ? 'selected' : ''}>Sort: color</option></select>` : ''}</div>`;
   const handoff = takeHandoff();
   if (handoff?.type === 'event') setTimeout(() => actions['event-detail']({ dataset: { id: String(handoff.id) } }), 60);
-  return `${head}<div class="page-controls">${filters}</div><div class="page-content split cal">
+  return `${head}${filters}<div class="page-content split cal">
     <section class="card" id="cal-main"><div>${view === 'list' ? listView() : monthView()}</div></section>
     <section class="card board" data-board>${boardInner(false)}</section></div>`;
 }
