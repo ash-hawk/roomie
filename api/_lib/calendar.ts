@@ -199,3 +199,37 @@ export async function deleteNote(user: CurrentUser, householdId: number, message
     await tx.delete(s.bulletinMessage).where(eq(s.bulletinMessage.messageId, messageId)); // replies cascade
   });
 }
+
+// ---- reminders --------------------------------------------------------------------------------
+// reminder_minutes_before is stored on the event; the daily cron is the only clock we have (Hobby plan), so an
+// event is reminded on the first run at or after (start - lead - 24h): a short lead can arrive up to a day early
+// but is never missed. No column tracks it: a 'system' notification pointing at the event, per person, is the
+// record, so re-running the job never sends twice. Only current roommates get one; the creator and anyone
+// tagged who has not declined.
+export async function sendEventReminders(opts: { nowIso?: string } = {}) {
+  const nowIso = opts.nowIso ?? new Date().toISOString();
+  return db.transaction(async (tx) => {
+    const due = await tx.execute(sql`
+      SELECT e.event_id, e.event_name, e.household_id, h.timezone, r.user_id,
+             to_char(e.event_date AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS starts
+      FROM event e
+      JOIN household h ON h.household_id = e.household_id
+      JOIN LATERAL (
+        SELECT e.created_by_user_id AS user_id WHERE e.created_by_user_id IS NOT NULL
+        UNION
+        SELECT t.user_id FROM event_tag t WHERE t.event_id = e.event_id AND t.response IS DISTINCT FROM 'declined'
+      ) r ON true
+      JOIN household_member m ON m.household_id = e.household_id AND m.user_id = r.user_id AND m.left_date IS NULL
+      WHERE e.reminder_minutes_before IS NOT NULL AND e.event_date > ${nowIso}::timestamptz
+        AND e.event_date - make_interval(mins => e.reminder_minutes_before) <= ${nowIso}::timestamptz + interval '24 hours'
+        AND NOT EXISTS (SELECT 1 FROM notification n WHERE n.user_id = r.user_id AND n.source_type = 'event' AND n.source_id = e.event_id AND n.section = 'system')
+      ORDER BY e.event_id, r.user_id
+      FOR UPDATE OF e SKIP LOCKED`);
+    const rows = due.rows as { event_id: string; event_name: string; household_id: string; timezone: string; user_id: string; starts: string }[];
+    if (rows.length) await tx.insert(s.notification).values(rows.map((r) => ({
+      userId: Number(r.user_id), householdId: Number(r.household_id), actorUserId: null, section: 'system' as const, sourceType: 'event' as const, sourceId: Number(r.event_id),
+      message: `Reminder: ${r.event_name} is ${whenText(r.starts, r.timezone)}.`,
+    })));
+    return { eventReminders: rows.length };
+  });
+}
