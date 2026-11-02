@@ -1,6 +1,11 @@
 # Roomie
 
-IS 401 Team 4-06. A shared-house app for roommates: chores, costs, calendar and a message board in one place.
+IS 401 Team 4-06. 
+- Heidi Barlow
+- Michael Bertoldo
+- Frankie Capello
+- Ashlynne Hawkins <br> <br>
+A shared-house app for roommates: chores, costs, calendar and a message board in one place.
 
 ## App Summary
 
@@ -85,3 +90,10 @@ A brand-new account has no chores assigned to it yet (only the person a chore is
 To see the row in the database: in the Neon console open **Tables**, pick the `chore_assignment` table, and find the row for your chore. `is_completed` is `true` and `completed_at` holds the time you clicked. The `updated_at` column also changed, set by a database trigger.
 
 To undo it, click the same button again (it marks the chore not done).
+
+## Recent Changes
+
+### Settings
+- Standardized typography in the Invite roommates card.
+- Updated the Copy button to use the standard button style.
+- Improved text wrapping for narrow screens.

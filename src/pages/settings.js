@@ -36,6 +36,11 @@ export async function settingsView() {
       <p class="body-copy">Share this code with the people you live with. Anyone who signs up can join with it.</p>
       <div class="rowline"><span class="code">${esc(h.joinCode)}</span><button class="btn s" data-action="copy-code" data-code="${esc(h.joinCode)}">Copy</button></div>
       <hr class="hr"><div class="rowline timezone-row"><span class="mute">Household timezone</span><span>${esc(h.timezone)}</span></div>
+  <div class="grid2">
+    <section class="card invite-card"><h2>Invite roommates</h2>
+     <p class="mute invite-description">Share this code. Anyone who signs up can join with it.</p>
+      <div class="rowline"><span class="code">${esc(h.joinCode)}</span><button class="btn" data-action="copy-code" data-code="${esc(h.joinCode)}">Copy</button></div>
+      <hr class="hr"><div class="rowline"><span class="mute">Household timezone</span><b>${esc(h.timezone)}</b></div>
     </section>
     <section class="card"><h2>You</h2>
       <div class="item row">${avatar(S.user)}<div class="grow"><b>${esc(fullName(S.user))}</b><div class="mute" style="font-size:13px">${esc(S.user.email)}</div></div></div>

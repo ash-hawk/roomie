@@ -453,7 +453,7 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .nt.unread .ntdot{background:var(--accent)}
 .nt .acts .ghost{background:transparent;box-shadow:none;color:var(--mute)}
 
-/* ---- slice (e): home ---- */
+
 .home-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
 .home-cards>.card{height:100%}
 .compact-empty{min-height:112px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:12px;padding:14px 0}
@@ -463,7 +463,7 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .setup-track{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin:16px 0}
 .setup-track i{display:block;width:var(--w);height:100%;background:var(--accent);border-radius:inherit}
 .setup-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.setup-step{display:flex;align-items:flex-start;gap:8px;padding:10px;border:1px solid var(--line);border-radius:9px;color:var(--ink);text-decoration:none;font-size:13.5px;line-height:1.35;background:var(--card)}
+.setup-step{display:flex;align-items:flex-start;gap:8px;padding:10px;border:1px solid var(--line);border-radius:99px;color:var(--ink);text-decoration:none;font-size:13.5px;line-height:1.35;background:var(--card)}
 .setup-step:hover{border-color:var(--accent);background:var(--soft)}
 .setup-step>span:first-child{color:var(--accent);font-weight:700}
 .setup-step.done{color:var(--mute);background:color-mix(in srgb,var(--bg) 55%,var(--card))}
@@ -476,4 +476,34 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 @media(max-width:520px){.setup-steps,.finance-snapshot{grid-template-columns:1fr}}
 @media(max-width:520px){
 .cr .st.effort,.cr .st.later,.sharechip .st{display:none}.cr{gap:8px}.card .item{padding:11px}.exp .chips{max-height:24px;overflow:hidden}.exp .amt{font-size:14px}.row-chevron{width:14px}.month-nav>.row{flex-direction:column;gap:4px}.setup-actions .setup-progress{width:100%}
+}
+
+/* Settings: consistent invitation typography */
+.invite-card {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.invite-card .invite-description {
+  margin: 6px 0 12px;
+}
+
+.invite-card .code {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.invite-card .rowline {
+  flex-wrap: wrap;
+}
+
+.invite-card .rowline > * {
+  min-width: 0;
+}
+
+.invite-card .rowline b {
+  overflow-wrap: anywhere;
 }
