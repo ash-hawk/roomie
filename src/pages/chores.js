@@ -72,7 +72,7 @@ function scheduleView() {
   }).join('')}</section>` : '';
 
   const people = active(); const openCounts = people.map((m) => [m, D.assignments.filter((a) => !a.isCompleted && a.assignedUserId === m.userId).length]); const mx = Math.max(1, ...openCounts.map((x) => x[1]));
-  const load = D.chores.length ? `<section class="card"><div class="row sp"><h2>Household workload</h2><span class="eyebrow">open chores</span></div>${openCounts.map(([m, n]) => `<div class="row" style="padding:7px 0">${avatar(m, 'sm')}<span class="truncate" style="width:74px">${esc(first(m.userId))}</span><div class="bar grow" style="--w:${Math.round((n / mx) * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${n}</b></div>`).join('')}</section>` : '';
+  const load = `<section class="card"><div class="row sp"><h2>Household workload</h2><span class="eyebrow">open chores</span></div>${openCounts.map(([m, n]) => `<div class="row" style="padding:7px 0">${avatar(m, 'sm')}<span class="truncate" style="width:74px">${esc(first(m.userId))}</span><div class="bar grow" style="--w:${Math.round((n / mx) * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${n}</b></div>`).join('')}</section>`;
 
   return `<div class="split"><section class="card">${main}</section><aside class="stack">${reqCard}${load}</aside></div>`;
 }

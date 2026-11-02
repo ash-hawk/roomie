@@ -55,16 +55,19 @@ function settleView() {
 
   const pairs = bal.pairs.map((p) => `<div class="item row">${avatar(who(p.debtorUserId), 'sm')}<span class="grow"><b>${esc(first(p.debtorUserId))}</b> ${p.debtorUserId === S.user.userId ? 'owe' : 'owes'} <b>${esc(first(p.creditorUserId))}</b></span><b class="amount">${$m(p.amount)}</b></div>`).join('');
 
-  return `<div class="grid2">
+  return `<div class="grid2 equal-cards finance-summary">
     <section class="card"><div class="row sp"><h2>Your balances</h2>${badge(mine ? 'Open' : 'All square', mine ? 'warn' : 'good')}</div>
+      <p class="section-description">What you owe or should receive.</p>
       ${mine || `<p class="mute" style="padding:10px 0">You don't owe anyone, and no one owes you. Log an expense when you buy something for the house.</p>`}</section>
     <section class="card"><div class="row sp"><h2>Who owes who</h2>${badge(`${bal.pairs.length}`, 'gray')}</div>
+      <p class="section-description">Payments needed across the whole household.</p>
       ${pairs || `<p class="mute" style="padding:10px 0">Everyone in the house is square.</p>`}</section>
   </div>
   ${incoming || outgoing ? `<div class="grid2">
     ${incoming ? `<section class="card"><h2>Waiting on you</h2>${incoming}</section>` : ''}
     ${outgoing ? `<section class="card"><h2>You sent</h2>${outgoing}</section>` : ''}</div>` : ''}
-  <section class="card"><div class="row sp"><h2>Past purchases</h2>${badge(`${D.expenses.length}`, 'gray')}</div>
+  <section class="card finance-history"><div class="row sp"><h2>Past purchases</h2>${badge(`${D.expenses.length}`, 'gray')}</div>
+    <p class="section-description">Shared expense history and how each purchase was split.</p>
     ${D.expenses.length ? D.expenses.map(expenseRow).join('') : empty('🧾', 'No purchases yet', 'Log the first shared purchase and the split is figured out for you.', '<button class="btn p" data-action="add-expense">Log expense</button>')}</section>`;
 }
 

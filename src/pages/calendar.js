@@ -209,11 +209,11 @@ function noteHtml(n) {
 }
 function boardInner(big) {
   const upcoming = D.events.filter((e) => Date.parse(e.eventDate) > Date.now() - 86400000);
-  return `<div class="row" style="justify-content:space-between"><h2>Board</h2>${big ? '' : '<button class="btn s" data-action="board-expand">Expand</button>'}</div>
+  return `<div class="row board-heading">${big ? '' : '<h2>Board</h2>'}${big ? '' : '<button class="btn s" data-action="board-expand">Expand</button>'}</div>
     <form class="stack" data-form="note-new"><textarea class="input" name="messageText" rows="2" maxlength="500" placeholder="Share a plan or check with everyone before hosting" aria-label="New note" required></textarea>
       <div class="row" style="gap:8px;flex-wrap:wrap"><select class="input" name="eventId" aria-label="Link to an event" style="flex:1;min-width:0"><option value="">No linked event</option>${upcoming.map((e) => `<option value="${e.eventId}">${esc(e.eventName)}</option>`).join('')}</select>
       <button class="btn p" type="submit">Post</button></div><div class="err" role="alert"></div></form>
-    <div class="notes ${big ? 'big' : ''}">${D.notes.length ? D.notes.map(noteHtml).join('') : '<p class="mute" style="text-align:center;padding:14px">No notes yet. Post the first one.</p>'}</div>`;
+    <div class="notes ${big ? 'notes-expanded' : ''}">${D.notes.length ? D.notes.map(noteHtml).join('') : '<p class="mute board-empty">No notes yet.<br>Post the first one.</p>'}</div>`;
 }
 const paintBoard = () => document.querySelectorAll('[data-board]').forEach((el) => { el.innerHTML = boardInner(el.dataset.board === 'big'); });
 async function reloadBoard() { const [{ notes }, { events }] = await Promise.all([api(path('/board')), api(path('/events'))]); D.notes = notes; D.events = events; paintBoard(); }
