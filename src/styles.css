@@ -398,3 +398,33 @@ select.input{appearance:auto}
 .ntdot{width:9px;height:9px;border-radius:50%;margin-top:7px;flex:none;background:transparent}
 .nt.unread .ntdot{background:var(--accent)}
 .nt .acts .ghost{background:transparent;box-shadow:none;color:var(--mute)}
+
+/* Settings: consistent invitation typography */
+.invite-card {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.invite-card .invite-description {
+  margin: 6px 0 12px;
+}
+
+.invite-card .code {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.invite-card .rowline {
+  flex-wrap: wrap;
+}
+
+.invite-card .rowline > * {
+  min-width: 0;
+}
+
+.invite-card .rowline b {
+  overflow-wrap: anywhere;
+}

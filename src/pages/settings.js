@@ -11,9 +11,9 @@ export async function settingsView() {
       <div class="mute" style="font-size:13px">${m.leftDate ? `Moved out ${fmtDate(m.leftDate, h.timezone)}` : `Joined ${fmtDate(m.joinedDate, h.timezone)}`}</div></div>${badge(m.role === 'owner' ? 'Owner' : 'Member', m.leftDate ? 'gray' : '')}</div>`;
   return `${phead('Your space', 'Settings', `The people and details behind ${esc(h.householdName)}.`)}
   <div class="grid2">
-    <section class="card"><h2>Invite roommates</h2>
-      <p class="mute" style="margin:6px 0 12px">Share this code. Anyone who signs up can join with it.</p>
-      <div class="rowline"><span class="code">${esc(h.joinCode)}</span><button class="btn s" data-action="copy-code" data-code="${esc(h.joinCode)}">Copy</button></div>
+    <section class="card invite-card"><h2>Invite roommates</h2>
+     <p class="mute invite-description">Share this code. Anyone who signs up can join with it.</p>
+      <div class="rowline"><span class="code">${esc(h.joinCode)}</span><button class="btn" data-action="copy-code" data-code="${esc(h.joinCode)}">Copy</button></div>
       <hr class="hr"><div class="rowline"><span class="mute">Household timezone</span><b>${esc(h.timezone)}</b></div>
     </section>
     <section class="card"><h2>You</h2>
