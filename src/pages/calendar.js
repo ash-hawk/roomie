@@ -5,15 +5,16 @@
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { ago as agoIn, avatar, closeModal, empty, esc, fullName, ico, mhead, openModal, phead, seg, showError, toast } from '../lib/dom.js';
+import { ago as agoIn, avatar, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, phead, seg, showError, toast } from '../lib/dom.js';
 
 const COLORS = ['#4338ca', '#db2777', '#0d9488', '#d97706', '#7c3aed', '#0284c7', '#475569'];
 const CATS = [['meeting', 'Meeting'], ['hosting', 'Hosting guests'], ['other', 'Other']];
 const CHORE_COLOR = '#94a3b8';
 
-let view = 'list';        // 'list' | 'month'
-let sortBy = 'date';      // 'date' | 'color'
-let show = 'all';         // 'all' | 'events' | 'chores'
+const savedPrefs = (() => { try { return JSON.parse(localStorage.getItem('roomie.calendar') || '{}'); } catch { return {}; } })();
+let view = ['list', 'month'].includes(savedPrefs.view) ? savedPrefs.view : 'list';
+let sortBy = ['date', 'color'].includes(savedPrefs.sortBy) ? savedPrefs.sortBy : 'date';
+let show = ['all', 'events', 'chores'].includes(savedPrefs.show) ? savedPrefs.show : 'all';
 let monthStart = null;    // 'YYYY-MM-01' being shown in the month view
 let D = null;             // { members, events, notes, chores, assignments }
 let seen = '';            // what the last poll saw, to repaint only on change
@@ -39,6 +40,7 @@ const ago = (iso) => agoIn(iso, tz());
 const takeHandoff = () => { try { const v = JSON.parse(sessionStorage.getItem('roomie.open') || 'null'); sessionStorage.removeItem('roomie.open'); return v; } catch { return null; } };
 const refresh = () => window.dispatchEvent(new Event('roomie:render'));
 const path = (p) => `/households/${hid()}${p}`;
+const savePrefs = () => { try { localStorage.setItem('roomie.calendar', JSON.stringify({ view, sortBy, show })); } catch { /* preferences are optional */ } };
 
 // ---- data -------------------------------------------------------------------------------------
 async function load() {
@@ -85,7 +87,7 @@ function row(it) {
 function listView() {
   const today = ymdIn(Date.now()), end = addDays(today, 90);
   let list = items().filter((i) => i.ymd >= today && i.ymd <= end);
-  if (!list.length) return empty('📅', 'Nothing coming up', 'Add an event, or add a chore on the Chores page, and it shows up here.', '<button class="btn p" data-action="add-event">Add event</button>');
+  if (!list.length) return empty('📅', 'Nothing coming up', 'Use Add event above, or add a chore on the Chores page.');
   if (sortBy === 'color') {
     list = [...list].sort((x, y) => (x.color === y.color ? Date.parse(x.at) - Date.parse(y.at) : x.color < y.color ? -1 : 1));
     return list.map((i) => `${row(i)}`).join('');
@@ -110,10 +112,11 @@ function monthView() {
     cells.push(`<button class="day2 ${d.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${d === today ? 'today' : ''}" data-action="day-detail" data-day="${d}" aria-label="${esc(dayLabel(d))}, ${todays.length} items">
       <span class="dn">${Number(d.slice(8))}</span>${todays.slice(0, 3).map((x) => `<i class="dpill" style="background:${esc(x.color)}">${esc(x.kind === 'event' ? x.e.eventName : x.c.choreName)}</i>`).join('')}${todays.length > 3 ? `<small>+${todays.length - 3} more</small>` : ''}</button>`);
   }
-  return `<div class="row" style="justify-content:space-between;margin-bottom:10px"><button class="btn s" data-action="month-nav" data-n="-1" aria-label="Previous month">‹</button><b>${title}</b><button class="btn s" data-action="month-nav" data-n="1" aria-label="Next month">›</button></div>
+  return `<div class="month-nav"><button class="btn s" data-action="month-nav" data-n="-1" aria-label="Previous month">‹</button><div class="row"><b>${title}</b><button class="btn s" data-action="calendar-today">Today</button></div><button class="btn s" data-action="month-nav" data-n="1" aria-label="Next month">›</button></div>
     <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div><div class="mgrid">${cells.join('')}</div>`;
 }
 actions['month-nav'] = (el) => { const t = new Date(`${monthStart}T12:00:00Z`); t.setUTCMonth(t.getUTCMonth() + Number(el.dataset.n)); monthStart = t.toISOString().slice(0, 7) + '-01'; refresh(); };
+actions['calendar-today'] = () => { monthStart = `${ymdIn(Date.now()).slice(0, 7)}-01`; refresh(); };
 actions['day-detail'] = (el) => {
   const d = el.dataset.day, todays = items().filter((x) => x.ymd === d);
   openModal(`${mhead(esc(dayLabel(d)))}<div class="stack">${todays.length ? todays.map(row).join('') : '<p class="mute">Nothing on this day.</p>'}</div>
@@ -124,18 +127,18 @@ actions['day-detail'] = (el) => {
 export async function calendarView() {
   await load();
   const head = phead('Shared schedule', 'Calendar', 'Events, chores and notes for your house.', `<button class="btn p" data-action="add-event">${ico('plus', 16)} Add event</button>`);
-  const filters = `<div class="filters">${seg([['list', 'List'], ['month', 'Month']], view, 'cal-view')}
+  const filters = `<div class="page-controls filters calendar-controls">${seg([['list', 'List'], ['month', 'Month']], view, 'cal-view')}
     <select class="input" data-input="cal-show" aria-label="Show"><option value="all">Events and chores</option><option value="events" ${show === 'events' ? 'selected' : ''}>Events only</option><option value="chores" ${show === 'chores' ? 'selected' : ''}>Chores only</option></select>
     ${view === 'list' ? `<select class="input" data-input="cal-sort" aria-label="Sort by"><option value="date">Sort: date</option><option value="color" ${sortBy === 'color' ? 'selected' : ''}>Sort: color</option></select>` : ''}</div>`;
   const handoff = takeHandoff();
   if (handoff?.type === 'event') setTimeout(() => actions['event-detail']({ dataset: { id: String(handoff.id) } }), 60);
-  return `${head}<div class="split cal">
-    <section class="card" id="cal-main"><div class="stack">${filters}<div>${view === 'list' ? listView() : monthView()}</div></div></section>
-    <section class="card board" data-board>${boardInner(false)}</section></div>`;
+  return `${head}${filters}<div class="page-content split cal">
+    <section class="card" id="cal-main"><div>${view === 'list' ? listView() : monthView()}</div></section>
+    <section class="card board" data-board>${boardInner()}</section></div>`;
 }
-actions['cal-view'] = (el) => { view = el.dataset.value; refresh(); };
-inputs['cal-show'] = (el) => { show = el.value; refresh(); };
-inputs['cal-sort'] = (el) => { sortBy = el.value; refresh(); };
+actions['cal-view'] = (el) => { view = el.dataset.value; savePrefs(); refresh(); };
+inputs['cal-show'] = (el) => { show = el.value; savePrefs(); refresh(); };
+inputs['cal-sort'] = (el) => { sortBy = el.value; savePrefs(); refresh(); };
 
 // ---- event detail -----------------------------------------------------------------------------
 actions['event-detail'] = (el) => {
@@ -154,7 +157,7 @@ actions['event-detail'] = (el) => {
     ${e.canEdit ? `<div class="acts" style="justify-content:flex-start"><button class="btn" data-action="edit-event" data-id="${e.eventId}">Edit</button><button class="btn d" data-action="delete-event" data-id="${e.eventId}">Delete</button></div>` : ''}`);
 };
 actions['event-answer'] = async (el) => { await api(path(`/events/${el.dataset.id}/respond`), { method: 'POST', body: { response: el.dataset.response } }); closeModal(); toast('Answer sent'); refresh(); };
-actions['delete-event'] = async (el) => { if (el.dataset.sure !== '1') { el.dataset.sure = '1'; el.textContent = 'Really delete? Tap again'; return; }
+actions['delete-event'] = async (el) => { if (!await confirmDialog('Delete event?', 'This removes the event for everyone in the household.')) return;
   await api(path(`/events/${el.dataset.id}`), { method: 'DELETE' }); closeModal(); toast('Event deleted'); refresh(); };
 
 // ---- add / edit ---------------------------------------------------------------------------------
@@ -201,23 +204,23 @@ function noteHtml(n) {
   return `<article class="sticky ${n.isPinned ? 'pinned' : ''}">
     <div class="row t" style="gap:8px">${avatar(who(n.senderUserId), 'sm')}<div class="grow"><b>${esc(first(n.senderUserId))}</b> <span class="hint">${ago(n.postedDate)}</span></div>
       ${n.canEdit ? `<button class="x" data-action="note-pin" data-id="${n.messageId}" data-pinned="${n.isPinned ? '' : '1'}" aria-label="${n.isPinned ? 'Unpin' : 'Pin'}" title="${n.isPinned ? 'Unpin' : 'Pin'}">📌</button><button class="x" data-action="note-delete" data-id="${n.messageId}" aria-label="Delete note">✕</button>` : (n.isPinned ? '<span title="Pinned">📌</span>' : '')}</div>
+    ${n.isPinned ? '<div class="pin-mark"><span aria-hidden="true">📌</span> Pinned</div>' : ''}
     <p>${esc(n.messageText)}</p>
     ${ev ? `<button class="chip" data-action="event-detail" data-id="${ev.eventId}">${ico('calendar', 13)} ${esc(ev.eventName)}</button>` : ''}
     ${n.replies.map((r) => `<div class="reply row t" style="gap:8px">${avatar(who(r.senderUserId), 'sm')}<div class="grow"><b>${esc(first(r.senderUserId))}</b> <span class="hint">${ago(r.postedDate)}</span><div>${esc(r.messageText)}</div></div>
       ${r.canEdit ? `<button class="x" data-action="note-delete" data-id="${r.messageId}" aria-label="Delete reply">✕</button>` : ''}</div>`).join('')}
     <form class="row replyf" data-form="note-reply" data-id="${n.messageId}"><input class="input" name="messageText" maxlength="500" placeholder="Reply" aria-label="Reply" required><button class="btn s" type="submit">Send</button></form></article>`;
 }
-function boardInner(big) {
+function boardInner() {
   const upcoming = D.events.filter((e) => Date.parse(e.eventDate) > Date.now() - 86400000);
-  return `<div class="row board-heading">${big ? '' : '<h2>Board</h2>'}${big ? '' : '<button class="btn s" data-action="board-expand">Expand</button>'}</div>
+  return `<div class="row board-heading"><h2>Board</h2></div>
     <form class="stack" data-form="note-new"><textarea class="input" name="messageText" rows="2" maxlength="500" placeholder="Share a plan or check with everyone before hosting" aria-label="New note" required></textarea>
       <div class="row" style="gap:8px;flex-wrap:wrap"><select class="input" name="eventId" aria-label="Link to an event" style="flex:1;min-width:0"><option value="">No linked event</option>${upcoming.map((e) => `<option value="${e.eventId}">${esc(e.eventName)}</option>`).join('')}</select>
       <button class="btn p" type="submit">Post</button></div><div class="err" role="alert"></div></form>
-    <div class="notes ${big ? 'notes-expanded' : ''}">${D.notes.length ? D.notes.map(noteHtml).join('') : '<p class="mute board-empty">No notes yet.<br>Post the first one.</p>'}</div>`;
+    <div class="notes">${D.notes.length ? D.notes.map(noteHtml).join('') : '<p class="board-empty">No notes yet — share a plan or check with everyone before hosting.</p>'}</div>`;
 }
-const paintBoard = () => document.querySelectorAll('[data-board]').forEach((el) => { el.innerHTML = boardInner(el.dataset.board === 'big'); });
+const paintBoard = () => document.querySelectorAll('[data-board]').forEach((el) => { el.innerHTML = boardInner(); });
 async function reloadBoard() { const [{ notes }, { events }] = await Promise.all([api(path('/board')), api(path('/events'))]); D.notes = notes; D.events = events; paintBoard(); }
-actions['board-expand'] = () => { openModal(`${mhead('Board')}<section data-board="big">${boardInner(true)}</section>`); document.querySelector('#modal .sheet')?.classList.add('wide'); };
 forms['note-new'] = async (form) => {
   const f = new FormData(form), body = { messageText: f.get('messageText') }; if (f.get('eventId')) body.eventId = Number(f.get('eventId'));
   try { await api(path('/board'), { method: 'POST', body }); } catch (err) { return showError(form, err.message); }
@@ -228,7 +231,7 @@ forms['note-reply'] = async (form) => {
   await reloadBoard();
 };
 actions['note-pin'] = async (el) => { await api(path(`/board/${el.dataset.id}`), { method: 'PATCH', body: { isPinned: el.dataset.pinned === '1' } }); await reloadBoard(); };
-actions['note-delete'] = async (el) => { if (el.dataset.sure !== '1') { el.dataset.sure = '1'; el.title = 'Tap again to delete'; el.textContent = '?'; return; }
+actions['note-delete'] = async (el) => { if (!await confirmDialog('Delete this note?', 'Replies to this note will also be removed.')) return;
   await api(path(`/board/${el.dataset.id}`), { method: 'DELETE' }); await reloadBoard(); };
 
 // ---- near-real-time: poll while the calendar is on screen and nobody is typing -------------------

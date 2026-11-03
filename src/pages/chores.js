@@ -3,13 +3,19 @@
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { avatar, badge, closeModal, empty, esc, fullName, ico, mhead, openModal, phead, seg, showError, toast } from '../lib/dom.js';
+import { avatar, badge, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, phead, seg, showError, toast } from '../lib/dom.js';
 import { dayName } from '../../shared/chore-dates.ts';
 
 let tab = 'schedule';
 let filter = 'all';     // 'all' | 'me' | userId
 let sortBy = 'added';   // chart: 'added' | 'az' | 'assignee'
 let D = null;           // { members, chores, assignments, swapRequests }
+const STARTERS = [
+  { key: 'trash', name: 'Take out the trash', description: 'Empty the kitchen and bathroom bins.', dayOfWeek: 1, dueTime: '19:00', effort: 'easy' },
+  { key: 'dishes', name: 'Kitchen reset', description: 'Load dishes and wipe the counters.', dayOfWeek: 3, dueTime: '20:00', effort: 'medium' },
+  { key: 'bathroom', name: 'Clean the bathroom', description: 'Sink, toilet, mirror, shower, and floor.', dayOfWeek: 6, dueTime: '10:00', effort: 'hard' },
+  { key: 'vacuum', name: 'Vacuum shared spaces', description: 'Living room, hallway, and entry.', dayOfWeek: 0, dueTime: '16:00', effort: 'medium' },
+];
 
 const hid = () => household().householdId;
 const tz = () => household().timezone;
@@ -22,7 +28,7 @@ const ymdIn = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: tz() }).format
 const daysFromToday = (iso) => Math.round((Date.parse(`${ymdIn(iso)}T12:00:00Z`) - Date.parse(`${ymdIn(Date.now())}T12:00:00Z`)) / 86400000);
 const whenFmt = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: tz(), weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '').replace(/(\d) (\d)/, '$1 · $2');
 const doneFmt = (iso) => new Date(iso).toLocaleDateString('en-US', { timeZone: tz(), month: 'short', day: 'numeric' });
-const effortChip = (e) => `<span class="st effort-${e}">${e}</span>`;
+const effortChip = (e) => `<span class="st effort effort-${e}" title="${e[0].toUpperCase() + e.slice(1)} effort">${e[0].toUpperCase() + e.slice(1)} ${e === 'easy' ? '·' : e === 'medium' ? '··' : '···'}</span>`;
 const openRequestOn = (aid) => D.swapRequests.find((r) => r.requesterAssignmentId === aid || r.targetAssignmentId === aid);
 
 export async function choresView() {
@@ -31,7 +37,7 @@ export async function choresView() {
   D = { members, ...data };
   const people = active();
   return `${phead('Shared responsibilities', 'Chores', 'A clear view of what needs doing, and whose turn it is.', `<button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
-  <div class="filters">${seg([['schedule', 'Schedule'], ['chart', 'Chore chart']], tab, 'chore-tab')}
+  <div class="page-controls filters">${seg([['schedule', 'Schedule'], ['chart', 'Chore chart']], tab, 'chore-tab')}
     <select class="input" data-input="chore-filter" aria-label="Show chores for"><option value="all">Everyone</option><option value="me" ${filter === 'me' ? 'selected' : ''}>Just mine</option>${people.filter((m) => m.userId !== S.user.userId).map((m) => `<option value="${m.userId}" ${String(filter) === String(m.userId) ? 'selected' : ''}>${esc(m.firstName)}</option>`).join('')}</select>
     ${tab === 'chart' ? `<select class="input" data-input="chore-sort" aria-label="Sort by"><option value="added" ${sortBy === 'added' ? 'selected' : ''}>Sort: date added</option><option value="az" ${sortBy === 'az' ? 'selected' : ''}>Sort: A to Z</option><option value="assignee" ${sortBy === 'assignee' ? 'selected' : ''}>Sort: assignee</option></select>` : ''}</div>
   ${tab === 'schedule' ? scheduleView() : chartView()}`;
@@ -45,13 +51,13 @@ const passes = (userId) => filter === 'all' || (filter === 'me' ? userId === S.u
 function row(a) {
   const c = choreOf(a.choreId); if (!c) return '';
   const mine = a.assignedUserId === S.user.userId, d = daysFromToday(a.dueAt);
-  const chip = a.isCompleted ? `<span class="st paid">Done ${doneFmt(a.completedAt)}</span>` : a.status === 'overdue' ? '<span class="st overdue">Overdue</span>' : d === 0 ? '<span class="st today">Today</span>' : '';
+  const chip = a.isCompleted ? `<span class="st paid">Done ${doneFmt(a.completedAt)}</span>` : a.status === 'overdue' ? '<span class="st overdue">Overdue</span>' : d <= 1 ? `<span class="st today">${d === 0 ? 'Now' : 'Due soon'}</span>` : '<span class="st later">Later</span>';
   const req = openRequestOn(a.assignmentId);
-  return `<div class="item cr ${a.isCompleted ? 'isdone' : ''}">
+  return `<div class="item cr click click-row ${a.isCompleted ? 'isdone' : ''}" data-action="chore-detail" data-id="${a.assignmentId}" tabindex="0">
     ${mine ? `<button class="doneb ${a.isCompleted ? 'on' : ''}" data-action="${a.isCompleted ? 'undo-chore' : 'done-chore'}" data-id="${a.assignmentId}" aria-label="${a.isCompleted ? 'Mark not done' : 'Mark done'}">${ico('check', 16)}</button>` : avatar(who(a.assignedUserId), '')}
-    <div class="grow" data-action="chore-detail" data-id="${a.assignmentId}" style="cursor:pointer;min-width:0"><b class="nm truncate">${esc(c.choreName)}${c.repeats !== 'none' ? ' <span class="mute" title="Repeats">↻</span>' : ''}</b>
+    <div class="grow" style="min-width:0"><b class="nm truncate">${esc(c.choreName)}${c.repeats !== 'none' ? ' <span class="mute" title="Repeats">↻</span>' : ''}</b>
       <div class="hint">${mine ? 'You' : esc(first(a.assignedUserId))} · ${whenFmt(a.dueAt)}</div></div>
-    ${req ? '<span class="st pending">Swap asked</span>' : ''}${chip}${effortChip(c.effort)}</div>`;
+    ${req ? '<span class="st pending">Swap asked</span>' : ''}${chip}${effortChip(c.effort)}<span class="row-chevron">${ico('chevron', 16)}</span></div>`;
 }
 function scheduleView() {
   const mineOnly = (a) => passes(a.assignedUserId);
@@ -60,7 +66,7 @@ function scheduleView() {
     ['This week', open.filter((a) => a.status !== 'overdue' && daysFromToday(a.dueAt) >= 1 && daysFromToday(a.dueAt) <= 7)], ['Later', open.filter((a) => a.status !== 'overdue' && daysFromToday(a.dueAt) > 7)]];
   const recent = D.assignments.filter((a) => a.isCompleted && mineOnly(a) && Date.now() - Date.parse(a.completedAt) < 7 * 86400000).sort((x, y) => Date.parse(y.completedAt) - Date.parse(x.completedAt));
   const main = D.chores.length === 0
-    ? empty('🧹', 'No chores yet', 'Add the first one and choose who does it, or let it rotate through the house.', '<button class="btn p" data-action="add-chore">Add your first chore</button>')
+    ? empty('🧹', 'No chores yet', 'Add one yourself or start with a few common household chores.', '<button class="btn s" data-action="starter-chores">Add common chores</button>')
     : (open.length || recent.length ? `${groups.filter(([, l]) => l.length).map(([n, l]) => `<div class="grp">${n}</div>${l.map(row).join('')}`).join('')}${recent.length ? `<div class="grp">Done this week</div>${recent.map(row).join('')}` : ''}` : '<p class="mute" style="padding:10px 0">Nothing due. Enjoy it.</p>');
 
   // open requests that need an answer from you, plus the ones you are waiting on
@@ -68,13 +74,13 @@ function scheduleView() {
   const reqCard = reqs.length ? `<section class="card"><div class="row sp"><h2>Swap requests</h2>${badge(`${reqs.length}`, 'warn')}</div>${reqs.map((r) => {
     const ra = asgOf(r.requesterAssignmentId), ta = r.targetAssignmentId ? asgOf(r.targetAssignmentId) : null, mineReq = r.requesterUserId === S.user.userId;
     const text = r.type === 'swap' ? `<b>${esc(first(r.requesterUserId))}</b> ${mineReq ? 'asked' : 'asks'} <b>${esc(first(r.targetUserId))}</b> to swap <b>${esc(choreOf(ra?.choreId)?.choreName ?? 'a chore')}</b> for <b>${esc(choreOf(ta?.choreId)?.choreName ?? 'a chore')}</b>` : `<b>${esc(first(r.requesterUserId))}</b> ${mineReq ? 'asked' : 'asks'} someone to cover <b>${esc(choreOf(ra?.choreId)?.choreName ?? 'a chore')}</b>`;
-    return `<div class="item"><div style="font-size:14px">${text}</div><div class="hint">“${esc(r.requestMessage ?? '')}”</div><div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn ${mineReq ? '' : 'p'} s" data-action="open-request" data-id="${r.swapId}">${mineReq ? 'Withdraw' : 'Respond'}</button></div></div>`;
+    return `<div class="item"><div style="font-size:14px">${text}</div><div class="hint">“${esc(r.requestMessage ?? '')}”</div><div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn s" data-action="open-request" data-id="${r.swapId}">${mineReq ? 'Withdraw' : 'Respond'}</button></div></div>`;
   }).join('')}</section>` : '';
 
   const people = active(); const openCounts = people.map((m) => [m, D.assignments.filter((a) => !a.isCompleted && a.assignedUserId === m.userId).length]); const mx = Math.max(1, ...openCounts.map((x) => x[1]));
-  const load = `<section class="card"><div class="row sp"><h2>Household workload</h2><span class="eyebrow">open chores</span></div>${openCounts.map(([m, n]) => `<div class="row" style="padding:7px 0">${avatar(m, 'sm')}<span class="truncate" style="width:74px">${esc(first(m.userId))}</span><div class="bar grow" style="--w:${Math.round((n / mx) * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${n}</b></div>`).join('')}</section>`;
+  const load = `<section class="card"><div class="row sp"><h2>Household workload</h2><span class="hint workload-label">Open chores</span></div>${openCounts.map(([m, n]) => `<div class="row" style="padding:7px 0">${avatar(m, 'sm')}<span class="truncate" style="width:74px">${esc(first(m.userId))}</span><div class="bar grow" style="--w:${Math.round((n / mx) * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${n}</b></div>`).join('')}</section>`;
 
-  return `<div class="split"><section class="card">${main}</section><aside class="stack">${reqCard}${load}</aside></div>`;
+  return `<div class="page-content stack"><section class="card">${main}</section>${reqCard || load ? `<aside class="grid2 support-grid">${reqCard}${load}</aside>` : ''}</div>`;
 }
 
 // ---- chore chart (the rules) ------------------------------------------------------------------
@@ -82,19 +88,25 @@ function chartView() {
   let list = D.chores.filter((c) => { const next = nextAsg(c); return filter === 'all' || c.rotation.some((u) => passes(u)) || (next && passes(next.assignedUserId)); });
   const nm = (c) => (nextAsg(c) ? first(nextAsg(c).assignedUserId) : 'zzz');
   list = [...list].sort(sortBy === 'az' ? (a, b) => a.choreName.localeCompare(b.choreName) : sortBy === 'assignee' ? (a, b) => nm(a).localeCompare(nm(b)) || a.choreName.localeCompare(b.choreName) : (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  if (!list.length) return `<section class="card">${empty('🧹', D.chores.length ? 'Nothing matches' : 'No chores yet', D.chores.length ? 'Try a different person.' : 'Add the first one and choose who does it, or let it rotate through the house.', D.chores.length ? '' : '<button class="btn p" data-action="add-chore">Add your first chore</button>')}</section>`;
-  return `<section class="card"><div class="row sp"><h2>All chores</h2>${badge(`${list.length}`, 'gray')}</div>${list.map((c) => {
+  if (!list.length) return `<div class="page-content"><section class="card">${empty('🧹', D.chores.length ? 'Nothing matches' : 'No chores yet', D.chores.length ? 'Try a different person.' : 'Add one yourself or start with common chores.', D.chores.length ? '' : '<button class="btn s" data-action="starter-chores">Add common chores</button>')}</section></div>`;
+  return `<div class="page-content"><section class="card"><div class="row sp"><h2>All chores</h2>${badge(`${list.length}`, 'gray')}</div>${list.map((c) => {
     const next = nextAsg(c); const rot = c.rotation.filter((u) => who(u) && !who(u).leftDate);
-    return `<div class="item cr" data-action="chore-rule" data-id="${c.choreId}" style="cursor:pointer"><div class="grow" style="min-width:0"><b class="truncate">${esc(c.choreName)}</b>
+    return `<div class="item cr click click-row" data-action="chore-rule" data-id="${c.choreId}" tabindex="0"><div class="grow" style="min-width:0"><b class="truncate">${esc(c.choreName)}</b>
       <div class="hint">${esc(c.schedule)}${c.repeats !== 'none' && rot.length > 1 ? ` · takes turns: ${rot.map((u) => esc(first(u))).join(', ')}` : ''}</div>
-      <div class="hint">${next ? `Next: ${esc(first(next.assignedUserId))}, ${whenFmt(next.dueAt)}` : c.repeats === 'none' ? 'Done' : 'Nobody to assign (everyone moved out)'}</div></div>${effortChip(c.effort)}</div>`;
-  }).join('')}</section>`;
+      <div class="hint">${next ? `Next: ${esc(first(next.assignedUserId))}, ${whenFmt(next.dueAt)}` : c.repeats === 'none' ? 'Done' : 'Nobody to assign (everyone moved out)'}</div></div>${effortChip(c.effort)}<span class="row-chevron">${ico('chevron', 16)}</span></div>`;
+  }).join('')}</section></div>`;
 }
 const nextAsg = (c) => D.assignments.filter((a) => a.choreId === c.choreId && !a.isCompleted).sort((x, y) => Date.parse(x.dueAt) - Date.parse(y.dueAt))[0] ?? null;
 
 // ---- done / undo ------------------------------------------------------------------------------
 const refresh = () => window.dispatchEvent(new Event('roomie:render'));
-actions['done-chore'] = async (el) => { await api(`/households/${hid()}/assignments/${el.dataset.id}/complete`, { method: 'POST' }); closeModal(); toast('Nice. Marked done.'); refresh(); };
+actions['done-chore'] = async (el) => {
+  const row = el.closest('.cr'); row?.classList.add('completing');
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  try { await api(`/households/${hid()}/assignments/${el.dataset.id}/complete`, { method: 'POST' }); }
+  catch (error) { row?.classList.remove('completing'); throw error; }
+  closeModal(); toast('Nice work — chore complete.'); refresh();
+};
 actions['undo-chore'] = async (el) => { await api(`/households/${hid()}/assignments/${el.dataset.id}/uncomplete`, { method: 'POST' }); closeModal(); toast('Marked not done'); refresh(); };
 actions['remind-chore'] = async (el) => { await api(`/households/${hid()}/assignments/${el.dataset.id}/remind`, { method: 'POST' }); closeModal(); toast('Reminder sent'); refresh(); };
 
@@ -145,6 +157,21 @@ actions['add-chore'] = () => {
     </form>`);
   inputs['chore-type'](); inputs['chore-who']();
 };
+actions['starter-chores'] = () => openModal(`${mhead('Add common chores')}<form class="stack" data-form="starter-chores"><p class="hint">Pick a starter set. Repeating chores rotate through the current household.</p>
+  <div class="opt-list starter-list">${STARTERS.map((item) => `<label class="chk"><input type="checkbox" name="starter" value="${item.key}" checked><span class="grow"><b>${item.name}</b><span class="hint">${dayName(item.dayOfWeek)} · ${item.dueTime.replace(/^0/, '')}</span></span>${effortChip(item.effort)}</label>`).join('')}</div>
+  <div class="err" role="alert"></div><div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Add selected</button></div></form>`);
+forms['starter-chores'] = async (form) => {
+  const picked = new Set(new FormData(form).getAll('starter').map(String));
+  if (!picked.size) return showError(form, 'Choose at least one chore.');
+  const people = active(), date = new Intl.DateTimeFormat('en-CA', { timeZone: tz() }).format(new Date());
+  const assignment = people.length > 1 ? { mode: 'rotate', userIds: people.map((m) => m.userId) } : { mode: 'person', userId: S.user.userId };
+  try {
+    await Promise.all(STARTERS.filter((item) => picked.has(item.key)).map((item) => api(`/households/${hid()}/chores`, { method: 'POST', body: {
+      choreName: item.name, description: item.description, repeats: 'weekly', dayOfWeek: item.dayOfWeek, date, dueTime: item.dueTime, effort: item.effort, assignment,
+    } })));
+  } catch (error) { return showError(form, error.message); }
+  closeModal(); toast(`Added ${picked.size} starter ${picked.size === 1 ? 'chore' : 'chores'}.`); refresh();
+};
 inputs['chore-type'] = () => {
   const f = document.querySelector('form[data-form=chore-add]'); if (!f) return;
   const r = f.repeats.value;
@@ -186,7 +213,7 @@ forms['chore-edit'] = async (form) => {
   closeModal(); toast('Saved'); refresh();
 };
 actions['delete-chore'] = async (el) => {
-  if (el.dataset.sure !== '1') { el.dataset.sure = '1'; el.textContent = 'Really delete? Tap again'; return; }
+  if (!await confirmDialog('Delete chore?', 'This removes its schedule, upcoming turns, and open requests.')) return;
   await api(`/households/${hid()}/chores/${el.dataset.id}`, { method: 'DELETE' });
   closeModal(); toast('Chore deleted'); refresh();
 };
