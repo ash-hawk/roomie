@@ -1,7 +1,7 @@
 import './styles.css';
 import { api, getToken, signOut } from './auth-client.js';
 import { actions, forms, inputs } from './lib/events.js';
-import { $, ico, mark, avatar, closeModal, esc, fullName, mhead, openModal, showError, toast } from './lib/dom.js';
+import { $, ico, mark, closeModal, esc, showError, toast } from './lib/dom.js';
 import { S, household, resetState } from './lib/state.js';
 import { authView } from './pages/auth.js';
 import { onboardingView } from './pages/onboarding.js';
@@ -55,7 +55,7 @@ function shell(page, body) {
   return `<div class="shell"><div class="main">
     <header class="top"><div class="brand">${mark()}<div class="grow"><b>Roomie</b><small class="truncate">${esc(h.householdName)}</small></div></div>
       <div class="row" style="gap:10px">${bellHtml()}
-      <button class="iconbtn acct" data-action="account" aria-label="Your account">${account}</button></div></header>
+      <button class="iconbtn acct" data-action="account" aria-label="Your profile and household">${account}</button></div></header>
     <nav class="pillnav" aria-label="Main">${items}</nav>
     <main class="page" id="page">${body}</main></div>
     <nav class="tabbar" aria-label="Main">${items}</nav></div>`;
@@ -120,9 +120,15 @@ for (const type of ['input', 'change']) document.addEventListener(type, (e) => {
 actions['close-modal'] = () => closeModal();
 actions.retry = () => render();
 actions.signout = async () => { closeModal(); await signOut(); resetState(); localStorage.removeItem('roomie.hid'); location.hash = ''; render(); };
-actions.account = () => openModal(`${mhead('Your account')}
-  <div class="item row">${avatar(S.user)}<div class="grow"><b>${esc(fullName(S.user))}</b><div class="mute" style="font-size:13px">${esc(S.user.email)}</div></div></div>
-  <div class="acts"><button class="btn d" data-action="signout">Sign out</button></div>`);
+actions.account = () => {
+  closeModal();
+
+  if (location.hash === '#/settings') {
+    render();
+  } else {
+    location.hash = '#/settings';
+  }
+};
 
 window.addEventListener('hashchange', render);
 window.addEventListener('roomie:render', render);
