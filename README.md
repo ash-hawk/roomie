@@ -93,7 +93,32 @@ To undo it, click the same button again (it marks the chore not done).
 
 ## Recent Changes
 
-### Settings
-- Standardized typography in the Invite roommates card.
-- Updated the Copy button to use the standard button style.
-- Improved text wrapping for narrow screens.
+### Settings and Household Members
+- Standardized typography in the Invite roommates section.
+- Kept the invitation code and working Copy button.
+- Updated the header account button to navigate directly to Settings.
+- Grouped the existing roommate list under the household name.
+- Displayed the active-member count, member roles, and join dates.
+- Identified the signed-in user with a “(you)” label.
+- Grouped former roommates in a collapsible section.
+- Preserved Sign out functionality.
+
+### Profile Editor
+- Restored the existing editable profile form in Settings.
+- Displayed first name, last name, phone, and profile-photo controls.
+- Restored payment-app fields for Venmo, Zelle, and Apple Cash,
+  including a preferred-app selection.
+- Reused the existing Save profile handler and PATCH /me endpoint.
+- Preserved the household member list and invitation functionality.
+
+### Verification
+- Build and typecheck passed locally.
+- All 73 unit tests passed locally.
+- Verified the deployed profile form appears after refreshing.
+- Verified household members load, former roommates expand,
+  and the header account button opens Settings.
+- Invitation copying was confirmed manually.
+- Profile saving and persistence after refresh still require
+  end-to-end verification.
+- Security tests were blocked by missing local development
+  environment configuration; they were not marked as passed.
