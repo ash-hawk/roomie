@@ -3,7 +3,7 @@
 IS 401 Team 4-06. 
 - Heidi Barlow
 - Michael Bertoldo
-- Frankie Capello
+- Frankie Cappello
 - Ashlynne Hawkins <br> <br>
 A shared-house app for roommates: chores, costs, calendar and a message board in one place.
 

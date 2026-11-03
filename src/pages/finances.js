@@ -4,7 +4,7 @@
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { avatar, badge, closeModal, empty, esc, fmtDay, fullName, ico, mhead, money, openModal, phead, seg, showError, toast } from '../lib/dom.js';
+import { avatar, badge, closeModal, confirmDialog, empty, esc, fmtDay, fullName, ico, mhead, money, openModal, phead, seg, showError, toast } from '../lib/dom.js';
 import { fromCents, splitCents, toCents } from '../../shared/money.ts';
 
 let tab = 'settle';
@@ -27,8 +27,8 @@ export async function financesView() {
   if (tab === 'wish') D.wish = (await api(`/households/${h}/wishlist`)).items;
   const action = tab === 'settle' ? `<button class="btn p" data-action="add-expense">${ico('plus', 16)} Log expense</button>` : `<button class="btn p" data-action="add-wish">${ico('plus', 16)} Add item</button>`;
   return `${phead('Shared money', 'Finances', 'Keep every shared cost clear and accounted for.', action)}
-  ${seg([['settle', 'Settle payments'], ['wish', 'Wish list']], tab, 'fin-tab')}
-  ${tab === 'settle' ? settleView() : wishView()}`;
+  <div class="page-controls">${seg([['settle', 'Settle payments'], ['wish', 'Wish list']], tab, 'fin-tab')}</div>
+  <div class="page-content stack">${tab === 'settle' ? settleView() : wishView()}</div>`;
 }
 actions['fin-tab'] = (el) => { tab = el.dataset.value; window.dispatchEvent(new Event('roomie:render')); };
 
@@ -44,13 +44,13 @@ function settleView() {
     const note = toCents(b.pendingAmount) > 0 ? `<div class="hint">${$m(b.pendingAmount)} sent, waiting for ${owe ? esc(nm(b.otherUserId)) : 'you'} to confirm</div>` : '';
     const dis = toCents(b.disputedAmount) > 0 ? `<div class="hint" style="color:var(--bad)">${$m(b.disputedAmount)} is disputed</div>` : '';
     return `<div class="item row">${person(b.otherUserId, `<div class="${owe ? 'bad' : 'good'}" style="font-size:13px">${owe ? 'you owe' : 'owes you'} <b class="amount">${money(Math.abs(cents))}</b></div>${note}${dis}`)}
-      <div class="grow"></div>${owe && payable ? `<button class="btn p s" data-action="pay" data-payee="${b.otherUserId}">Pay back</button>` : ''}</div>`;
+      <div class="grow"></div>${owe && payable ? `<button class="btn s" data-action="pay" data-payee="${b.otherUserId}">Pay back</button>` : ''}</div>`;
   }).join('');
 
   const incoming = bal.incoming.map((p) => `<div class="item"><div class="row t">${avatar(who(p.payerUserId))}<div class="grow"><b>${esc(first(p.payerUserId))}</b> says they paid you <b class="amount">${$m(p.amount)}</b> via ${APP_LABEL[p.paidWith]}
       <div class="hint">${p.items.map((i) => esc(i.itemName)).join(', ')}</div>
       ${p.status === 'disputed' ? '<div style="margin-top:2px">' + stChip('disputed') + '</div>' : ''}
-      <div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn p s" data-action="review" data-payment="${p.paymentId}" data-status="confirmed">${p.status === 'disputed' ? 'Mark received' : 'Got it'}</button>${p.status === 'sent' ? `<button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="disputed">Did not get it</button>` : ''}</div></div></div></div>`).join('');
+      <div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="confirmed">${p.status === 'disputed' ? 'Mark received' : 'Got it'}</button>${p.status === 'sent' ? `<button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="disputed">Did not get it</button>` : ''}</div></div></div></div>`).join('');
   const outgoing = bal.outgoing.map((p) => `<div class="item row">${person(p.payeeUserId, `<div class="hint">You sent ${$m(p.amount)} via ${APP_LABEL[p.paidWith]}</div>`)}<div class="grow"></div>${stChip(p.status === 'sent' ? 'pending' : 'disputed')}</div>`).join('');
 
   const pairs = bal.pairs.map((p) => `<div class="item row">${avatar(who(p.debtorUserId), 'sm')}<span class="grow"><b>${esc(first(p.debtorUserId))}</b> ${p.debtorUserId === S.user.userId ? 'owe' : 'owes'} <b>${esc(first(p.creditorUserId))}</b></span><b class="amount">${$m(p.amount)}</b></div>`).join('');
@@ -65,15 +65,15 @@ function settleView() {
     ${incoming ? `<section class="card"><h2>Waiting on you</h2>${incoming}</section>` : ''}
     ${outgoing ? `<section class="card"><h2>You sent</h2>${outgoing}</section>` : ''}</div>` : ''}
   <section class="card"><div class="row sp"><h2>Past purchases</h2>${badge(`${D.expenses.length}`, 'gray')}</div>
-    ${D.expenses.length ? D.expenses.map(expenseRow).join('') : empty('🧾', 'No purchases yet', 'Log the first shared purchase and the split is figured out for you.', '<button class="btn p" data-action="add-expense">Log expense</button>')}</section>`;
+    ${D.expenses.length ? D.expenses.map(expenseRow).join('') : empty('🧾', 'No purchases yet', 'Use Log expense above and the split is figured out for you.')}</section>`;
 }
 
 function expenseRow(e) {
   const others = e.shares.filter((s) => s.userId !== e.paidByUserId);
-  return `<div class="item exp" data-action="expense" data-id="${e.expenseId}"><div class="grow"><b class="truncate">${esc(e.itemName)}</b>
-    <div class="hint">${fmtDay(e.purchaseDate)} · ${esc(first(e.paidByUserId))} paid</div>
+  return `<div class="item exp click click-row" data-action="expense" data-id="${e.expenseId}" tabindex="0"><div class="grow"><b class="truncate">${esc(e.itemName)}</b>
+    <div class="hint expense-detail">${fmtDay(e.purchaseDate)} · ${esc(first(e.paidByUserId))} paid</div>
     <div class="chips">${others.map((s) => `<span class="sharechip">${avatar(who(s.userId), 'sm')}${$m(s.amountOwed)} ${stChip(s.status)}</span>`).join('')}</div></div>
-    <div class="amt">${$m(e.totalAmount)}</div></div>`;
+    <div class="amt">${$m(e.totalAmount)}</div><span class="row-chevron">${ico('chevron', 16)}</span></div>`;
 }
 
 actions.review = async (el) => {
@@ -93,7 +93,7 @@ actions.expense = (el) => {
     ${e.canDelete ? `<div class="acts"><button class="btn d" data-action="delete-expense" data-id="${e.expenseId}">Delete</button></div>` : ''}`);
 };
 actions['delete-expense'] = async (el) => {
-  if (el.dataset.sure !== '1') { el.dataset.sure = '1'; el.textContent = 'Really delete? Tap again'; return; }
+  if (!await confirmDialog('Delete purchase?', 'This removes the purchase and its unpaid shares for everyone.')) return;
   await api(`/households/${hid()}/expenses/${el.dataset.id}`, { method: 'DELETE' });
   closeModal(); toast('Expense deleted'); window.dispatchEvent(new Event('roomie:render'));
 };
@@ -233,7 +233,7 @@ actions['edit-wish'] = (el) => {
 };
 forms['wish-edit'] = async (form) => { try { await api(`/households/${hid()}/wishlist/${form.dataset.id}`, { method: 'PATCH', body: wishBody(form) }); } catch (e) { return showError(form, e.message); } closeModal(); toast('Saved'); window.dispatchEvent(new Event('roomie:render')); };
 actions['delete-wish'] = async (el) => {
-  if (el.dataset.sure !== '1') { el.dataset.sure = '1'; el.textContent = 'Really delete? Tap again'; return; }
+  if (!await confirmDialog('Delete wish-list item?', 'This removes the item from the household list.')) return;
   await api(`/households/${hid()}/wishlist/${el.dataset.id}`, { method: 'DELETE' });
   closeModal(); toast('Deleted'); window.dispatchEvent(new Event('roomie:render'));
 };
