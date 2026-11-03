@@ -216,7 +216,7 @@ function boardInner() {
   return `<div class="row board-heading"><h2>Board</h2></div>
     <form class="stack" data-form="note-new"><textarea class="input" name="messageText" rows="2" maxlength="500" placeholder="Share a plan or check with everyone before hosting" aria-label="New note" required></textarea>
       <div class="row" style="gap:8px;flex-wrap:wrap"><select class="input" name="eventId" aria-label="Link to an event" style="flex:1;min-width:0"><option value="">No linked event</option>${upcoming.map((e) => `<option value="${e.eventId}">${esc(e.eventName)}</option>`).join('')}</select>
-      <button class="btn p" type="submit">Post</button></div><div class="err" role="alert"></div></form>
+      <button class="btn s" type="submit">Post</button></div><div class="err" role="alert"></div></form>
     <div class="notes">${D.notes.length ? D.notes.map(noteHtml).join('') : '<p class="board-empty">No notes yet — share a plan or check with everyone before hosting.</p>'}</div>`;
 }
 const paintBoard = () => document.querySelectorAll('[data-board]').forEach((el) => { el.innerHTML = boardInner(); });

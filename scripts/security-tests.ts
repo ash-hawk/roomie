@@ -630,6 +630,24 @@ async function main() {
   await expectStatus('A deletes the note', send4('DELETE', `/board/${note.messageId}`, A.token), 200);
   check('its reply and the notification about it went with it', (await sql('SELECT 1 FROM bulletin_message WHERE message_id IN ($1,$2)', [note.messageId, reply.messageId])).length === 0 && (await notes4(`source_type='bulletin_message'`)) === 0);
 
+  console.log(' [10d2] event reminders (daily job)');
+  const { sendEventReminders } = await import('../api/_lib/calendar.js');
+  const startMs = Date.parse((await sql('SELECT event_date FROM event WHERE event_id=$1', [evId]))[0].event_date);
+  const remNotes = () => notes4(`source_type='event' AND source_id=$1 AND section='system'`, [evId]);
+  await sendEventReminders({ nowIso: new Date(startMs - 3 * 86400_000).toISOString() });
+  check('three days out with a 1 hour lead: nobody is reminded yet', (await remNotes()) === 0);
+  await sendEventReminders({ nowIso: new Date(startMs - 20 * 3600_000).toISOString() });
+  check('the day before: the creator A and tagged roommate D are each reminded once', (await remNotes()) === 2 && (await notes4(`user_id IN ($1,$2) AND source_type='event' AND source_id=$3 AND section='system' AND message LIKE 'Reminder:%'`, [uA, uD, evId])) === 2);
+  await sendEventReminders({ nowIso: new Date(startMs - 19 * 3600_000).toISOString() });
+  check('running the job again sends nothing new', (await remNotes()) === 2);
+  await sql(`DELETE FROM notification WHERE source_type='event' AND source_id=$1 AND section='system'`, [evId]);
+  await sendEventReminders({ nowIso: new Date(startMs + 3600_000).toISOString() });
+  check('an event that already started is never reminded', (await remNotes()) === 0);
+  await sql(`UPDATE event_tag SET response='declined' WHERE event_id=$1 AND user_id=$2`, [evId, uD]);
+  await sendEventReminders({ nowIso: new Date(startMs - 20 * 3600_000).toISOString() });
+  check('a roommate who declined is not reminded, the creator still is', (await remNotes()) === 1 && (await notes4(`user_id=$1 AND source_id=$2 AND section='system'`, [uD, evId])) === 0);
+  await sql(`UPDATE event_tag SET response='pending' WHERE event_id=$1 AND user_id=$2`, [evId, uD]);
+
   console.log(' [10e] deleting an event, and roommates who moved out');
   await expectStatus('A deletes the event', send4('DELETE', `/events/${evId}`, A.token), 200);
   check('its tags and notifications are gone', (await sql('SELECT 1 FROM event_tag WHERE event_id=$1', [evId])).length === 0 && (await notes4(`source_type='event' AND source_id=$1`, [evId])) === 0);
