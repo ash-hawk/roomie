@@ -507,3 +507,24 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .invite-card .rowline b {
   overflow-wrap: anywhere;
 }
+/* Consistent card spacing and readable board content. */
+.equal-cards{align-items:stretch}
+.equal-cards>.card{min-width:0}
+.section-description{font-size:14px;line-height:1.5;color:var(--mute);margin:8px 0 14px}
+.finance-summary .item{font-size:14px;line-height:1.5}
+.finance-history .item{font-size:14px}
+.board-heading{justify-content:space-between;margin-bottom:14px}
+.board-heading:empty{display:none}
+.board-empty{grid-column:1/-1;text-align:center;padding:28px 16px;font-size:15px;font-weight:400;line-height:1.6;letter-spacing:normal}
+.sticky{min-width:0;font-size:14px;line-height:1.5;letter-spacing:normal}
+.sticky>.row>.grow>b,.sticky .reply b{font-size:13px;font-weight:650}
+.sticky .hint{display:block;font-size:12px;font-weight:400}
+.sticky .x{width:28px;height:28px;flex:none;font-size:12px}
+.sticky>.chip{width:100%;min-height:36px;display:flex;align-items:center;justify-content:flex-start;gap:6px;text-align:left;white-space:normal;overflow-wrap:anywhere;font-size:13px}
+.sticky>.chip .i{flex:none}
+.sticky .reply{overflow-wrap:anywhere}
+.sticky .replyf{margin-top:auto;padding-top:12px;gap:8px}
+.sticky .replyf .input{flex:1;min-width:0;width:0;font-size:14px}
+.sticky .replyf .btn{flex:none}
+
+.board-empty{white-space:normal;overflow-wrap:anywhere}

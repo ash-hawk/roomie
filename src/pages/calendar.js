@@ -213,7 +213,7 @@ function noteHtml(n) {
 }
 function boardInner() {
   const upcoming = D.events.filter((e) => Date.parse(e.eventDate) > Date.now() - 86400000);
-  return `<div class="row" style="justify-content:space-between"><h2>Board</h2></div>
+  return `<div class="row board-heading"><h2>Board</h2></div>
     <form class="stack" data-form="note-new"><textarea class="input" name="messageText" rows="2" maxlength="500" placeholder="Share a plan or check with everyone before hosting" aria-label="New note" required></textarea>
       <div class="row" style="gap:8px;flex-wrap:wrap"><select class="input" name="eventId" aria-label="Link to an event" style="flex:1;min-width:0"><option value="">No linked event</option>${upcoming.map((e) => `<option value="${e.eventId}">${esc(e.eventName)}</option>`).join('')}</select>
       <button class="btn p" type="submit">Post</button></div><div class="err" role="alert"></div></form>
