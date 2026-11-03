@@ -53,21 +53,11 @@ export async function settingsView() {
     ${phead('Your space', 'Settings', 'Your account and household in one place.')}
 
     <div class="stack">
-      <section class="card">
-        <h2>Your profile</h2>
-        <div class="item row">
-          ${avatar(S.user)}
-          <div class="grow">
-            <b>${esc(fullName(S.user))}</b>
-            <div class="mute" style="font-size:13px">
-              ${esc(S.user.email)}
-            </div>
-          </div>
-        </div>
-        <div class="acts" style="justify-content:flex-start;margin-top:12px">
-          <button class="btn d" data-action="signout">Sign out</button>
-        </div>
-      </section>
+      ${profileForm()}
+
+      <div class="acts" style="justify-content:flex-start">
+        <button class="btn d" data-action="signout">Sign out</button>
+      </div>
 
       <section class="card invite-card">
         <div class="eyebrow">Your household</div>
