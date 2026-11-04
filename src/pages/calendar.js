@@ -15,6 +15,8 @@ const savedPrefs = (() => { try { return JSON.parse(localStorage.getItem('roomie
 let view = ['list', 'month'].includes(savedPrefs.view) ? savedPrefs.view : 'list';
 let sortBy = ['date', 'color'].includes(savedPrefs.sortBy) ? savedPrefs.sortBy : 'date';
 let show = ['all', 'events', 'chores'].includes(savedPrefs.show) ? savedPrefs.show : 'all';
+let eventType = ['all', ...CATS.map(([key]) => key)].includes(savedPrefs.eventType) ? savedPrefs.eventType : 'all';
+let choreStatus = ['all', 'todo', 'completed', 'overdue'].includes(savedPrefs.choreStatus) ? savedPrefs.choreStatus : 'all';
 let monthStart = null;    // 'YYYY-MM-01' being shown in the month view
 let D = null;             // { members, events, notes, chores, assignments }
 let seen = '';            // what the last poll saw, to repaint only on change
@@ -40,7 +42,7 @@ const ago = (iso) => agoIn(iso, tz());
 const takeHandoff = () => { try { const v = JSON.parse(sessionStorage.getItem('roomie.open') || 'null'); sessionStorage.removeItem('roomie.open'); return v; } catch { return null; } };
 const refresh = () => window.dispatchEvent(new Event('roomie:render'));
 const path = (p) => `/households/${hid()}${p}`;
-const savePrefs = () => { try { localStorage.setItem('roomie.calendar', JSON.stringify({ view, sortBy, show })); } catch { /* preferences are optional */ } };
+const savePrefs = () => { try { localStorage.setItem('roomie.calendar', JSON.stringify({ view, sortBy, show, eventType, choreStatus })); } catch { /* preferences are optional */ } };
 
 // ---- data -------------------------------------------------------------------------------------
 async function load() {
@@ -52,9 +54,17 @@ async function load() {
 // everything that can sit on the calendar, as one list
 function items() {
   const out = [];
-  if (show !== 'chores') for (const e of D.events) out.push({ kind: 'event', at: e.eventDate, ymd: ymdIn(e.eventDate), color: e.color || COLORS[0], e });
+  if (show !== 'chores') for (const e of D.events) {
+    if (eventType !== 'all' && e.category !== eventType) continue;
+    out.push({ kind: 'event', at: e.eventDate, ymd: ymdIn(e.eventDate), color: e.color || COLORS[0], e });
+  }
   if (show !== 'events') for (const a of D.assignments) {
     const c = D.chores.find((x) => x.choreId === a.choreId); if (!c) continue;
+    if (show === 'chores') {
+      if (choreStatus === 'todo' && a.isCompleted) continue;
+      if (choreStatus === 'completed' && !a.isCompleted) continue;
+      if (choreStatus === 'overdue' && (a.isCompleted || a.status !== 'overdue')) continue;
+    }
     out.push({ kind: 'chore', at: a.dueAt, ymd: ymdIn(a.dueAt), color: CHORE_COLOR, a, c });
   }
   return out.sort((x, y) => Date.parse(x.at) - Date.parse(y.at));
@@ -63,7 +73,7 @@ function items() {
 // ---- rows -------------------------------------------------------------------------------------
 function tagAvatars(e) { return e.tags.length ? `<span class="row" style="gap:3px">${e.tags.slice(0, 4).map((t) => avatar(who(t.userId), 'sm')).join('')}</span>` : ''; }
 function hostChip(e) {
-  if (e.category !== 'hosting') return '';
+  if (e.category !== 'hosting') return `<span class="st later">${e.category === 'meeting' ? 'Meeting' : 'Other'}</span>`;
   const asked = e.tags.filter((t) => t.response);
   if (!asked.length) return '<span class="st later">Hosting</span>';
   if (asked.some((t) => t.response === 'declined')) return '<span class="st disputed">Someone said no</span>';
@@ -129,6 +139,9 @@ export async function calendarView() {
   const head = phead('Shared schedule', 'Calendar', 'Events, chores and notes for your house.', `<button class="btn p" data-action="add-event">${ico('plus', 16)} Add event</button>`);
   const filters = `<div class="page-controls filters calendar-controls">${seg([['list', 'List'], ['month', 'Month']], view, 'cal-view')}
     <select class="input" data-input="cal-show" aria-label="Show"><option value="all">Events and chores</option><option value="events" ${show === 'events' ? 'selected' : ''}>Events only</option><option value="chores" ${show === 'chores' ? 'selected' : ''}>Chores only</option></select>
+    ${show === 'chores'
+      ? `<select class="input" data-input="cal-chore-status" aria-label="Filter chores by status"><option value="all">All chore statuses</option><option value="todo" ${choreStatus === 'todo' ? 'selected' : ''}>To do</option><option value="completed" ${choreStatus === 'completed' ? 'selected' : ''}>Completed</option><option value="overdue" ${choreStatus === 'overdue' ? 'selected' : ''}>Overdue</option></select>`
+      : `<select class="input" data-input="cal-event-type" aria-label="Filter events by type"><option value="all">All event types</option>${CATS.map(([key, label]) => `<option value="${key}" ${eventType === key ? 'selected' : ''}>${label}</option>`).join('')}</select>`}
     ${view === 'list' ? `<select class="input" data-input="cal-sort" aria-label="Sort by"><option value="date">Sort: date</option><option value="color" ${sortBy === 'color' ? 'selected' : ''}>Sort: color</option></select>` : ''}</div>`;
   const handoff = takeHandoff();
   if (handoff?.type === 'event') setTimeout(() => actions['event-detail']({ dataset: { id: String(handoff.id) } }), 60);
@@ -138,6 +151,8 @@ export async function calendarView() {
 }
 actions['cal-view'] = (el) => { view = el.dataset.value; savePrefs(); refresh(); };
 inputs['cal-show'] = (el) => { show = el.value; savePrefs(); refresh(); };
+inputs['cal-event-type'] = (el) => { eventType = el.value; savePrefs(); refresh(); };
+inputs['cal-chore-status'] = (el) => { choreStatus = el.value; savePrefs(); refresh(); };
 inputs['cal-sort'] = (el) => { sortBy = el.value; savePrefs(); refresh(); };
 
 // ---- event detail -----------------------------------------------------------------------------
@@ -161,14 +176,14 @@ actions['delete-event'] = async (el) => { if (!await confirmDialog('Delete event
   await api(path(`/events/${el.dataset.id}`), { method: 'DELETE' }); closeModal(); toast('Event deleted'); refresh(); };
 
 // ---- add / edit ---------------------------------------------------------------------------------
-function eventForm(e, day) {
+function eventForm(e, day, linkToNote = false) {
   const others = active().filter((m) => m.userId !== S.user.userId);
   const date = e ? ymdIn(e.eventDate) : day || ymdIn(Date.now());
   const endSame = e?.endDate && ymdIn(e.endDate) === date;
   const tagged = new Set(e?.tags.map((t) => t.userId) ?? []);
   const color = e?.color || COLORS[0];
   return `${mhead(e ? 'Edit event' : 'Add an event')}
-  <form class="stack" data-form="event-save" ${e ? `data-id="${e.eventId}"` : ''} autocomplete="off">
+  <form class="stack" data-form="event-save" ${e ? `data-id="${e.eventId}"` : ''} ${linkToNote ? 'data-link-to-note="1"' : ''} autocomplete="off">
     <label class="fld"><span>What is happening?</span><input class="input" name="eventName" required maxlength="120" value="${esc(e?.eventName ?? '')}" placeholder="House meeting"></label>
     <div class="inline-grid"><label class="fld"><span>Date</span><input class="input" name="date" type="date" required value="${date}"></label>
       <label class="fld"><span>Starts</span><input class="input" name="time" type="time" required value="${e ? hmIn(e.eventDate) : '18:00'}"></label>
@@ -189,12 +204,26 @@ inputs['event-cat'] = () => {
   const hint = document.getElementById('tag-hint'); if (hint) hint.textContent = f.category.value === 'hosting' ? 'Tagged roommates are asked if hosting is okay with them.' : 'Tagged roommates are notified.';
 };
 actions['add-event'] = (el) => { openModal(eventForm(null, el?.dataset?.day)); inputs['event-cat'](); };
+actions['add-and-link-event'] = () => { openModal(eventForm(null, null, true)); inputs['event-cat'](); };
 actions['edit-event'] = (el) => { const e = eventOf(Number(el.dataset.id)); if (!e) return; openModal(eventForm(e)); inputs['event-cat'](); };
 forms['event-save'] = async (form) => {
   const f = new FormData(form), id = form.dataset.id;
   const body = { eventName: f.get('eventName'), date: f.get('date'), time: f.get('time'), endTime: f.get('endTime') || null, location: f.get('location'), category: f.get('category'),
     color: f.get('color'), reminderMinutesBefore: f.get('reminder') === '' ? null : Number(f.get('reminder')), description: f.get('description'), taggedUserIds: f.getAll('tag').map(Number) };
-  try { await api(path(id ? `/events/${id}` : '/events'), { method: id ? 'PATCH' : 'POST', body }); } catch (err) { return showError(form, err.message); }
+  let saved;
+  try { saved = await api(path(id ? `/events/${id}` : '/events'), { method: id ? 'PATCH' : 'POST', body }); } catch (err) { return showError(form, err.message); }
+  if (form.dataset.linkToNote === '1') {
+    D.events.push(saved);
+    const noteForm = document.querySelector('form[data-form="note-new"]');
+    const mode = noteForm?.querySelector('[data-input="board-link-mode"]');
+    const picker = noteForm?.querySelector('[name="eventId"]');
+    if (mode && picker) {
+      picker.insertAdjacentHTML('beforeend', `<option value="${saved.eventId}">${esc(saved.eventName)}</option>`);
+      mode.value = 'link'; picker.hidden = false; picker.required = true; picker.value = String(saved.eventId);
+    }
+    seen = JSON.stringify([D.events, D.notes, D.assignments]);
+    closeModal(); toast('Event added and linked'); return;
+  }
   closeModal(); toast(id ? 'Event saved' : 'Event added'); refresh();
 };
 
@@ -215,10 +244,18 @@ function boardInner() {
   const upcoming = D.events.filter((e) => Date.parse(e.eventDate) > Date.now() - 86400000);
   return `<div class="row board-heading"><h2>Board</h2></div>
     <form class="stack" data-form="note-new"><textarea class="input" name="messageText" rows="2" maxlength="500" placeholder="Share a plan or check with everyone before hosting" aria-label="New note" required></textarea>
-      <div class="row" style="gap:8px;flex-wrap:wrap"><select class="input" name="eventId" aria-label="Link to an event" style="flex:1;min-width:0"><option value="">No linked event</option>${upcoming.map((e) => `<option value="${e.eventId}">${esc(e.eventName)}</option>`).join('')}</select>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><select class="input" data-input="board-link-mode" aria-label="Event link option" style="flex:1;min-width:0"><option value="none">No linked event</option><option value="link">Link event</option><option value="add">Add and link event</option></select>
+      <select class="input" name="eventId" aria-label="Choose an event" style="flex:1;min-width:0" hidden><option value="">Choose an event</option>${upcoming.map((e) => `<option value="${e.eventId}">${esc(e.eventName)}</option>`).join('')}</select>
       <button class="btn s" type="submit">Post</button></div><div class="err" role="alert"></div></form>
     <div class="notes">${D.notes.length ? D.notes.map(noteHtml).join('') : '<p class="board-empty">No notes yet — share a plan or check with everyone before hosting.</p>'}</div>`;
 }
+inputs['board-link-mode'] = (el) => {
+  const picker = el.form?.querySelector('[name="eventId"]'); if (!picker) return;
+  if (el.value === 'add') { el.value = 'none'; picker.hidden = true; picker.required = false; picker.value = ''; actions['add-and-link-event'](); return; }
+  picker.hidden = el.value !== 'link';
+  picker.required = !picker.hidden;
+  if (picker.hidden) picker.value = '';
+};
 const paintBoard = () => document.querySelectorAll('[data-board]').forEach((el) => { el.innerHTML = boardInner(); });
 async function reloadBoard() { const [{ notes }, { events }] = await Promise.all([api(path('/board')), api(path('/events'))]); D.notes = notes; D.events = events; paintBoard(); }
 forms['note-new'] = async (form) => {
