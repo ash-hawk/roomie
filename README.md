@@ -149,8 +149,9 @@ Checked the signed-in deployed app at https://roomie-mockup.vercel.app.
 | Chore text sizes | Passed: titles render at 16px; schedule/due-date text at 14px with 21px line height; chart metadata renders at 14px. |
 | Desktop horizontal overflow | Passed on Finances and Chores schedule at 1440px viewport width. |
 | Mobile horizontal overflow | Chores schedule and chart passed at 390px width. Finances failed: a long purchase title extends the document to 866px. |
-| Lighthouse accessibility score | Not measured: the connected-browser tools do not expose Lighthouse, and the test environment has no Chrome executable for the CLI. No score or >=90 pass is claimed. |
+| Lighthouse accessibility — Finances | Passed: 96/100, reported by Frankie on November 4, 2026; exceeds the required 90. |
+| Lighthouse accessibility — Chores | Passed: 96/100, reported by Frankie on November 4, 2026; exceeds the required 90. |
 
-To complete Lighthouse testing, sign in using Chrome, open each affected page (Finances and Chores), then use DevTools > Lighthouse > Accessibility. Run mobile and desktop audits and record the scores, date, page state, and any failed audits. Audit the authenticated household content rather than the sign-in screen.
+Frankie ran Lighthouse for Finances and Chores and reported an accessibility score of 96 for each. Audit exports and device-mode details are not included here. These results meet the accessibility-score requirement; they do not by themselves establish that all Definition of Done criteria are complete.
 
 Profile save/persistence and live security-test notes above remain pending; these UI checks do not verify them. Security tests require authorized dev environment configuration, which is unavailable in this checkout.
