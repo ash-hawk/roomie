@@ -42,7 +42,7 @@ function setupCard(members, chores, prefs) {
   const steps = [
     { done: Boolean(household()), label: 'Join or create a household', href: '#/settings' },
     { done: Boolean(S.user.profilePhoto) && Boolean(S.user.paymentMethods?.length), label: 'Add a profile photo and payment app', href: '#/settings' },
-    { done: members.filter((m) => !m.leftDate).length > 1, label: 'Invite your roommates', href: '#/settings' },
+    { done: members.filter((m) => !m.leftDate).length > 1, label: 'Invite your roommates', href: '#/household' },
     { done: chores.chores.length > 0, label: 'Add your first chore', href: '#/chores' },
   ];
   const complete = steps.filter((s) => s.done).length;

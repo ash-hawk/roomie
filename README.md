@@ -93,30 +93,27 @@ To undo it, click the same button again (it marks the chore not done).
 
 ## Recent Changes
 
-### Settings and Household Members
-- Standardized typography in the Invite roommates section.
-- Kept the invitation code and working Copy button.
-- Updated the header account button to navigate directly to Settings.
-- Grouped the existing roommate list under the household name.
-- Displayed the active-member count, member roles, and join dates.
-- Identified the signed-in user with a “(you)” label.
-- Grouped former roommates in a collapsible section.
-- Preserved Sign out functionality.
+### Profile and Household
+- The header account button opens the signed-in user's editable profile.
+- Household is a separate navigation tab with the roommate list and invite code.
+- Roommate rows open read-only contact and payment-method profiles.
+- Contact and payment details are hidden for former roommates.
+- Active-member counts, roles, join dates, and former-roommate history remain visible.
 
 ### Profile Editor
-- Restored the existing editable profile form in Settings.
+- Kept the editable profile form on the dedicated Profile page.
 - Displayed first name, last name, phone, and profile-photo controls.
 - Restored payment-app fields for Venmo, Zelle, and Apple Cash,
   including a preferred-app selection.
 - Reused the existing Save profile handler and PATCH /me endpoint.
-- Preserved the household member list and invitation functionality.
+- Preserved profile saving and sign out functionality.
 
 ### Verification
 - Build and typecheck passed locally.
 - All 73 unit tests passed locally.
 - Verified the deployed profile form appears after refreshing.
 - Verified household members load, former roommates expand,
-  and the header account button opens Settings.
+  and the header account button opens Profile.
 - Invitation copying was confirmed manually.
 - Profile saving and persistence after refresh still require
   end-to-end verification.
