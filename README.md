@@ -115,8 +115,9 @@ To undo it, click the same button again (it marks the chore not done).
 - Verified household members load, former roommates expand,
   and the header account button opens Profile.
 - Invitation copying was confirmed manually.
-- Profile saving and persistence after refresh still require
-  end-to-end verification.
+- Profile saving and persistence passed on November 4, 2026: a temporary
+  first-name edit survived refresh, and the original name was restored and
+  verified after a second refresh.
 - Security tests were blocked by missing local development
   environment configuration; they were not marked as passed.
 
@@ -148,10 +149,21 @@ Checked the signed-in deployed app at https://roomie-mockup.vercel.app.
 | Keyboard focus on disclosure | Passed: focused summary has a visible 2px outline. |
 | Chore text sizes | Passed: titles render at 16px; schedule/due-date text at 14px with 21px line height; chart metadata renders at 14px. |
 | Desktop horizontal overflow | Passed on Finances and Chores schedule at 1440px viewport width. |
-| Mobile horizontal overflow | Chores schedule and chart passed at 390px width. A long purchase title previously extended Finances to 866px; the follow-up CSS fix wraps expense titles within their column and keeps amounts from shrinking. Production build passed; deployed mobile verification of this fix remains pending. |
+| Mobile horizontal overflow | Chores schedule and chart passed at 390px width. A long purchase title previously extended Finances to 866px; the follow-up CSS fix wraps expense titles within their column and keeps amounts from shrinking. Production build passed. Deployed retest passed at 390px: document width is 390px, the long title wraps, and its expense-details dialog opens without horizontal overflow. |
 | Lighthouse accessibility — Finances | Passed: 96/100, reported by Frankie on November 4, 2026; exceeds the required 90. |
 | Lighthouse accessibility — Chores | Passed: 96/100, reported by Frankie on November 4, 2026; exceeds the required 90. |
 
 Frankie ran Lighthouse for Finances and Chores and reported an accessibility score of 96 for each. Audit exports and device-mode details are not included here. These results meet the accessibility-score requirement; they do not by themselves establish that all Definition of Done criteria are complete.
 
-Profile save/persistence and live security-test notes above remain pending; these UI checks do not verify them. Security tests require authorized dev environment configuration, which is unavailable in this checkout.
+Profile save/persistence has now passed the deployed regression check below. Live security tests remain blocked: they require authorized dev environment configuration, which is unavailable in this checkout.
+
+
+### Sprint 1 regression check (November 4, 2026)
+
+- Tested the merged application at commit `b773824` with the signed-in household.
+- Saved a temporary first-name edit, refreshed to verify persistence, then restored the original name and refreshed again to verify restoration. Other profile fields were preserved.
+- Household displayed 10 active-member profile buttons; former-roommate history expanded correctly.
+- Verified Finances has no horizontal overflow at 390px, including the long-title expense details dialog. The expense row still opens its details.
+- Chores Just mine filter showed the signed-in user's existing completed assignment. Chore chart opened, and A–Z sorting produced alphabetically ordered chore titles.
+- Latest merged code passed production build, typecheck, and all 73 unit tests.
+- No new application defect was found in this focused pass. No chores, expenses, payments, or household membership records were changed. Full multi-user, photo-upload, and security testing are outside this recorded pass.
