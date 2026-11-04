@@ -7,7 +7,7 @@ import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
 import { ago, closeModal, empty, esc, ico, phead, seg, toast } from '../lib/dom.js';
 
-const SECTIONS = [['all', 'All'], ['chores', 'Chores'], ['money', 'Money'], ['expense_tracker', 'Expenses'], ['system', 'System'], ['calendar_board', 'Calendar']];
+const SECTIONS = [['all', 'All'], ['chores', 'Chores'], ['money', 'Money'], ['expense_tracker', 'Expenses'], ['system', 'System'], ['calendar_board', 'Events & board']];
 const TARGET = { chore_assignment: 'chores', chore_swap_request: 'chores', expense: 'finances', expense_share: 'finances', payment: 'finances', wishlist_item: 'finances', event: 'calendar', bulletin_message: 'calendar' };
 let tab = 'all';
 let D = { notifications: [], unread: 0, swapPending: 0 };

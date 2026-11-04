@@ -3,7 +3,7 @@
 import { actions, forms } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { avatar, closeModal, esc, ico, mhead, money, openModal, phead, toast } from '../lib/dom.js';
+import { avatar, closeModal, esc, ico, mhead, money, openModal, personColor, phead, toast } from '../lib/dom.js';
 import { greeting, pickWeek } from '../../shared/home.ts';
 import { toCents } from '../../shared/money.ts';
 
@@ -26,8 +26,8 @@ function weekRows(events, chores, members) {
   ].sort((x, y) => Date.parse(x.at) - Date.parse(y.at));
   const week = pickWeek(all, ymdIn(Date.now()), 7);
   const row = (x) => x.kind === 'event'
-    ? `<a class="item click row ev" href="#/calendar" data-action="home-event" data-id="${x.e.eventId}" style="--ev:${esc(x.e.color || '#4338ca')}"><span class="evbar"></span><div class="grow"><b>${esc(x.e.eventName)}</b><div class="hint">${timeFmt(x.e.eventDate)}${x.e.location ? ` · ${esc(x.e.location)}` : ''}</div></div></a>`
-    : `<a class="item click row ev" href="#/chores" style="--ev:#64748b"><span class="evbar"></span><div class="grow"><b>${ico('check', 14)} ${esc(x.c.choreName)}</b><div class="hint">${timeFmt(x.a.dueAt)} · ${esc(name(x.a.assignedUserId))}</div></div>${avatar(members.find((m) => m.userId === x.a.assignedUserId), 'sm')}</a>`;
+    ? `<a class="item click row ev" href="#/calendar" data-action="home-event" data-id="${x.e.eventId}" style="--ev:${personColor(x.e.createdByUserId)}"><span class="evbar"></span><div class="grow"><b>${esc(x.e.eventName)}</b><div class="hint">${timeFmt(x.e.eventDate)}${x.e.location ? ` · ${esc(x.e.location)}` : ''}</div></div></a>`
+    : `<a class="item click row ev" href="#/chores" style="--ev:${personColor(x.a.assignedUserId)}"><span class="evbar"></span><div class="grow"><b>${ico('check', 14)} ${esc(x.c.choreName)}</b><div class="hint">${timeFmt(x.a.dueAt)} · ${esc(name(x.a.assignedUserId))}</div></div>${avatar(members.find((m) => m.userId === x.a.assignedUserId), 'sm')}</a>`;
   const days = [...new Set(week.map((x) => x.ymd))];
   return days.map((d) => `<div class="dayh">${dayLabel(d)}</div>${week.filter((x) => x.ymd === d).map(row).join('')}`).join('');
 }
@@ -66,7 +66,7 @@ export async function homeView() {
   const owingMe = balances.mine.reduce((sum, b) => sum + Math.max(0, toCents(b.signedAmount)), 0);
   const prefs = getPrefs();
   const cards = {
-    week: `<section class="card stack">${cardHead('This week', '#/calendar', 'Open calendar')}${week || compactEmpty('No plans yet this week.', '#/calendar', 'Add an event')}</section>`,
+    week: `<section class="card stack">${cardHead('This week', '#/calendar', 'Open events')}${week || compactEmpty('No plans yet this week.', '#/calendar', 'Add an event')}</section>`,
     chores: `<section class="card stack">${cardHead('My chores', '#/chores', 'Open chores')}${mine.length ? mine.map(({ a, c }) => `<a class="item click row" href="#/chores"><div class="grow"><b>${esc(c.choreName)}</b><div class="hint">${dayLabel(ymdIn(a.dueAt))} · ${timeFmt(a.dueAt)}</div></div>${a.status === 'overdue' ? '<span class="st overdue">Overdue</span>' : ''}</a>`).join('') : compactEmpty('No chores assigned to you yet.', '#/chores', 'Add a chore')}</section>`,
     finances: `<section class="card stack">${cardHead('Finances', '#/finances', 'Open finances')}${owed || owingMe ? `<div class="finance-snapshot"><div><span>You owe</span><b>${money(owed)}</b></div><div><span>Owed to you</span><b>${money(owingMe)}</b></div></div>` : compactEmpty('No shared expenses yet.', '#/finances', 'Log an expense')}</section>`,
   };

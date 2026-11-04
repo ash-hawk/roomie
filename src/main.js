@@ -14,7 +14,7 @@ import { homeView } from './pages/home.js';
 import { soonView } from './pages/soon.js';
 import { toCents } from '../shared/money.ts';
 
-const NAV = [['home', 'home', 'Home'], ['calendar', 'calendar', 'Calendar'], ['finances', 'money', 'Finances'], ['chores', 'check', 'Chores'], ['settings', 'settings', 'Settings']];
+const NAV = [['home', 'home', 'Home'], ['calendar', 'calendar', 'Events'], ['finances', 'money', 'Finances'], ['chores', 'check', 'Chores'], ['settings', 'settings', 'Settings']];
 // Real pages register here as each slice lands; everything else shows the "coming next" card.
 export const pages = { settings: settingsView, finances: financesView, chores: choresView, calendar: calendarView, notifications: notificationsView, home: homeView };
 
