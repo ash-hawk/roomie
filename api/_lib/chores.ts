@@ -230,7 +230,7 @@ export async function deleteChore(user: CurrentUser, householdId: number, choreI
 
 // ---- completing -------------------------------------------------------------------------------
 async function lockAssignment(tx: Tx, householdId: number, assignmentId: number) {
-  const [a] = await tx.select({ assignmentId: s.choreAssignment.assignmentId, choreId: s.choreAssignment.choreId, assignedUserId: s.choreAssignment.assignedUserId, dueAt: s.choreAssignment.dueAt, isCompleted: s.choreAssignment.isCompleted, lastRemindedAt: s.choreAssignment.lastRemindedAt, choreName: s.chore.choreName, createdBy: s.chore.createdByUserId })
+  const [a] = await tx.select({ assignmentId: s.choreAssignment.assignmentId, choreId: s.choreAssignment.choreId, assignedUserId: s.choreAssignment.assignedUserId, dueAt: s.choreAssignment.dueAt, isCompleted: s.choreAssignment.isCompleted, lastRemindedAt: s.choreAssignment.lastRemindedAt, choreName: s.chore.choreName, createdBy: s.chore.createdByUserId, repeats: s.chore.repeats })
     .from(s.choreAssignment).innerJoin(s.chore, eq(s.chore.choreId, s.choreAssignment.choreId))
     .where(and(eq(s.choreAssignment.assignmentId, assignmentId), eq(s.chore.householdId, householdId))).for('update', { of: s.choreAssignment });
   if (!a) throw new HttpError(404, 'Chore not found');
@@ -345,6 +345,10 @@ export async function respondToSwap(user: CurrentUser, householdId: number, swap
       await assertActiveMembers(tx, householdId, [requester, user.userId]);
       await tx.update(s.choreAssignment).set({ assignedUserId: user.userId }).where(eq(s.choreAssignment.assignmentId, ra.assignmentId));
       await tx.update(s.choreAssignment).set({ assignedUserId: requester }).where(eq(s.choreAssignment.assignmentId, ta.assignmentId));
+      // A one-time chore has no future schedule to protect, so ownership follows responsibility.
+      // Recurring chore rules stay with their original creator even when one occurrence is traded.
+      if (ra.repeats === 'none') await tx.update(s.chore).set({ createdByUserId: user.userId }).where(eq(s.chore.choreId, ra.choreId));
+      if (ta.repeats === 'none') await tx.update(s.chore).set({ createdByUserId: requester }).where(eq(s.chore.choreId, ta.choreId));
       await finish('accepted', reply);
       await notifyRequester(requester, `${me} accepted your swap: you now have ${ta.choreName}, they have ${ra.choreName}.${tail}`);
       return { swapId, status: 'accepted' };
@@ -359,6 +363,7 @@ export async function respondToSwap(user: CurrentUser, householdId: number, swap
     if (ra.isCompleted) throw new HttpError(409, 'That chore was already done');
     await assertActiveMembers(tx, householdId, [user.userId]);
     await tx.update(s.choreAssignment).set({ assignedUserId: user.userId }).where(eq(s.choreAssignment.assignmentId, ra.assignmentId));
+    if (ra.repeats === 'none') await tx.update(s.chore).set({ createdByUserId: user.userId }).where(eq(s.chore.choreId, ra.choreId));
     await finish('accepted', reply);
     await notifyRequester(requester, `${me} will cover ${ra.choreName} for you.${tail}`);
     return { swapId, status: 'accepted' };
