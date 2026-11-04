@@ -548,3 +548,7 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .chores-content .cr .grow>b{font-size:16px;line-height:1.5}
 .chores-content .cr .hint{font-size:14px;line-height:1.5;overflow-wrap:anywhere}
 .chores-content .grp{font-size:13px;font-weight:700;line-height:1.5}
+
+/* Let long purchase names wrap inside their flex column on narrow screens. */
+.exp>.grow>.truncate{display:block;white-space:normal;overflow-wrap:anywhere}
+.exp>.amt{flex-shrink:0;white-space:nowrap}
