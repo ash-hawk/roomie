@@ -148,7 +148,7 @@ Checked the signed-in deployed app at https://roomie-mockup.vercel.app.
 | Keyboard focus on disclosure | Passed: focused summary has a visible 2px outline. |
 | Chore text sizes | Passed: titles render at 16px; schedule/due-date text at 14px with 21px line height; chart metadata renders at 14px. |
 | Desktop horizontal overflow | Passed on Finances and Chores schedule at 1440px viewport width. |
-| Mobile horizontal overflow | Chores schedule and chart passed at 390px width. Finances failed: a long purchase title extends the document to 866px. |
+| Mobile horizontal overflow | Chores schedule and chart passed at 390px width. A long purchase title previously extended Finances to 866px; the follow-up CSS fix wraps expense titles within their column and keeps amounts from shrinking. Production build passed; deployed mobile verification of this fix remains pending. |
 | Lighthouse accessibility — Finances | Passed: 96/100, reported by Frankie on November 4, 2026; exceeds the required 90. |
 | Lighthouse accessibility — Chores | Passed: 96/100, reported by Frankie on November 4, 2026; exceeds the required 90. |
 
