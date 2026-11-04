@@ -536,3 +536,15 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .sticky .replyf .btn{flex:none}
 
 .board-empty{white-space:normal;overflow-wrap:anywhere}
+
+/* Visual critique follow-up: keep personal balances primary and chore dates readable. */
+.household-balances>summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;list-style:none;min-height:44px}
+.household-balances>summary::-webkit-details-marker{display:none}
+.household-balances>summary::before{content:"▸";color:var(--mute)}
+.household-balances[open]>summary::before{content:"▾"}
+.household-balances>summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:6px}
+.household-balances-title{font-size:18px;font-weight:700}
+.household-balances>summary>.hint{margin-left:auto}
+.chores-content .cr .grow>b{font-size:16px;line-height:1.5}
+.chores-content .cr .hint{font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.chores-content .grp{font-size:13px;font-weight:700;line-height:1.5}

@@ -119,3 +119,21 @@ To undo it, click the same button again (it marks the chore not done).
   end-to-end verification.
 - Security tests were blocked by missing local development
   environment configuration; they were not marked as passed.
+
+
+## Visual Critique Follow-up (November 4, 2026)
+
+Reviewed the eight findings in Sierra Andreason's October 16 visual critique against current main and the deployed Home, Events, Finances, and Chores pages.
+
+| Finding | Current status and response |
+|---|---|
+| Empty Home snapshot | Already addressed: Home shows upcoming chores and financial balances. |
+| Cluttered mobile calendar filters | Already addressed: Events controls stack in a separate padded block; inspected at 390 × 844. |
+| Pinned notes blend in | Already addressed in current code: pinned notes have a distinct background, border, and Pinned label. |
+| Small purchase details / unclear clickable rows | Already addressed in current code: 14px purchase details, hover/focus treatment, and a chevron. |
+| Household balances outweigh personal balances | This change places Your balances first at full width and makes Who owes who a collapsed native disclosure. |
+| Chore tab order disagrees with initial view | Already addressed: Schedule is both first and the initial view. Retained that consistent order rather than moving the active tab. |
+| Small chore schedule text | This change sets chore titles to 16px, due-date/schedule text to 14px, and group labels to 13px. |
+| Red means both difficulty and overdue | Already addressed: effort badges use neutral styling; overdue keeps its red warning and explicit label. |
+
+Validation: production build, typecheck, and 73 unit tests passed. No database or API behavior changed. The new disclosure, keyboard focus, mobile layout, and text sizes need verification on the PR preview before merge. Lighthouse accessibility >=90 has not been measured for this change. Live security tests require authorized dev environment configuration, which is unavailable in this checkout.

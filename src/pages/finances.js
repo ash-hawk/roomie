@@ -55,13 +55,13 @@ function settleView() {
 
   const pairs = bal.pairs.map((p) => `<div class="item row">${avatar(who(p.debtorUserId), 'sm')}<span class="grow"><b>${esc(first(p.debtorUserId))}</b> ${p.debtorUserId === S.user.userId ? 'owe' : 'owes'} <b>${esc(first(p.creditorUserId))}</b></span><b class="amount">${$m(p.amount)}</b></div>`).join('');
 
-  return `<div class="grid2 equal-cards finance-summary">
+  return `<div class="stack finance-summary">
     <section class="card"><div class="row sp"><h2>Your balances</h2>${badge(mine ? 'Open' : 'All square', mine ? 'warn' : 'good')}</div>
       <p class="section-description">What you owe or should receive.</p>
       ${mine || `<p class="mute" style="padding:10px 0">You don't owe anyone, and no one owes you. Log an expense when you buy something for the house.</p>`}</section>
-    <section class="card"><div class="row sp"><h2>Who owes who</h2>${badge(`${bal.pairs.length}`, 'gray')}</div>
+    <details class="card household-balances"><summary><span class="household-balances-title">Who owes who</span>${badge(`${bal.pairs.length}`, 'gray')}<span class="hint">Show / hide</span></summary>
       <p class="section-description">Payments needed across the whole household.</p>
-      ${pairs || `<p class="mute" style="padding:10px 0">Everyone in the house is square.</p>`}</section>
+      ${pairs || `<p class="mute" style="padding:10px 0">Everyone in the house is square.</p>`}</details>
   </div>
   ${incoming || outgoing ? `<div class="grid2">
     ${incoming ? `<section class="card"><h2>Waiting on you</h2>${incoming}</section>` : ''}
