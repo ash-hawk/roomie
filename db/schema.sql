@@ -163,7 +163,7 @@ CREATE TABLE event (
     end_date                TIMESTAMPTZ,
     location                TEXT,
     category                TEXT NOT NULL DEFAULT 'other' CHECK (category IN ('hosting', 'meeting', 'other')),
-    color                   TEXT,          -- color-coding and sorting the calendar
+    color                   TEXT,          -- custom display label when category is other (legacy column name)
     reminder_minutes_before INTEGER CHECK (reminder_minutes_before >= 0),
     description             TEXT,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),

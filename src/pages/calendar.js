@@ -70,7 +70,7 @@ function items() {
 
 // ---- rows -------------------------------------------------------------------------------------
 function hostChip(e) {
-  if (e.category !== 'hosting') return `<span class="st later">${e.category === 'meeting' ? 'Meeting' : 'Other'}</span>`;
+  if (e.category !== 'hosting') return `<span class="st later">${esc(e.category === 'meeting' ? 'Meeting' : e.otherLabel || 'Other')}</span>`;
   const asked = e.tags.filter((t) => t.response);
   if (!asked.length) return '<span class="st later">Hosting</span>';
   if (asked.some((t) => t.response === 'declined')) return '<span class="st disputed">Someone said no</span>';
@@ -160,7 +160,7 @@ actions['event-detail'] = (el) => {
   const answer = (t) => (t.response === 'accepted' ? '<span class="st paid">Okay</span>' : t.response === 'declined' ? '<span class="st disputed">Not okay</span>' : t.response === 'pending' ? '<span class="st unpaid">Waiting</span>' : '');
   openModal(`${mhead(esc(e.eventName))}
     <div class="row" style="gap:8px;flex-wrap:wrap"><span class="evdot" style="background:${personColor(e.createdByUserId)}"></span><b>${whenFull(e.eventDate)}${e.endDate ? ` to ${timeFmt(e.endDate)}` : ''}</b></div>
-    <div class="hint">${CATS.find(([k]) => k === e.category)?.[1] ?? ''}${e.location ? ` · ${esc(e.location)}` : ''}${e.reminderMinutesBefore != null ? ` · reminder ${e.reminderMinutesBefore >= 60 && e.reminderMinutesBefore % 60 === 0 ? `${e.reminderMinutesBefore / 60}h` : `${e.reminderMinutesBefore}m`} before` : ''}</div>
+    <div class="hint">${esc(e.category === 'other' ? e.otherLabel || 'Other' : CATS.find(([k]) => k === e.category)?.[1] ?? '')}${e.location ? ` · ${esc(e.location)}` : ''}${e.reminderMinutesBefore != null ? ` · reminder ${e.reminderMinutesBefore >= 60 && e.reminderMinutesBefore % 60 === 0 ? `${e.reminderMinutesBefore / 60}h` : `${e.reminderMinutesBefore}m`} before` : ''}</div>
     ${e.description ? `<p>${esc(e.description)}</p>` : ''}
     <div class="hint">Added by ${esc(first(e.createdByUserId))}</div>
     ${e.tags.length ? `<div class="stack">${e.tags.map((t) => `<div class="item row">${avatar(who(t.userId))}<div class="grow"><b>${esc(first(t.userId))}</b></div>${answer(t)}</div>`).join('')}</div>` : ''}
@@ -187,6 +187,7 @@ function eventForm(e, day, linkToNote = false) {
       <label class="fld"><span>Ends (optional)</span><input class="input" name="endTime" type="time" value="${endSame ? hmIn(e.endDate) : ''}"></label></div>
     <label class="fld"><span>Where (optional)</span><input class="input" name="location" maxlength="120" value="${esc(e?.location ?? '')}" placeholder="Living room"></label>
     <div class="fld"><span>What kind?</span><div class="methods">${CATS.map(([k, l]) => `<label><input type="radio" name="category" value="${k}" ${(e?.category ?? 'meeting') === k ? 'checked' : ''} data-input="event-cat">${l}</label>`).join('')}</div></div>
+    <label class="fld" id="other-label-field" ${e?.category === 'other' ? '' : 'hidden'}><span>Label for this event</span><input class="input" name="otherLabel" maxlength="40" value="${esc(e?.otherLabel ?? '')}" placeholder="Maintenance"><small class="hint">This label appears on the calendar card.</small></label>
     <label class="fld"><span>Reminder</span><select class="input" name="reminder">${[['', 'No reminder'], ['0', 'At the start'], ['30', '30 minutes before'], ['60', '1 hour before'], ['1440', '1 day before']].map(([v, l]) => `<option value="${v}" ${String(e?.reminderMinutesBefore ?? '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     <div class="fld"><span id="tag-label">Tag roommates</span><div class="opt-list">${others.length ? others.map((m) => `<label class="chk"><input type="checkbox" name="tag" value="${m.userId}" ${tagged.has(m.userId) ? 'checked' : ''}> ${avatar(m, 'sm')} ${esc(fullName(m))}</label>`).join('') : '<span class="hint">No other roommates yet.</span>'}</div>
       <span class="hint" id="tag-hint"></span></div>
@@ -197,6 +198,8 @@ function eventForm(e, day, linkToNote = false) {
 }
 inputs['event-cat'] = () => {
   const f = document.querySelector('form[data-form=event-save]'); if (!f) return;
+  const otherField = document.getElementById('other-label-field'), otherInput = f.elements.otherLabel;
+  if (otherField && otherInput) { const isOther = f.category.value === 'other'; otherField.hidden = !isOther; otherInput.required = isOther; }
   const hint = document.getElementById('tag-hint'); if (hint) hint.textContent = f.category.value === 'hosting' ? 'Tagged roommates are asked if hosting is okay with them.' : 'Tagged roommates are notified.';
 };
 actions['add-event'] = (el) => { openModal(eventForm(null, el?.dataset?.day)); inputs['event-cat'](); };
@@ -205,7 +208,7 @@ actions['edit-event'] = (el) => { const e = eventOf(Number(el.dataset.id)); if (
 forms['event-save'] = async (form) => {
   const f = new FormData(form), id = form.dataset.id;
   const body = { eventName: f.get('eventName'), date: f.get('date'), time: f.get('time'), endTime: f.get('endTime') || null, location: f.get('location'), category: f.get('category'),
-    reminderMinutesBefore: f.get('reminder') === '' ? null : Number(f.get('reminder')), description: f.get('description'), taggedUserIds: f.getAll('tag').map(Number) };
+    otherLabel: f.get('otherLabel'), reminderMinutesBefore: f.get('reminder') === '' ? null : Number(f.get('reminder')), description: f.get('description'), taggedUserIds: f.getAll('tag').map(Number) };
   let saved;
   try { saved = await api(path(id ? `/events/${id}` : '/events'), { method: id ? 'PATCH' : 'POST', body }); } catch (err) { return showError(form, err.message); }
   if (form.dataset.linkToNote === '1') {
