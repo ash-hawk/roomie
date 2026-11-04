@@ -71,7 +71,6 @@ function items() {
 }
 
 // ---- rows -------------------------------------------------------------------------------------
-function tagAvatars(e) { return e.tags.length ? `<span class="row" style="gap:3px">${e.tags.slice(0, 4).map((t) => avatar(who(t.userId), 'sm')).join('')}</span>` : ''; }
 function hostChip(e) {
   if (e.category !== 'hosting') return `<span class="st later">${e.category === 'meeting' ? 'Meeting' : 'Other'}</span>`;
   const asked = e.tags.filter((t) => t.response);
@@ -85,7 +84,8 @@ function row(it) {
     const e = it.e;
     return `<div class="item click row ev" data-action="event-detail" data-id="${e.eventId}" tabindex="0" style="--ev:${esc(it.color)}">
       <span class="evbar"></span><div class="grow"><b>${esc(e.eventName)}</b>
-      <div class="hint">${timeFmt(e.eventDate)}${e.location ? ` · ${esc(e.location)}` : ''}${e.createdByUserId ? ` · ${esc(first(e.createdByUserId))}` : ''}</div></div>${hostChip(e)}${tagAvatars(e)}</div>`;
+      <div class="hint event-meta"><span>${timeFmt(e.eventDate)}${e.location ? ` · ${esc(e.location)}` : ''}</span>
+      ${e.createdByUserId ? `<span class="event-creator">${avatar(who(e.createdByUserId), 'sm')} Added by ${esc(first(e.createdByUserId))}</span>` : ''}</div></div>${hostChip(e)}</div>`;
   }
   const { a, c } = it, mine = a.assignedUserId === S.user.userId;
   const st = a.isCompleted ? '<span class="st paid">Done</span>' : a.status === 'overdue' ? '<span class="st overdue">Overdue</span>' : '';
