@@ -136,4 +136,21 @@ Reviewed the eight findings in Sierra Andreason's October 16 visual critique aga
 | Small chore schedule text | This change sets chore titles to 16px, due-date/schedule text to 14px, and group labels to 13px. |
 | Red means both difficulty and overdue | Already addressed: effort badges use neutral styling; overdue keeps its red warning and explicit label. |
 
-Validation: production build, typecheck, and 73 unit tests passed. No database or API behavior changed. The new disclosure, keyboard focus, mobile layout, and text sizes need verification on the PR preview before merge. Lighthouse accessibility >=90 has not been measured for this change. Live security tests require authorized dev environment configuration, which is unavailable in this checkout.
+Validation: production build, typecheck, and 73 unit tests passed. PR #8 was merged. No database or API behavior changed.
+
+### Deployed UI verification (November 4, 2026)
+
+Checked the signed-in deployed app at https://roomie-mockup.vercel.app.
+
+| Check | Result |
+|---|---|
+| Finances disclosure | Passed: initially collapsed; mouse click and Space open it, and Enter closes it. |
+| Keyboard focus on disclosure | Passed: focused summary has a visible 2px outline. |
+| Chore text sizes | Passed: titles render at 16px; schedule/due-date text at 14px with 21px line height; chart metadata renders at 14px. |
+| Desktop horizontal overflow | Passed on Finances and Chores schedule at 1440px viewport width. |
+| Mobile horizontal overflow | Chores schedule and chart passed at 390px width. Finances failed: a long purchase title extends the document to 866px. |
+| Lighthouse accessibility score | Not measured: the connected-browser tools do not expose Lighthouse, and the test environment has no Chrome executable for the CLI. No score or >=90 pass is claimed. |
+
+To complete Lighthouse testing, sign in using Chrome, open each affected page (Finances and Chores), then use DevTools > Lighthouse > Accessibility. Run mobile and desktop audits and record the scores, date, page state, and any failed audits. Audit the authenticated household content rather than the sign-in screen.
+
+Profile save/persistence and live security-test notes above remain pending; these UI checks do not verify them. Security tests require authorized dev environment configuration, which is unavailable in this checkout.
