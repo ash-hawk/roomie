@@ -6,6 +6,7 @@ import { S, household, resetState } from './lib/state.js';
 import { authView } from './pages/auth.js';
 import { onboardingView } from './pages/onboarding.js';
 import { settingsView } from './pages/settings.js';
+import { householdView } from './pages/household.js';
 import { financesView } from './pages/finances.js';
 import { choresView } from './pages/chores.js';
 import { calendarView } from './pages/calendar.js';
@@ -14,12 +15,12 @@ import { homeView } from './pages/home.js';
 import { soonView } from './pages/soon.js';
 import { toCents } from '../shared/money.ts';
 
-const NAV = [['home', 'home', 'Home'], ['calendar', 'calendar', 'Calendar'], ['finances', 'money', 'Finances'], ['chores', 'check', 'Chores'], ['settings', 'settings', 'Settings']];
+const NAV = [['home', 'home', 'Home'], ['calendar', 'calendar', 'Events'], ['finances', 'money', 'Finances'], ['chores', 'check', 'Chores'], ['household', 'users', 'Household']];
 // Real pages register here as each slice lands; everything else shows the "coming next" card.
-export const pages = { settings: settingsView, finances: financesView, chores: choresView, calendar: calendarView, notifications: notificationsView, home: homeView };
+export const pages = { settings: settingsView, household: householdView, finances: financesView, chores: choresView, calendar: calendarView, notifications: notificationsView, home: homeView };
 
 const root = $('#root');
-const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/')[0]; return r === 'notifications' || NAV.some(([k]) => k === r) ? r : 'home'; };
+const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/')[0]; return r === 'notifications' || r === 'settings' || NAV.some(([k]) => k === r) ? r : 'home'; };
 const loading = `<div class="page-skeleton" aria-label="Loading page" aria-busy="true"><div class="sk sk-title"></div><div class="sk sk-sub"></div>
   <div class="sk-grid"><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div></div></div>`;
 

@@ -1,7 +1,7 @@
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
-import { S, household } from '../lib/state.js';
-import { avatar, badge, closeModal, confirmDialog, esc, fmtDate, fullName, mhead, openModal, phead, showError, toast } from '../lib/dom.js';
+import { S } from '../lib/state.js';
+import { avatar, closeModal, confirmDialog, esc, mhead, openModal, phead, showError, toast } from '../lib/dom.js';
 
 const PAYMENT_APPS = [['venmo', 'Venmo'], ['zelle', 'Zelle'], ['apple_cash', 'Apple Cash']];
 let profileDirty = false;
@@ -24,32 +24,9 @@ function profileForm() {
     </form></section>`;
 }
 
-export async function settingsView() {
-  const h = household();
-  const { members } = await api(`/households/${h.householdId}/members`);
-  const current = members.filter((m) => !m.leftDate);
-  const former = members.filter((m) => m.leftDate);
-
-  const row = (m) => `
-    <div class="item row">
-      ${avatar(m)}
-      <div class="grow">
-        <b>${esc(fullName(m))}</b>
-        ${m.userId === S.user.userId ? ' <span class="mute">(you)</span>' : ''}
-        <div class="mute" style="font-size:13px">
-          ${m.leftDate
-            ? `Moved out ${fmtDate(m.leftDate, h.timezone)}`
-            : `Joined ${fmtDate(m.joinedDate, h.timezone)}`}
-        </div>
-      </div>
-      ${badge(
-        m.role === 'owner' ? 'Owner' : 'Member',
-        m.leftDate ? 'gray' : ''
-      )}
-    </div>`;
-
+export function settingsView() {
   return `
-    ${phead('Your space', 'Settings', 'Your account and household in one place.')}
+    ${phead('Your account', 'Profile', 'Manage the information your roommates can see.')}
 
     <div class="stack">
       ${profileForm()}
@@ -57,43 +34,8 @@ export async function settingsView() {
       <div class="acts" style="justify-content:flex-start">
         <button class="btn d" data-action="signout">Sign out</button>
       </div>
-
-      <section class="card invite-card">
-        <div class="eyebrow">Your household</div>
-        <h2>${esc(h.householdName)}</h2>
-        <p class="mute">
-          ${current.length} ${current.length === 1 ? 'member' : 'members'}
-          · ${esc(h.timezone)}
-        </p>
-
-        <hr class="hr">
-        <h3>Roommates</h3>
-        ${current.map(row).join('')}
-
-        ${former.length ? `
-          <details style="margin-top:16px">
-            <summary>Former roommates (${former.length})</summary>
-            ${former.map(row).join('')}
-          </details>
-        ` : ''}
-
-        <hr class="hr">
-        <h3>Invite roommates</h3>
-        <p class="mute invite-description">
-          Share this code. Anyone who signs up can join with it.
-        </p>
-        <div class="rowline">
-          <span class="code">${esc(h.joinCode)}</span>
-          <button
-            class="btn"
-            data-action="copy-code"
-            data-code="${esc(h.joinCode)}"
-          >Copy</button>
-        </div>
-      </section>
     </div>`;
 }
-actions['copy-code'] = async (el) => { try { await navigator.clipboard.writeText(el.dataset.code); toast('Join code copied'); } catch { toast(`Your code is ${el.dataset.code}`); } };
 
 const markProfileDirty = () => {
   profileDirty = true;

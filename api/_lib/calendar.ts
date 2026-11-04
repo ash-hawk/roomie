@@ -16,9 +16,12 @@ const whenText = (isoStr: string, tz: string) => new Date(isoStr).toLocaleString
 
 type EventRow = typeof s.event.$inferSelect;
 type TagRow = typeof s.eventTag.$inferSelect;
+// Event colors are now derived from the creator. Reuse the legacy nullable color column for the
+// custom label on "other" events; old hex values remain harmless and are treated as no label.
 const eventOut = (e: EventRow, tags: TagRow[], viewerId: number) => ({
   eventId: e.eventId, eventName: e.eventName, eventDate: iso(e.eventDate), endDate: e.endDate ? iso(e.endDate) : null, location: e.location,
-  category: e.category, color: e.color, reminderMinutesBefore: e.reminderMinutesBefore, description: e.description,
+  category: e.category, otherLabel: e.category === 'other' && e.color && !HEX.test(e.color) ? e.color : null,
+  reminderMinutesBefore: e.reminderMinutesBefore, description: e.description,
   createdByUserId: e.createdByUserId, canEdit: e.createdByUserId === viewerId,
   tags: tags.filter((t) => t.eventId === e.eventId).map((t) => ({ userId: t.userId, response: t.response, respondedDate: t.respondedDate ? iso(t.respondedDate) : null })),
 });
@@ -40,7 +43,7 @@ export async function listEvents(householdId: number, viewerId: number) {
 
 function eventFields(b: Record<string, unknown>) {
   const category = b.category === undefined ? 'other' : (CATEGORIES as readonly string[]).includes(b.category as string) ? (b.category as (typeof CATEGORIES)[number]) : (() => { throw new HttpError(400, 'Category must be hosting, meeting or other'); })();
-  const color = b.color == null || b.color === '' ? null : typeof b.color === 'string' && HEX.test(b.color) ? b.color : (() => { throw new HttpError(400, 'Color must look like #4338ca'); })();
+  const otherLabel = category === 'other' ? str(b.otherLabel, 1, 40, 'Other event label') : null;
   let reminder: number | null = null;
   if (b.reminderMinutesBefore != null && b.reminderMinutesBefore !== '') {
     reminder = Number(b.reminderMinutesBefore);
@@ -51,7 +54,7 @@ function eventFields(b: Record<string, unknown>) {
   return {
     eventName: str(b.eventName, 1, 120, 'Event name'), date: ymd(b.date, 'Date'), time: hhmm(b.time, 'Time'),
     endTime: b.endTime == null || b.endTime === '' ? null : hhmm(b.endTime, 'End time'),
-    location: optStr(b.location, 120, 'Location'), description: optStr(b.description, 500, 'Description'), category, color, reminder, tagged,
+    location: optStr(b.location, 120, 'Location'), description: optStr(b.description, 500, 'Description'), category, otherLabel, reminder, tagged,
   };
 }
 
@@ -76,7 +79,7 @@ export async function createEvent(user: CurrentUser, householdId: number, b: Rec
     const end = f.endTime ? sql`((${f.date}::date + ${f.endTime}::time) AT TIME ZONE ${tz})` : null;
     if (end) { const ok = await tx.execute(sql`SELECT ${end} >= ${start} AS ok`); if (!(ok.rows[0] as { ok: boolean }).ok) throw new HttpError(400, 'The event cannot end before it starts'); }
     const [e] = await tx.insert(s.event).values({ householdId, createdByUserId: user.userId, eventName: f.eventName, eventDate: start, endDate: end, location: f.location,
-      category: f.category, color: f.color, reminderMinutesBefore: f.reminder, description: f.description }).returning();
+      category: f.category, color: f.otherLabel, reminderMinutesBefore: f.reminder, description: f.description }).returning();
     await tagRoommates(tx, householdId, e!, tagged, user, tz);
     const tags = await tx.select().from(s.eventTag).where(eq(s.eventTag.eventId, e!.eventId));
     return eventOut(e!, tags, user.userId);
@@ -97,7 +100,7 @@ export async function updateEvent(user: CurrentUser, householdId: number, eventI
     const start = sql`((${f.date}::date + ${f.time}::time) AT TIME ZONE ${tz})`;
     const end = f.endTime ? sql`((${f.date}::date + ${f.endTime}::time) AT TIME ZONE ${tz})` : null;
     if (end) { const ok = await tx.execute(sql`SELECT ${end} >= ${start} AS ok`); if (!(ok.rows[0] as { ok: boolean }).ok) throw new HttpError(400, 'The event cannot end before it starts'); }
-    const [e] = await tx.update(s.event).set({ eventName: f.eventName, eventDate: start, endDate: end, location: f.location, category: f.category, color: f.color, reminderMinutesBefore: f.reminder, description: f.description })
+    const [e] = await tx.update(s.event).set({ eventName: f.eventName, eventDate: start, endDate: end, location: f.location, category: f.category, color: f.otherLabel, reminderMinutesBefore: f.reminder, description: f.description })
       .where(eq(s.event.eventId, eventId)).returning();
     const gone = have.filter((t) => !wanted.includes(t.userId)).map((t) => t.userId);
     if (gone.length) await tx.delete(s.eventTag).where(and(eq(s.eventTag.eventId, eventId), inArray(s.eventTag.userId, gone)));
