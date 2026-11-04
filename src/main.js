@@ -54,7 +54,7 @@ function shell(page, body) {
   const accent = h.themeColor || '#4338ca'; document.documentElement.style.setProperty('--accent', accent); document.documentElement.style.setProperty('--on-accent', accentInk(accent));
   const account = S.user.profilePhoto ? `<img class="acct-photo" src="${esc(S.user.profilePhoto)}" alt="" referrerpolicy="no-referrer">` : esc(((S.user.firstName || '?')[0]).toUpperCase());
   return `<div class="shell"><div class="main">
-    <header class="top"><div class="brand">${mark()}<div class="grow"><b>Roomie</b><small class="truncate">${esc(h.householdName)}</small></div></div>
+    <header class="top"><a href="/#/home"><div class="brand">${mark()}<div class="grow"><b>Roomie</b><small class="truncate">${esc(h.householdName)}</small></div></div></a>
       <div class="row" style="gap:10px">${bellHtml()}
       <button class="iconbtn acct" data-action="account" aria-label="Your profile and household">${account}</button></div></header>
     <nav class="pillnav" aria-label="Main">${items}</nav>
