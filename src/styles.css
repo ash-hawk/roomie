@@ -567,7 +567,6 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .home-calendar-item b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .home-calendar-item.completed b{text-decoration:line-through;color:var(--mute)}
 .home-more{font-size:11px;color:var(--mute)}.home-mobile-count{display:none}
-.home-calendar-hint{margin-top:12px}
 .home-finances{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .home-balance{display:flex;gap:24px;flex-wrap:wrap}.home-balance span{display:flex;gap:8px;color:var(--mute)}.home-balance b{color:var(--ink)}
 .home-schedule button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
