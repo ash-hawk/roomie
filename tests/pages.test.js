@@ -224,7 +224,7 @@ describe('Home household board', () => {
   const request = { swapId: 7, type: 'skip', requesterAssignmentId: 20, targetAssignmentId: null, requesterUserId: 2, targetUserId: null, requestMessage: 'Visiting family' };
   let boardChores, boardEvents, notes;
   async function renderBoard() {
-    boardChores = { chores: [{ choreId: 5, choreName: 'Laundry' }], assignments: [assignment], swapRequests: [request] };
+    boardChores = { chores: [{ choreId: 5, choreName: 'Laundry', repeats: 'weekly', effort: 'medium', rotation: [1, 2], schedule: 'Every Monday' }], assignments: [assignment], swapRequests: [request] };
     boardEvents = [{ ...events[0], eventId: 9, createdByUserId: 2, tags: [{ userId: 1, response: 'pending' }] }];
     notes = [{ messageId: 8, senderUserId: 2, messageText: 'Same announcement as Events', postedDate: '2026-11-05T17:00:00Z', isPinned: true, replies: [] }];
     mockedApi.mockImplementation(async (path, options = {}) => {
@@ -244,10 +244,31 @@ describe('Home household board', () => {
     expect(board.textContent).toContain('Jordan needs someone to cover Laundry');
     expect(board.textContent).toContain('I can cover');
     expect(board.textContent).toContain('Same announcement as Events');
+    expect(board.querySelector('.home-board-columns')).toBeNull();
+    expect(board.textContent).not.toMatch(/Needs your response|Your requests/);
+    expect(board.querySelector('[aria-label="Household announcements and requests"] > article')).not.toBeNull();
     expect(board.querySelector('[data-kind=event][data-response=accepted]')).not.toBeNull();
     boardChores.swapRequests = [{ ...request, type: 'swap', targetUserId: 3 }];
     document.getElementById('page').innerHTML = await homeView();
     expect(document.querySelector('#home-board [data-kind=chore]')).toBeNull();
+  });
+  it('shows the same cover request on both Chores views with a working response control', async () => {
+    await renderBoard();
+    const { choresView } = await import('../src/pages/chores.js');
+    document.getElementById('page').innerHTML = await choresView();
+    const board = document.querySelector('.chore-requests-board');
+    expect(board.textContent).toContain('Chore requests');
+    expect(board.textContent).toContain('Cover request');
+    expect(board.textContent).toContain('Laundry');
+    expect(board.querySelector('[data-action=open-request]').dataset.id).toBe('7');
+    actions['open-request'](board.querySelector('[data-action=open-request]'));
+    expect(document.querySelector('[role=dialog]').textContent).toContain('Can you cover?');
+    expect(document.querySelector('form[data-form=respond]').dataset.id).toBe('7');
+    actions['chore-tab']({ dataset: { value: 'chart' } });
+    document.getElementById('page').innerHTML = await choresView();
+    expect(document.querySelectorAll('.chore-requests-board')).toHaveLength(1);
+    expect(document.querySelector('.chore-requests-board').textContent).toContain('Laundry');
+    actions['chore-tab']({ dataset: { value: 'schedule' } });
   });
   it('accepts cover through the existing endpoint and removes the resolved request, preserving an announcement draft', async () => {
     await renderBoard();
