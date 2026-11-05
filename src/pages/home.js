@@ -28,20 +28,20 @@ function row(item) {
     <div class="hint">${timeFmt(item.at)} · ${item.kind === 'event' ? 'Added by ' : ''}${esc(name)}${item.location ? ` · ${esc(item.location)}` : ''}</div></div>${avatar(member, 'sm')}</a>`;
 }
 
-function monthNav() {
+function monthNav(view) {
   const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-  return `<div class="month-nav"><button class="btn s" data-action="home-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="home-month" data-n="1" aria-label="Next month">›</button></div>`;
+  return `<div class="home-schedule-toolbar"><div class="month-nav"><button class="btn s" data-action="home-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="home-month" data-n="1" aria-label="Next month">›</button></div><select class="input home-view-select" data-input="home-view" aria-label="Schedule view">${[['calendar', 'Calendar view'], ['list', 'List view']].map(([key, label]) => `<option value="${key}" ${view === key ? 'selected' : ''}>${label}</option>`).join('')}</select></div>`;
 }
 
 function listView() {
   const items = D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7));
-  return `${monthNav()}${items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('')
+  return `${monthNav('list')}${items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('')
     : '<p class="home-empty">No events or chores this month.</p>'}`;
 }
 
 function calendarView() {
   const today = ymdIn(Date.now());
-  return `${monthNav()}
+  return `${monthNav('calendar')}
     <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div>
     <div class="mgrid home-month">${monthDays(monthStart).map((day) => {
       const items = D.items.filter((item) => item.ymd === day);
@@ -61,8 +61,7 @@ export async function homeView() {
   const view = getView();
   const owed = balances.mine.reduce((sum, b) => sum + Math.max(0, -toCents(b.signedAmount)), 0);
   const owingMe = balances.mine.reduce((sum, b) => sum + Math.max(0, toCents(b.signedAmount)), 0);
-  const viewSelect = `<select class="input home-view-select" data-input="home-view" aria-label="Schedule view">${[['calendar', 'Calendar view'], ['list', 'List view']].map(([key, label]) => `<option value="${key}" ${view === key ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
-  return `${phead(esc(household().householdName), 'Shared household schedule', 'See an overview of what’s happening in your household.', viewSelect)}
+  return `${phead(esc(household().householdName), 'Shared household schedule', 'See an overview of what’s happening in your household.')}
     <div class="page-content stack"><section class="card stack home-board" id="home-board">${householdBoard(D)}</section><section class="card stack home-schedule" aria-label="Shared household schedule">
     <div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content" data-view="${view}">${view === 'calendar' ? calendarView() : listView()}</div></section>
     <section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section></div>`;
@@ -76,7 +75,9 @@ inputs['home-view'] = (el) => {
   const content = document.getElementById('home-schedule-content');
   content.dataset.view = view;
   content.className = view === 'list' ? 'stack' : '';
+  const keepFocus = document.activeElement === el;
   content.innerHTML = view === 'calendar' ? calendarView() : listView();
+  if (keepFocus) content.querySelector('[data-input=home-view]')?.focus();
 };
 actions['home-month'] = (el) => {
   const d = new Date(`${monthStart}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + Number(el.dataset.n)); monthStart = `${d.toISOString().slice(0, 7)}-01`;
