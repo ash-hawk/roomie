@@ -27,19 +27,20 @@ function row(item) {
     <div class="hint">${timeFmt(item.at)} · ${item.kind === 'event' ? 'Added by ' : ''}${esc(name)}${item.location ? ` · ${esc(item.location)}` : ''}</div></div>${avatar(member, 'sm')}</a>`;
 }
 
+function monthNav() {
+  const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
+  return `<div class="month-nav"><button class="btn s" data-action="home-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="home-month" data-n="1" aria-label="Next month">›</button></div>`;
+}
+
 function listView() {
-  const today = ymdIn(Date.now());
-  const upcoming = D.items.filter((item) => item.ymd >= today);
-  const overdue = D.items.filter((item) => item.kind === 'chore' && !item.completed && item.ymd < today);
-  return `${overdue.length ? `<section class="stack home-day"><h3>Overdue chores</h3>${overdue.map((item) => `<div><div class="hint">${esc(dayLabel(item.ymd))}</div>${row(item)}</div>`).join('')}</section>` : ''}
-    ${upcoming.length ? [...new Set(upcoming.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${upcoming.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('')
-      : '<p class="home-empty">No upcoming events or chores. Your household schedule will appear here.</p>'}`;
+  const items = D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7));
+  return `${monthNav()}${items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('')
+    : '<p class="home-empty">No events or chores this month.</p>'}`;
 }
 
 function calendarView() {
   const today = ymdIn(Date.now());
-  const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-  return `<div class="month-nav"><button class="btn s" data-action="home-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="home-month" data-n="1" aria-label="Next month">›</button></div>
+  return `${monthNav()}
     <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div>
     <div class="mgrid home-month">${monthDays(monthStart).map((day) => {
       const items = D.items.filter((item) => item.ymd === day);
@@ -62,7 +63,7 @@ export async function homeView() {
   const viewSelect = `<select class="input home-view-select" data-input="home-view" aria-label="Schedule view">${[['calendar', 'Calendar view'], ['list', 'List view']].map(([key, label]) => `<option value="${key}" ${view === key ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
   return `${phead(esc(household().householdName), 'Shared household schedule', 'See an overview of what’s happening in your household.', viewSelect)}
     <div class="page-content stack"><section class="card stack home-schedule" aria-label="Shared household schedule">
-    <div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content">${view === 'calendar' ? calendarView() : listView()}</div></section>
+    <div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content" data-view="${view}">${view === 'calendar' ? calendarView() : listView()}</div></section>
     <section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section></div>`;
 }
 
@@ -72,12 +73,14 @@ inputs['home-view'] = (el) => {
   try { localStorage.setItem(viewKey(), view); } catch { /* Display still changes when storage is unavailable. */ }
   // Use the same loaded items and keep keyboard focus on the view dropdown.
   const content = document.getElementById('home-schedule-content');
+  content.dataset.view = view;
   content.className = view === 'list' ? 'stack' : '';
   content.innerHTML = view === 'calendar' ? calendarView() : listView();
 };
 actions['home-month'] = (el) => {
   const d = new Date(`${monthStart}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + Number(el.dataset.n)); monthStart = `${d.toISOString().slice(0, 7)}-01`;
-  document.getElementById('home-schedule-content').innerHTML = calendarView();
+  const content = document.getElementById('home-schedule-content');
+  content.innerHTML = content.dataset.view === 'calendar' ? calendarView() : listView();
 };
 actions['home-day'] = (el) => {
   const items = D.items.filter((item) => item.ymd === el.dataset.day);

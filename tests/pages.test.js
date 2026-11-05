@@ -107,6 +107,43 @@ describe("profile save", () => {
   });
 });
 describe("Home views", () => {
+  it("limits the list to one month and keeps month navigation in List view across year boundaries", async () => {
+    S.hid = 2; S.households = [{ householdId: 2, householdName: 'Another house', timezone: 'America/Denver' }];
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => path.endsWith('/events') ? Promise.resolve({ events: [
+      ...events,
+      { ...events[0], eventId: 2, eventName: 'December plan', eventDate: '2026-12-01T20:00:00Z' },
+      { ...events[0], eventId: 3, eventName: 'January plan', eventDate: '2027-01-01T20:00:00Z' },
+    ] }) : baseApi(path));
+    document.getElementById('page').innerHTML = await homeView();
+    const content = document.getElementById('home-schedule-content');
+    expect(content.textContent).toContain('November 2026');
+    expect(content.textContent).toContain('Dinner');
+    expect(content.textContent).not.toContain('December plan');
+    const next = () => actions['home-month'](content.querySelector('[data-n="1"]'));
+    next();
+    expect(content.textContent).toContain('December 2026');
+    expect(content.textContent).toContain('December plan');
+    expect(content.textContent).not.toContain('Dinner');
+    expect(content.textContent).not.toContain('January plan');
+    expect(content.querySelector('.home-month')).toBeNull();
+    next();
+    expect(content.textContent).toContain('January 2027');
+    expect(content.textContent).toContain('January plan');
+    expect(content.textContent).not.toContain('December plan');
+    const picker = document.querySelector('[data-input="home-view"]');
+    picker.value = 'calendar'; inputs['home-view'](picker);
+    expect(content.textContent).toContain('January 2027');
+    expect(content.querySelector('.home-month')).not.toBeNull();
+    picker.value = 'list'; inputs['home-view'](picker);
+    next();
+    expect(content.textContent).toContain('February 2027');
+    expect(content.textContent).toContain('No events or chores this month.');
+    actions['home-month'](content.querySelector('[data-n="-1"]'));
+    expect(content.textContent).toContain('January plan');
+    expect(mockedApi).toHaveBeenCalledTimes(4);
+  });
+
   it("switches the same household-wide items between list and calendar, with pending approval visible", async () => {
     document.getElementById("page").innerHTML = await homeView();
     expect(document.body.textContent).not.toMatch(/Customize|My chores/);
