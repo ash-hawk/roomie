@@ -168,3 +168,53 @@ describe("Home views", () => {
     expect(mockedApi).toHaveBeenCalledTimes(4);
   });
 });
+
+describe('chore rotation order', () => {
+  async function rotationForm() {
+    const { choresView } = await import('../src/pages/chores.js');
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => path.endsWith('/chores') ? Promise.resolve({ chores: [], assignments: [], swapRequests: [] }) : baseApi(path));
+    document.getElementById('page').innerHTML = await choresView();
+    actions['add-chore']();
+    const form = document.querySelector('form[data-form=chore-add]');
+    form.elements.namedItem('mode').value = 'rotate'; inputs['chore-who']();
+    return form;
+  }
+  it('moves roommates up/down, preserves selections, and submits the displayed checked order', async () => {
+    const form = await rotationForm();
+    const list = form.querySelector('.rotation-list');
+    expect(list.firstElementChild.querySelector('[data-direction=up]').disabled).toBe(true);
+    expect(list.lastElementChild.querySelector('[data-direction=down]').disabled).toBe(true);
+    const sam = list.lastElementChild;
+    actions['rotation-move'](sam.querySelector('[data-direction=up]'));
+    actions['rotation-move'](sam.querySelector('[data-direction=up]'));
+    expect([...new FormData(form).getAll('rot')]).toEqual(['3', '1', '2']);
+    form.querySelector('[name=rot][value="1"]').checked = false;
+    actions['rotation-move'](sam.querySelector('[data-direction=down]'));
+    expect(form.querySelector('[name=rot][value="1"]').checked).toBe(false);
+    expect([...new FormData(form).getAll('rot')]).toEqual(['3', '2']);
+    form.elements.namedItem('choreName').value = 'Take out trash';
+    mockedApi.mockResolvedValue({ occurrences: 2 });
+    await forms['chore-add'](form);
+    expect(mockedApi.mock.calls.at(-1)[1].body.assignment).toEqual({ mode: 'rotate', userIds: [3, 2] });
+  });
+  it('drags a roommate into a new position without changing who is selected', async () => {
+    const form = await rotationForm();
+    const list = form.querySelector('.rotation-list');
+    const sam = list.lastElementChild, alex = list.firstElementChild;
+    const transfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' };
+    const drag = (target, type) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperties(event, { dataTransfer: { value: transfer }, clientY: { value: 0 } });
+      target.dispatchEvent(event);
+      return event;
+    };
+    drag(sam.querySelector('[data-rotation-drag]'), 'dragstart');
+    expect(transfer.setData).toHaveBeenCalledWith('text/plain', '3');
+    expect(drag(alex, 'dragover').defaultPrevented).toBe(true);
+    drag(alex, 'drop');
+    expect([...new FormData(form).getAll('rot')]).toEqual(['3', '1', '2']);
+    expect(list.querySelector('.dragging,.drag-target')).toBeNull();
+    expect(document.getElementById('rotation-status').textContent).toContain('position 1 of 3');
+  });
+});

@@ -96,3 +96,5 @@
 - Date is above side-by-side start/end inputs. The custom event label is visible and required only for Other; hidden fields respect the global hidden attribute.
 - Ask for approval explains pending events; Select all roommates excludes the creator and synchronizes checked/partial selection. Progress is shown on Events and Home, including calendar entries and day details.
 - Repeating events are deferred. This change contains no database migration or schema changes.
+
+- The Add chore rotation list supports dragging by its grip and up/down buttons. Checked roommates are submitted in the displayed order; reordering never changes checkbox selections. No backend/schema change is needed for ordering.
