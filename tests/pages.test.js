@@ -152,6 +152,8 @@ describe("Home views", () => {
     expect(document.body.textContent).toContain("Pending approval");
     const picker = document.querySelector('[data-input="home-view"]');
     expect([...picker.options].map((option) => option.textContent)).toEqual(['Calendar view', 'List view']);
+    expect(picker.closest('.home-schedule')).not.toBeNull();
+    expect(document.querySelector('.page-header [data-input=home-view]')).toBeNull();
     picker.value = 'calendar';
     inputs['home-view'](picker);
     expect(picker.value).toBe('calendar');
