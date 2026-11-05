@@ -141,7 +141,7 @@ describe("Home views", () => {
     expect(content.textContent).toContain('No events or chores this month.');
     actions['home-month'](content.querySelector('[data-n="-1"]'));
     expect(content.textContent).toContain('January plan');
-    expect(mockedApi).toHaveBeenCalledTimes(4);
+    expect(mockedApi).toHaveBeenCalledTimes(5);
   });
 
   it("switches the same household-wide items between list and calendar, with pending approval visible", async () => {
@@ -165,7 +165,7 @@ describe("Home views", () => {
     picker.value = 'list';
     inputs['home-view'](picker);
     expect(document.getElementById("home-schedule-content").textContent.indexOf("Dishes")).toBeLessThan(document.getElementById("home-schedule-content").textContent.indexOf("Dinner"));
-    expect(mockedApi).toHaveBeenCalledTimes(4);
+    expect(mockedApi).toHaveBeenCalledTimes(5);
   });
 });
 
@@ -216,5 +216,84 @@ describe('chore rotation order', () => {
     expect([...new FormData(form).getAll('rot')]).toEqual(['3', '1', '2']);
     expect(list.querySelector('.dragging,.drag-target')).toBeNull();
     expect(document.getElementById('rotation-status').textContent).toContain('position 1 of 3');
+  });
+});
+
+describe('Home household board', () => {
+  const assignment = { assignmentId: 20, choreId: 5, assignedUserId: 2, dueAt: '2026-11-16T14:00:00Z', isCompleted: false };
+  const request = { swapId: 7, type: 'skip', requesterAssignmentId: 20, targetAssignmentId: null, requesterUserId: 2, targetUserId: null, requestMessage: 'Visiting family' };
+  let boardChores, boardEvents, notes;
+  async function renderBoard() {
+    boardChores = { chores: [{ choreId: 5, choreName: 'Laundry' }], assignments: [assignment], swapRequests: [request] };
+    boardEvents = [{ ...events[0], eventId: 9, createdByUserId: 2, tags: [{ userId: 1, response: 'pending' }] }];
+    notes = [{ messageId: 8, senderUserId: 2, messageText: 'Same announcement as Events', postedDate: '2026-11-05T17:00:00Z', isPinned: true, replies: [] }];
+    mockedApi.mockImplementation(async (path, options = {}) => {
+      if (options.method) return {};
+      if (path.endsWith('/members')) return { members };
+      if (path.endsWith('/events')) return { events: boardEvents };
+      if (path.endsWith('/chores')) return boardChores;
+      if (path.endsWith('/balances')) return { mine: [] };
+      if (path.endsWith('/board')) return { notes };
+      throw new Error('Unexpected path ' + path);
+    });
+    document.getElementById('page').innerHTML = await homeView();
+  }
+  it('shows actionable requests and the same announcements, without granting unrelated swap controls', async () => {
+    await renderBoard();
+    const board = document.getElementById('home-board');
+    expect(board.textContent).toContain('Jordan needs someone to cover Laundry');
+    expect(board.textContent).toContain('I can cover');
+    expect(board.textContent).toContain('Same announcement as Events');
+    expect(board.querySelector('[data-kind=event][data-response=accepted]')).not.toBeNull();
+    boardChores.swapRequests = [{ ...request, type: 'swap', targetUserId: 3 }];
+    document.getElementById('page').innerHTML = await homeView();
+    expect(document.querySelector('#home-board [data-kind=chore]')).toBeNull();
+  });
+  it('accepts cover through the existing endpoint and removes the resolved request, preserving an announcement draft', async () => {
+    await renderBoard();
+    document.querySelector('[data-form=home-note-new] textarea').value = 'My unsent draft';
+    boardChores = { ...boardChores, swapRequests: [] };
+    const button = document.querySelector('[data-kind=chore][data-response=accept]');
+    await actions['home-board-response'](button);
+    expect(mockedApi).toHaveBeenCalledWith('/households/1/swap-requests/7', { method: 'PATCH', body: { action: 'accept' } });
+    expect(document.querySelector('#home-board [data-kind=chore]')).toBeNull();
+    expect(document.querySelector('[data-form=home-note-new] textarea').value).toBe('My unsent draft');
+  });
+  it('lets a requester see and cancel their own request, without offering to cover it themselves', async () => {
+    await renderBoard();
+    boardChores = { ...boardChores, swapRequests: [{ ...request, requesterUserId: 1 }] };
+    document.getElementById('page').innerHTML = await homeView();
+    expect(document.getElementById('home-board').textContent).toContain('Waiting for a volunteer');
+    expect(document.querySelector('[data-kind=chore][data-response=accept]')).toBeNull();
+    await actions['home-board-response'](document.querySelector('[data-kind=chore][data-response=withdraw]'));
+    expect(mockedApi).toHaveBeenCalledWith('/households/1/swap-requests/7', { method: 'PATCH', body: { action: 'withdraw' } });
+  });
+  it('submits event approval without duplicating an event or a board post', async () => {
+    await renderBoard();
+    boardEvents = [];
+    await actions['home-board-response'](document.querySelector('[data-kind=event][data-response=accepted]'));
+    const writes = mockedApi.mock.calls.filter(([, options]) => options?.method);
+    expect(writes).toEqual([['/households/1/events/9/respond', { method: 'POST', body: { response: 'accepted' } }]]);
+  });
+  it('keeps a failed response visible and retryable', async () => {
+    await renderBoard();
+    const button = document.querySelector('[data-kind=chore][data-response=accept]');
+    mockedApi.mockRejectedValueOnce(new Error('Connection lost'));
+    await actions['home-board-response'](button);
+    expect(button.disabled).toBe(false);
+    expect(button.closest('article').querySelector('.err').textContent).toBe('Connection lost');
+  });
+  it('posts and replies to the existing shared board records', async () => {
+    await renderBoard();
+    const form = document.querySelector('[data-form=home-note-new]');
+    form.elements.namedItem('messageText').value = 'Pizza tonight';
+    notes = [...notes, { messageId: 10, senderUserId: 1, messageText: 'Pizza tonight', postedDate: '2026-11-05T18:00:00Z', replies: [] }];
+    await forms['home-note-new'](form);
+    expect(mockedApi).toHaveBeenCalledWith('/households/1/board', { method: 'POST', body: { messageText: 'Pizza tonight' } });
+    expect(document.getElementById('home-board').textContent).toContain('Pizza tonight');
+    const reply = document.querySelector('[data-form=home-note-reply][data-id="8"]');
+    reply.elements.namedItem('messageText').value = 'Sounds good';
+    await forms['home-note-reply'](reply);
+    expect(mockedApi).toHaveBeenCalledWith('/households/1/board', { method: 'POST', body: { messageText: 'Sounds good', parentMessageId: 8 } });
   });
 });

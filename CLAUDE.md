@@ -98,3 +98,7 @@
 - Repeating events are deferred. This change contains no database migration or schema changes.
 
 - The Add chore rotation list supports dragging by its grip and up/down buttons. Checked roommates are submitted in the displayed order; reordering never changes checkbox selections. No backend/schema change is needed for ordering.
+
+## Household board on Home
+- Home composes the same board, events, and chores endpoints into a Household board above the schedule. Current cover requests are open to other roommates; swaps show response controls only to their target; requesters can see and cancel their own open requests. Upcoming event approval requests and creator approval progress are shown too.
+- Announcements and replies use the same bulletin records as the Events board, with posting/replying on Home and linked events. Responses use existing server-validated endpoints and refresh the board and schedule. No new database schema or notifications copies.

@@ -1,10 +1,11 @@
 // Home shows one household schedule in two formats; feature pages own editing and responses.
-import { actions, inputs } from '../lib/events.js';
+import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { avatar, closeModal, esc, mhead, money, openModal, personColor, phead } from '../lib/dom.js';
+import { avatar, closeModal, esc, mhead, money, openModal, personColor, phead, showError, toast } from '../lib/dom.js';
 import { addDays } from '../../shared/chore-dates.ts';
 import { monthDays, scheduleItems } from '../../shared/home-schedule.ts';
+import { householdBoard } from '../components/household-board.js';
 import { toCents } from '../../shared/money.ts';
 
 const hid = () => household().householdId;
@@ -51,10 +52,10 @@ function calendarView() {
 }
 
 export async function homeView() {
-  const [{ members }, { events }, chores, balances] = await Promise.all([
-    api(`/households/${hid()}/members`), api(`/households/${hid()}/events`), api(`/households/${hid()}/chores`), api(`/households/${hid()}/balances`),
+  const [{ members }, { events }, chores, balances, { notes }] = await Promise.all([
+    api(`/households/${hid()}/members`), api(`/households/${hid()}/events`), api(`/households/${hid()}/chores`), api(`/households/${hid()}/balances`), api(`/households/${hid()}/board`),
   ]);
-  D = { members, items: scheduleItems(events, chores, tz()) };
+  D = { householdId: hid(), members, events, chores, notes, user: S.user, timezone: tz(), items: scheduleItems(events, chores, tz()) };
   if (monthHousehold !== hid()) { monthStart = null; monthHousehold = hid(); }
   monthStart ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   const view = getView();
@@ -62,7 +63,7 @@ export async function homeView() {
   const owingMe = balances.mine.reduce((sum, b) => sum + Math.max(0, toCents(b.signedAmount)), 0);
   const viewSelect = `<select class="input home-view-select" data-input="home-view" aria-label="Schedule view">${[['calendar', 'Calendar view'], ['list', 'List view']].map(([key, label]) => `<option value="${key}" ${view === key ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
   return `${phead(esc(household().householdName), 'Shared household schedule', 'See an overview of what’s happening in your household.', viewSelect)}
-    <div class="page-content stack"><section class="card stack home-schedule" aria-label="Shared household schedule">
+    <div class="page-content stack"><section class="card stack home-board" id="home-board">${householdBoard(D)}</section><section class="card stack home-schedule" aria-label="Shared household schedule">
     <div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content" data-view="${view}">${view === 'calendar' ? calendarView() : listView()}</div></section>
     <section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section></div>`;
 }
@@ -93,3 +94,54 @@ actions['home-open'] = (el) => {
   }
   location.hash = el.getAttribute('href');
 };
+
+async function refreshHomeBoard(onlyChanged = false) {
+  const householdId = D.householdId;
+  const [{ events }, chores, { notes }] = await Promise.all([api(`/households/${householdId}/events`), api(`/households/${householdId}/chores`), api(`/households/${householdId}/board`)]);
+  if (hid() !== householdId || !document.getElementById('home-board')) return;
+  if (onlyChanged && JSON.stringify([events, chores, notes]) === JSON.stringify([D.events, D.chores, D.notes])) return;
+  const drafts = [...document.querySelectorAll('#home-board form')].map((form) => ({ kind: form.dataset.form, id: form.dataset.id, message: form.elements.namedItem('messageText')?.value ?? '', eventId: form.elements.namedItem('eventId')?.value ?? '' }));
+  D = { ...D, events, chores, notes, items: scheduleItems(events, chores, tz()) };
+  document.getElementById('home-board').innerHTML = householdBoard(D);
+  for (const form of document.querySelectorAll('#home-board form')) {
+    const draft = drafts.find((d) => d.kind === form.dataset.form && d.id === form.dataset.id);
+    if (!draft) continue;
+    form.elements.namedItem('messageText').value = draft.message;
+    const eventField = form.elements.namedItem('eventId'); if (eventField) eventField.value = draft.eventId;
+  }
+  const content = document.getElementById('home-schedule-content');
+  if (content) content.innerHTML = content.dataset.view === 'calendar' ? calendarView() : listView();
+}
+actions['home-board-response'] = async (button) => {
+  const card = button.closest('article');
+  card.setAttribute('aria-busy', 'true');
+  const buttons = [...card.querySelectorAll('button')];
+  buttons.forEach((el) => { el.disabled = true; });
+  showError(card, '');
+  const kind = button.dataset.kind, id = Number(button.dataset.id), answer = button.dataset.response;
+  try {
+    if (kind === 'event') await api(`/households/${D.householdId}/events/${id}/respond`, { method: 'POST', body: { response: answer } });
+    else await api(`/households/${D.householdId}/swap-requests/${id}`, { method: 'PATCH', body: { action: answer } });
+  } catch (error) { showError(card, error.message); return; }
+  finally { card.removeAttribute('aria-busy'); buttons.forEach((el) => { el.disabled = false; }); }
+  toast(answer === 'withdraw' ? 'Request cancelled' : 'Response saved');
+  try { await refreshHomeBoard(); } catch { card.innerHTML = '<p class="hint" role="status">Response saved. Refresh Home to see the latest requests.</p>'; }
+};
+const postHomeNote = async (form, reply) => {
+  const data = new FormData(form), body = { messageText: data.get('messageText') };
+  if (reply) body.parentMessageId = Number(form.dataset.id);
+  else if (data.get('eventId')) body.eventId = Number(data.get('eventId'));
+  try { await api(`/households/${D.householdId}/board`, { method: 'POST', body }); }
+  catch (error) { showError(form, error.message); return; }
+  form.reset(); toast(reply ? 'Reply posted' : 'Announcement posted');
+  try { await refreshHomeBoard(); } catch { showError(form, 'Posted successfully. Refresh Home to see the latest announcements.'); }
+};
+forms['home-note-new'] = (form) => postHomeNote(form, false);
+forms['home-note-reply'] = (form) => postHomeNote(form, true);
+
+// Like the Events board, refresh while idle; never interrupt editing or an in-flight response.
+setInterval(async () => {
+  if (document.hidden || document.getElementById('root')?.dataset.page !== 'home' || !D || document.getElementById('modal')) return;
+  if (document.activeElement?.closest?.('form,input,textarea,select,button') || document.querySelector('#home-board [aria-busy=true]')) return;
+  try { await refreshHomeBoard(true); } catch { /* Keep the last snapshot while offline. */ }
+}, 15000);
