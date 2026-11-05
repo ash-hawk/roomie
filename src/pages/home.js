@@ -61,7 +61,7 @@ export async function homeView() {
   const view = getView();
   const owed = balances.mine.reduce((sum, b) => sum + Math.max(0, -toCents(b.signedAmount)), 0);
   const owingMe = balances.mine.reduce((sum, b) => sum + Math.max(0, toCents(b.signedAmount)), 0);
-  return `${phead(esc(household().householdName), 'Shared household schedule', 'See an overview of what’s happening in your household.')}
+  return `${phead(esc(household().householdName), 'Shared household schedule', 'Here you can see an overview of what’s happening in your household!')}
     <div class="page-content stack"><section class="card stack home-board" id="home-board">${householdBoard(D)}</section><section class="card stack home-schedule" aria-label="Shared household schedule">
     <div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content" data-view="${view}">${view === 'calendar' ? calendarView() : listView()}</div></section>
     <section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section></div>`;
