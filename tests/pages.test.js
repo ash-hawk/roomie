@@ -113,9 +113,11 @@ describe("Home views", () => {
     expect(document.body.textContent).toContain("Dishes");
     expect(document.body.textContent).toContain("Dinner");
     expect(document.body.textContent).toContain("Pending approval");
-    const button = document.querySelector("[data-value=calendar]");
-    actions["home-view"](button);
-    expect(button.getAttribute("aria-pressed")).toBe("true");
+    const picker = document.querySelector('[data-input="home-view"]');
+    expect([...picker.options].map((option) => option.textContent)).toEqual(['Calendar view', 'List view']);
+    picker.value = 'calendar';
+    inputs['home-view'](picker);
+    expect(picker.value).toBe('calendar');
     const day = document.querySelector('[data-day="2026-11-05"]');
     expect(day.textContent).toContain("Dishes");
     expect(day.textContent).toContain("Dinner");
@@ -123,7 +125,8 @@ describe("Home views", () => {
     actions["home-day"](day);
     expect(document.querySelector("[role=dialog]").textContent).toContain("Sam");
     expect(document.querySelector("[role=dialog]").textContent).toContain("Dinner");
-    actions["home-view"](document.querySelector("[data-value=list]"));
+    picker.value = 'list';
+    inputs['home-view'](picker);
     expect(document.getElementById("home-schedule-content").textContent.indexOf("Dishes")).toBeLessThan(document.getElementById("home-schedule-content").textContent.indexOf("Dinner"));
     expect(mockedApi).toHaveBeenCalledTimes(4);
   });

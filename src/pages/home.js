@@ -1,9 +1,8 @@
 // Home shows one household schedule in two formats; feature pages own editing and responses.
-import { actions } from '../lib/events.js';
+import { actions, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
 import { avatar, closeModal, esc, mhead, money, openModal, personColor, phead } from '../lib/dom.js';
-import { greeting } from '../../shared/home.ts';
 import { addDays } from '../../shared/chore-dates.ts';
 import { monthDays, scheduleItems } from '../../shared/home-schedule.ts';
 import { toCents } from '../../shared/money.ts';
@@ -40,7 +39,7 @@ function listView() {
 function calendarView() {
   const today = ymdIn(Date.now());
   const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-  return `<div class="month-nav"><button class="btn s" data-action="home-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h3>${title}</h3><button class="btn s" data-action="home-today">Today</button></div><button class="btn s" data-action="home-month" data-n="1" aria-label="Next month">›</button></div>
+  return `<div class="month-nav"><button class="btn s" data-action="home-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="home-month" data-n="1" aria-label="Next month">›</button></div>
     <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div>
     <div class="mgrid home-month">${monthDays(monthStart).map((day) => {
       const items = D.items.filter((item) => item.ymd === day);
@@ -58,32 +57,28 @@ export async function homeView() {
   if (monthHousehold !== hid()) { monthStart = null; monthHousehold = hid(); }
   monthStart ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   const view = getView();
-  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: tz(), hour: '2-digit', hour12: false }).format(new Date())) % 24;
-  const dateLine = new Date().toLocaleDateString('en-US', { timeZone: tz(), weekday: 'long', month: 'long', day: 'numeric' });
   const owed = balances.mine.reduce((sum, b) => sum + Math.max(0, -toCents(b.signedAmount)), 0);
   const owingMe = balances.mine.reduce((sum, b) => sum + Math.max(0, toCents(b.signedAmount)), 0);
-  return `${phead(esc(household().householdName), `${greeting(hour)}, ${esc(S.user.firstName || 'there')}`, dateLine)}
-    <div class="page-content stack"><section class="card stack home-schedule"><div class="home-schedule-head"><div><h2>Household schedule</h2><p class="hint">Everyone’s events and chores, together.</p></div>
-    <div class="seg" role="group" aria-label="Schedule display">${[['calendar', 'Calendar'], ['list', 'Upcoming list']].map(([key, label]) => `<button class="${view === key ? 'on' : ''}" data-action="home-view" data-value="${key}" aria-pressed="${view === key}">${label}</button>`).join('')}</div></div>
+  const viewSelect = `<select class="input home-view-select" data-input="home-view" aria-label="Schedule view">${[['calendar', 'Calendar view'], ['list', 'List view']].map(([key, label]) => `<option value="${key}" ${view === key ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
+  return `${phead(esc(household().householdName), 'Shared household schedule', 'See an overview of what’s happening in your household.', viewSelect)}
+    <div class="page-content stack"><section class="card stack home-schedule" aria-label="Shared household schedule">
     <div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content">${view === 'calendar' ? calendarView() : listView()}</div></section>
     <section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section></div>`;
 }
 
-actions['home-view'] = (el) => {
-  const view = el.dataset.value;
+inputs['home-view'] = (el) => {
+  const view = el.value;
   if (!['calendar', 'list'].includes(view)) return;
   try { localStorage.setItem(viewKey(), view); } catch { /* Display still changes when storage is unavailable. */ }
-  // Use the same loaded items and keep keyboard focus on the display button.
+  // Use the same loaded items and keep keyboard focus on the view dropdown.
   const content = document.getElementById('home-schedule-content');
   content.className = view === 'list' ? 'stack' : '';
   content.innerHTML = view === 'calendar' ? calendarView() : listView();
-  el.parentElement.querySelectorAll('button').forEach((button) => { const selected = button === el; button.classList.toggle('on', selected); button.setAttribute('aria-pressed', String(selected)); });
 };
 actions['home-month'] = (el) => {
   const d = new Date(`${monthStart}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + Number(el.dataset.n)); monthStart = `${d.toISOString().slice(0, 7)}-01`;
   document.getElementById('home-schedule-content').innerHTML = calendarView();
 };
-actions['home-today'] = () => { monthStart = `${ymdIn(Date.now()).slice(0, 7)}-01`; document.getElementById('home-schedule-content').innerHTML = calendarView(); };
 actions['home-day'] = (el) => {
   const items = D.items.filter((item) => item.ymd === el.dataset.day);
   openModal(`${mhead(esc(dayLabel(el.dataset.day)))}<div class="stack">${items.length ? items.map(row).join('') : '<p class="mute">No events or chores on this day.</p>'}</div>`);
