@@ -1,11 +1,11 @@
 // Home shows one household schedule in two formats; feature pages own editing and responses.
-import { actions } from '../lib/events.js';
+import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { avatar, closeModal, esc, mhead, money, openModal, personColor, phead } from '../lib/dom.js';
-import { greeting } from '../../shared/home.ts';
+import { avatar, closeModal, esc, mhead, money, openModal, personColor, phead, showError, toast } from '../lib/dom.js';
 import { addDays } from '../../shared/chore-dates.ts';
 import { monthDays, scheduleItems } from '../../shared/home-schedule.ts';
+import { householdBoard } from '../components/household-board.js';
 import { toCents } from '../../shared/money.ts';
 
 const hid = () => household().householdId;
@@ -28,62 +28,61 @@ function row(item) {
     <div class="hint">${timeFmt(item.at)} · ${item.kind === 'event' ? 'Added by ' : ''}${esc(name)}${item.location ? ` · ${esc(item.location)}` : ''}</div></div>${avatar(member, 'sm')}</a>`;
 }
 
+function monthNav() {
+  const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
+  return `<div class="month-nav"><button class="btn s" data-action="home-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="home-month" data-n="1" aria-label="Next month">›</button></div>`;
+}
+
 function listView() {
-  const today = ymdIn(Date.now());
-  const upcoming = D.items.filter((item) => item.ymd >= today);
-  const overdue = D.items.filter((item) => item.kind === 'chore' && !item.completed && item.ymd < today);
-  return `${overdue.length ? `<section class="stack home-day"><h3>Overdue chores</h3>${overdue.map((item) => `<div><div class="hint">${esc(dayLabel(item.ymd))}</div>${row(item)}</div>`).join('')}</section>` : ''}
-    ${upcoming.length ? [...new Set(upcoming.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${upcoming.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('')
-      : '<p class="home-empty">No upcoming events or chores. Your household schedule will appear here.</p>'}`;
+  const items = D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7));
+  return `${monthNav()}${items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('')
+    : '<p class="home-empty">No events or chores this month.</p>'}`;
 }
 
 function calendarView() {
   const today = ymdIn(Date.now());
-  const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-  return `<div class="month-nav"><button class="btn s" data-action="home-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h3>${title}</h3><button class="btn s" data-action="home-today">Today</button></div><button class="btn s" data-action="home-month" data-n="1" aria-label="Next month">›</button></div>
+  return `${monthNav()}
     <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div>
     <div class="mgrid home-month">${monthDays(monthStart).map((day) => {
       const items = D.items.filter((item) => item.ymd === day);
       return `<button class="day2 ${day.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${day === today ? 'today' : ''}" data-action="home-day" data-day="${day}" aria-label="${esc(dayLabel(day))}, ${items.length} items" ${day === today ? 'aria-current="date"' : ''}>
         <span class="dn">${Number(day.slice(8))}</span>${items.slice(0, 3).map((item) => `<span class="home-calendar-item ${item.completed ? 'completed' : ''}" style="--ev:${personColor(item.userId)}"><span>${timeFmt(item.at)} · ${esc(item.label)}</span><b>${esc(item.name)}</b>${item.approval?.total ? `<span class="home-calendar-approval">${item.approval.label} · ${item.approval.approved}/${item.approval.total}</span>` : ''}</span>`).join('')}
         ${items.length > 3 ? `<span class="home-more">+${items.length - 3} more</span>` : ''}<span class="home-mobile-count" aria-hidden="true">${items.length || ''}</span></button>`;
-    }).join('')}</div><p class="hint home-calendar-hint">Select a day to see all events, chores, and roommate details.</p>`;
+    }).join('')}</div>`;
 }
 
 export async function homeView() {
-  const [{ members }, { events }, chores, balances] = await Promise.all([
-    api(`/households/${hid()}/members`), api(`/households/${hid()}/events`), api(`/households/${hid()}/chores`), api(`/households/${hid()}/balances`),
+  const [{ members }, { events }, chores, balances, { notes }] = await Promise.all([
+    api(`/households/${hid()}/members`), api(`/households/${hid()}/events`), api(`/households/${hid()}/chores`), api(`/households/${hid()}/balances`), api(`/households/${hid()}/board`),
   ]);
-  D = { members, items: scheduleItems(events, chores, tz()) };
+  D = { householdId: hid(), members, events, chores, notes, user: S.user, timezone: tz(), items: scheduleItems(events, chores, tz()) };
   if (monthHousehold !== hid()) { monthStart = null; monthHousehold = hid(); }
   monthStart ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   const view = getView();
-  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: tz(), hour: '2-digit', hour12: false }).format(new Date())) % 24;
-  const dateLine = new Date().toLocaleDateString('en-US', { timeZone: tz(), weekday: 'long', month: 'long', day: 'numeric' });
   const owed = balances.mine.reduce((sum, b) => sum + Math.max(0, -toCents(b.signedAmount)), 0);
   const owingMe = balances.mine.reduce((sum, b) => sum + Math.max(0, toCents(b.signedAmount)), 0);
-  return `${phead(esc(household().householdName), `${greeting(hour)}, ${esc(S.user.firstName || 'there')}`, dateLine)}
-    <div class="page-content stack"><section class="card stack home-schedule"><div class="home-schedule-head"><div><h2>Household schedule</h2><p class="hint">Everyone’s events and chores, together.</p></div>
-    <div class="seg" role="group" aria-label="Schedule display">${[['calendar', 'Calendar'], ['list', 'Upcoming list']].map(([key, label]) => `<button class="${view === key ? 'on' : ''}" data-action="home-view" data-value="${key}" aria-pressed="${view === key}">${label}</button>`).join('')}</div></div>
-    <div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content">${view === 'calendar' ? calendarView() : listView()}</div></section>
+  const viewSelect = `<select class="input home-view-select" data-input="home-view" aria-label="Schedule view">${[['calendar', 'Calendar view'], ['list', 'List view']].map(([key, label]) => `<option value="${key}" ${view === key ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
+  return `${phead(esc(household().householdName), 'Shared household schedule', 'See an overview of what’s happening in your household.', viewSelect)}
+    <div class="page-content stack"><section class="card stack home-board" id="home-board">${householdBoard(D)}</section><section class="card stack home-schedule" aria-label="Shared household schedule">
+    <div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content" data-view="${view}">${view === 'calendar' ? calendarView() : listView()}</div></section>
     <section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section></div>`;
 }
 
-actions['home-view'] = (el) => {
-  const view = el.dataset.value;
+inputs['home-view'] = (el) => {
+  const view = el.value;
   if (!['calendar', 'list'].includes(view)) return;
   try { localStorage.setItem(viewKey(), view); } catch { /* Display still changes when storage is unavailable. */ }
-  // Use the same loaded items and keep keyboard focus on the display button.
+  // Use the same loaded items and keep keyboard focus on the view dropdown.
   const content = document.getElementById('home-schedule-content');
+  content.dataset.view = view;
   content.className = view === 'list' ? 'stack' : '';
   content.innerHTML = view === 'calendar' ? calendarView() : listView();
-  el.parentElement.querySelectorAll('button').forEach((button) => { const selected = button === el; button.classList.toggle('on', selected); button.setAttribute('aria-pressed', String(selected)); });
 };
 actions['home-month'] = (el) => {
   const d = new Date(`${monthStart}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + Number(el.dataset.n)); monthStart = `${d.toISOString().slice(0, 7)}-01`;
-  document.getElementById('home-schedule-content').innerHTML = calendarView();
+  const content = document.getElementById('home-schedule-content');
+  content.innerHTML = content.dataset.view === 'calendar' ? calendarView() : listView();
 };
-actions['home-today'] = () => { monthStart = `${ymdIn(Date.now()).slice(0, 7)}-01`; document.getElementById('home-schedule-content').innerHTML = calendarView(); };
 actions['home-day'] = (el) => {
   const items = D.items.filter((item) => item.ymd === el.dataset.day);
   openModal(`${mhead(esc(dayLabel(el.dataset.day)))}<div class="stack">${items.length ? items.map(row).join('') : '<p class="mute">No events or chores on this day.</p>'}</div>`);
@@ -95,3 +94,54 @@ actions['home-open'] = (el) => {
   }
   location.hash = el.getAttribute('href');
 };
+
+async function refreshHomeBoard(onlyChanged = false) {
+  const householdId = D.householdId;
+  const [{ events }, chores, { notes }] = await Promise.all([api(`/households/${householdId}/events`), api(`/households/${householdId}/chores`), api(`/households/${householdId}/board`)]);
+  if (hid() !== householdId || !document.getElementById('home-board')) return;
+  if (onlyChanged && JSON.stringify([events, chores, notes]) === JSON.stringify([D.events, D.chores, D.notes])) return;
+  const drafts = [...document.querySelectorAll('#home-board form')].map((form) => ({ kind: form.dataset.form, id: form.dataset.id, message: form.elements.namedItem('messageText')?.value ?? '', eventId: form.elements.namedItem('eventId')?.value ?? '' }));
+  D = { ...D, events, chores, notes, items: scheduleItems(events, chores, tz()) };
+  document.getElementById('home-board').innerHTML = householdBoard(D);
+  for (const form of document.querySelectorAll('#home-board form')) {
+    const draft = drafts.find((d) => d.kind === form.dataset.form && d.id === form.dataset.id);
+    if (!draft) continue;
+    form.elements.namedItem('messageText').value = draft.message;
+    const eventField = form.elements.namedItem('eventId'); if (eventField) eventField.value = draft.eventId;
+  }
+  const content = document.getElementById('home-schedule-content');
+  if (content) content.innerHTML = content.dataset.view === 'calendar' ? calendarView() : listView();
+}
+actions['home-board-response'] = async (button) => {
+  const card = button.closest('article');
+  card.setAttribute('aria-busy', 'true');
+  const buttons = [...card.querySelectorAll('button')];
+  buttons.forEach((el) => { el.disabled = true; });
+  showError(card, '');
+  const kind = button.dataset.kind, id = Number(button.dataset.id), answer = button.dataset.response;
+  try {
+    if (kind === 'event') await api(`/households/${D.householdId}/events/${id}/respond`, { method: 'POST', body: { response: answer } });
+    else await api(`/households/${D.householdId}/swap-requests/${id}`, { method: 'PATCH', body: { action: answer } });
+  } catch (error) { showError(card, error.message); return; }
+  finally { card.removeAttribute('aria-busy'); buttons.forEach((el) => { el.disabled = false; }); }
+  toast(answer === 'withdraw' ? 'Request cancelled' : 'Response saved');
+  try { await refreshHomeBoard(); } catch { card.innerHTML = '<p class="hint" role="status">Response saved. Refresh Home to see the latest requests.</p>'; }
+};
+const postHomeNote = async (form, reply) => {
+  const data = new FormData(form), body = { messageText: data.get('messageText') };
+  if (reply) body.parentMessageId = Number(form.dataset.id);
+  else if (data.get('eventId')) body.eventId = Number(data.get('eventId'));
+  try { await api(`/households/${D.householdId}/board`, { method: 'POST', body }); }
+  catch (error) { showError(form, error.message); return; }
+  form.reset(); toast(reply ? 'Reply posted' : 'Announcement posted');
+  try { await refreshHomeBoard(); } catch { showError(form, 'Posted successfully. Refresh Home to see the latest announcements.'); }
+};
+forms['home-note-new'] = (form) => postHomeNote(form, false);
+forms['home-note-reply'] = (form) => postHomeNote(form, true);
+
+// Like the Events board, refresh while idle; never interrupt editing or an in-flight response.
+setInterval(async () => {
+  if (document.hidden || document.getElementById('root')?.dataset.page !== 'home' || !D || document.getElementById('modal')) return;
+  if (document.activeElement?.closest?.('form,input,textarea,select,button') || document.querySelector('#home-board [aria-busy=true]')) return;
+  try { await refreshHomeBoard(true); } catch { /* Keep the last snapshot while offline. */ }
+}, 15000);

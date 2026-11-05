@@ -151,12 +151,62 @@ actions['add-chore'] = () => {
         <label><input type="radio" name="mode" value="person" checked data-input="chore-who">One person</label>
         <label id="mode-rotate"><input type="radio" name="mode" value="rotate" data-input="chore-who">Take turns</label></div></div>
       <label class="fld" id="f-person"><span>Person</span><select class="input" name="person">${people.map((m) => `<option value="${m.userId}" ${m.userId === S.user.userId ? 'selected' : ''}>${esc(fullName(m))}${m.userId === S.user.userId ? ' (you)' : ''}</option>`).join('')}</select></label>
-      <div class="fld hidden" id="f-rot"><span>Turn order (top goes first)</span><div class="opt-list">${people.map((m) => `<label class="chk"><input type="checkbox" name="rot" value="${m.userId}" checked> ${avatar(m, 'sm')} ${esc(fullName(m))}</label>`).join('')}</div></div>
+      <div class="fld hidden" id="f-rot"><span>Turn order (top goes first)</span><div class="opt-list rotation-list">${people.map((m) => `<div class="rotation-row" data-rotation-row data-name="${esc(fullName(m))}"><button type="button" class="rotation-grip" draggable="true" data-rotation-drag aria-label="Drag ${esc(fullName(m))} to reorder" title="Drag to reorder">⠿</button><label class="chk"><input type="checkbox" name="rot" value="${m.userId}" checked> ${avatar(m, 'sm')} <span>${esc(fullName(m))}</span></label><div class="rotation-moves"><button type="button" class="btn s" data-action="rotation-move" data-direction="up" aria-label="Move ${esc(fullName(m))} up">↑</button><button type="button" class="btn s" data-action="rotation-move" data-direction="down" aria-label="Move ${esc(fullName(m))} down">↓</button></div></div>`).join('')}</div><span class="sr-only" id="rotation-status" role="status" aria-live="polite"></span></div>
       <div class="err" role="alert"></div>
       <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Add chore</button></div>
     </form>`);
-  inputs['chore-type'](); inputs['chore-who']();
+  inputs['chore-type'](); inputs['chore-who'](); wireRotation();
 };
+// FormData reads selected checkboxes in DOM order, which is the rotation order sent to the API.
+function updateRotation(row) {
+  const list = document.querySelector('.rotation-list'); if (!list) return;
+  const rows = [...list.children];
+  rows.forEach((item, i) => {
+    item.querySelector('[data-direction=up]').disabled = i === 0;
+    item.querySelector('[data-direction=down]').disabled = i === rows.length - 1;
+  });
+  if (row) document.getElementById('rotation-status').textContent = `${row.dataset.name} moved to position ${rows.indexOf(row) + 1} of ${rows.length}.`;
+}
+actions['rotation-move'] = (button) => {
+  const row = button.closest('[data-rotation-row]'); if (!row) return;
+  const neighbor = button.dataset.direction === 'up' ? row.previousElementSibling : row.nextElementSibling;
+  if (!neighbor) return;
+  if (button.dataset.direction === 'up') row.parentElement.insertBefore(row, neighbor);
+  else row.parentElement.insertBefore(row, neighbor.nextElementSibling);
+  updateRotation(row);
+  if (button.disabled) row.querySelector('[data-rotation-drag]').focus();
+};
+function wireRotation() {
+  const list = document.querySelector('.rotation-list'); if (!list) return;
+  let dragged = null;
+  const clear = () => { list.querySelectorAll('.dragging,.drag-target').forEach((row) => row.classList.remove('dragging', 'drag-target')); };
+  list.addEventListener('dragstart', (event) => {
+    const handle = event.target.closest?.('[data-rotation-drag]');
+    if (!handle) { event.preventDefault(); return; }
+    dragged = handle.closest('[data-rotation-row]');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', dragged.querySelector('[name=rot]').value);
+    dragged.classList.add('dragging');
+  });
+  list.addEventListener('dragover', (event) => {
+    const target = event.target.closest?.('[data-rotation-row]');
+    if (!dragged || !target || target === dragged) return;
+    event.preventDefault(); event.dataTransfer.dropEffect = 'move';
+    list.querySelectorAll('.drag-target').forEach((row) => row.classList.remove('drag-target'));
+    target.classList.add('drag-target');
+  });
+  list.addEventListener('drop', (event) => {
+    const target = event.target.closest?.('[data-rotation-row]');
+    if (!dragged || !target || target === dragged) return;
+    event.preventDefault();
+    const rect = target.getBoundingClientRect();
+    list.insertBefore(dragged, event.clientY > rect.top + rect.height / 2 ? target.nextElementSibling : target);
+    updateRotation(dragged); dragged.querySelector('[data-rotation-drag]').focus();
+    clear(); dragged = null;
+  });
+  list.addEventListener('dragend', () => { clear(); dragged = null; });
+  updateRotation();
+}
 actions['starter-chores'] = () => openModal(`${mhead('Add common chores')}<form class="stack" data-form="starter-chores"><p class="hint">Pick a starter set. Repeating chores rotate through the current household.</p>
   <div class="opt-list starter-list">${STARTERS.map((item) => `<label class="chk"><input type="checkbox" name="starter" value="${item.key}" checked><span class="grow"><b>${item.name}</b><span class="hint">${dayName(item.dayOfWeek)} · ${item.dueTime.replace(/^0/, '')}</span></span>${effortChip(item.effort)}</label>`).join('')}</div>
   <div class="err" role="alert"></div><div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Add selected</button></div></form>`);
@@ -174,17 +224,17 @@ forms['starter-chores'] = async (form) => {
 };
 inputs['chore-type'] = () => {
   const f = document.querySelector('form[data-form=chore-add]'); if (!f) return;
-  const r = f.repeats.value;
+  const r = f.elements.namedItem('repeats').value;
   document.getElementById('f-dow').classList.toggle('hidden', r !== 'weekly');
   document.getElementById('f-dom').classList.toggle('hidden', r !== 'monthly');
   document.getElementById('l-date').textContent = r === 'none' ? 'Date' : 'Starting';
   // taking turns only makes sense for something that repeats
   const rotate = document.getElementById('mode-rotate'); rotate.classList.toggle('hidden', r === 'none');
-  if (r === 'none' && f.mode.value === 'rotate') { f.mode.value = 'person'; inputs['chore-who'](); }
+  if (r === 'none' && f.elements.namedItem('mode').value === 'rotate') { f.elements.namedItem('mode').value = 'person'; inputs['chore-who'](); }
 };
 inputs['chore-who'] = () => {
   const f = document.querySelector('form[data-form=chore-add]'); if (!f) return;
-  const rot = f.mode.value === 'rotate';
+  const rot = f.elements.namedItem('mode').value === 'rotate';
   document.getElementById('f-person').classList.toggle('hidden', rot);
   document.getElementById('f-rot').classList.toggle('hidden', !rot);
 };
