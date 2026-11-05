@@ -552,3 +552,38 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 /* Let long purchase names wrap inside their flex column on narrow screens. */
 .exp>.grow>.truncate{display:block;white-space:normal;overflow-wrap:anywhere}
 .exp>.amt{flex-shrink:0;white-space:nowrap}
+
+/* Home: one shared schedule, with only a format toggle. */
+.home-schedule-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.home-schedule-head .hint{margin-top:6px}
+.home-schedule-head .seg{flex-shrink:0}
+.home-day{margin-top:12px}.home-day h3{font-size:15px;color:var(--mute)}
+.home-item-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.home-kind{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
+.home-schedule-row b{overflow-wrap:anywhere}
+.home-schedule-row.completed b{text-decoration:line-through;color:var(--mute)}
+.home-empty{padding:30px 0;color:var(--mute)}
+.home-month .day2{min-height:150px;padding:8px;gap:5px}
+.home-calendar-item{display:flex;flex-direction:column;border-left:3px solid var(--ev);padding:3px 5px;background:var(--soft);border-radius:4px;font-size:12px;min-width:0}
+.home-calendar-item span{font-size:10px;color:var(--mute)}
+.home-calendar-item b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home-calendar-item.completed b{text-decoration:line-through;color:var(--mute)}
+.home-more{font-size:11px;color:var(--mute)}.home-mobile-count{display:none}
+.home-calendar-hint{margin-top:12px}
+.home-finances{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.home-balance{display:flex;gap:24px;flex-wrap:wrap}.home-balance span{display:flex;gap:8px;color:var(--mute)}.home-balance b{color:var(--ink)}
+.home-schedule button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:767px){.home-month .day2{min-height:100px;padding:4px}.home-calendar-item{padding:2px 3px;font-size:10px}.home-calendar-item span{font-size:9px}}
+@media(max-width:520px){.home-schedule-head .seg{width:100%}.home-schedule-head .seg button{flex:1}.home-month .day2{min-height:64px}.home-calendar-item,.home-more{display:none}.home-mobile-count{display:block;font-size:12px;text-align:center;color:var(--accent);font-weight:700}.home-finances{align-items:flex-start}.home-balance{gap:12px;flex-direction:column}}
+
+/* Category-dependent fields must respect hidden even when .fld sets display:flex. */
+[hidden]{display:none!important}
+.event-time-range{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.event-time-range .input{min-width:0;width:100%}
+.event-status{display:flex;align-items:flex-end;flex-direction:column;gap:6px;flex-shrink:1;max-width:45%}
+.event-status .st{white-space:normal;text-align:right}
+.home-calendar-approval{font-size:10px;font-weight:600;color:var(--accent)}
+.home-schedule-row.pending,.home-schedule-row.changes_requested{border-style:dashed}
+@media(max-width:600px){.event-status{max-width:42%}.event-status .st{font-size:10px}}
+
+.dpill.pending-event{outline:1px dashed currentColor;outline-offset:1px;opacity:.8}

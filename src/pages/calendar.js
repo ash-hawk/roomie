@@ -7,6 +7,8 @@ import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
 import { ago as agoIn, avatar, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, personColor, phead, seg, showError, toast } from '../lib/dom.js';
 
+import { approvalState } from '../../shared/event-approval.ts';
+
 const CATS = [['meeting', 'Meeting'], ['hosting', 'Hosting guests'], ['other', 'Other']];
 
 const savedPrefs = (() => { try { return JSON.parse(localStorage.getItem('roomie.calendar') || '{}'); } catch { return {}; } })();
@@ -58,14 +60,16 @@ function items() {
 }
 
 // ---- rows -------------------------------------------------------------------------------------
-function hostChip(e) {
-  if (e.category !== 'hosting') return `<span class="st later">${esc(e.category === 'meeting' ? 'Meeting' : e.otherLabel || 'Other')}</span>`;
-  const asked = e.tags.filter((t) => t.response);
-  if (!asked.length) return '<span class="st later">Hosting</span>';
-  if (asked.some((t) => t.response === 'declined')) return '<span class="st disputed">Someone said no</span>';
-  if (asked.some((t) => t.response === 'pending')) return '<span class="st unpaid">Waiting for answers</span>';
-  return '<span class="st paid">Everyone is okay</span>';
+function approvalChip(e) {
+  const state = approvalState(e.tags);
+  if (!state.total) return '';
+  const kind = state.status === 'confirmed' ? 'paid' : state.status === 'changes_requested' ? 'disputed' : 'unpaid';
+  return `<span class="st ${kind}">${state.label} · ${state.approved} of ${state.total} approved</span>`;
 }
+function hostChip(e) {
+  return `<div class="event-status"><span class="st later">${esc(e.category === 'meeting' ? 'Meeting' : e.category === 'hosting' ? 'Hosting' : e.otherLabel || 'Other')}</span>${approvalChip(e)}</div>`;
+}
+
 function row(it) {
   const e = it.e;
   return `<div class="item click row ev" data-action="event-detail" data-id="${e.eventId}" tabindex="0" style="--ev:${esc(it.color)}">
@@ -101,7 +105,7 @@ function monthView() {
     if (i >= 35 && d.slice(0, 7) !== monthStart.slice(0, 7)) break;
     const todays = all.filter((x) => x.ymd === d);
     cells.push(`<button class="day2 ${d.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${d === today ? 'today' : ''}" data-action="day-detail" data-day="${d}" aria-label="${esc(dayLabel(d))}, ${todays.length} items">
-      <span class="dn">${Number(d.slice(8))}</span>${todays.slice(0, 3).map((x) => `<i class="dpill" style="background:${esc(x.color)}">${esc(x.e.eventName)}</i>`).join('')}${todays.length > 3 ? `<small>+${todays.length - 3} more</small>` : ''}</button>`);
+      <span class="dn">${Number(d.slice(8))}</span>${todays.slice(0, 3).map((x) => { const state = approvalState(x.e.tags); return `<i class="dpill ${state.total && state.status !== 'confirmed' ? 'pending-event' : ''}" style="background:${esc(x.color)}" title="${esc(x.e.eventName)}${state.total ? ` · ${state.label} · ${state.approved} of ${state.total} approved` : ''}">${esc(x.e.eventName)}${state.total && state.status !== 'confirmed' ? ` · ${state.label}` : ''}</i>`; }).join('')}${todays.length > 3 ? `<small>+${todays.length - 3} more</small>` : ''}</button>`);
   }
   return `<div class="month-nav"><button class="btn s" data-action="month-nav" data-n="-1" aria-label="Previous month">‹</button><div class="row"><b>${title}</b><button class="btn s" data-action="calendar-today">Today</button></div><button class="btn s" data-action="month-nav" data-n="1" aria-label="Next month">›</button></div>
     <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div><div class="mgrid">${cells.join('')}</div>`;
@@ -135,16 +139,17 @@ inputs['cal-sort'] = (el) => { sortBy = el.value; savePrefs(); refresh(); };
 actions['event-detail'] = (el) => {
   const e = eventOf(Number(el.dataset.id)); if (!e) return;
   const mine = e.tags.find((t) => t.userId === S.user.userId);
-  const answer = (t) => (t.response === 'accepted' ? '<span class="st paid">Okay</span>' : t.response === 'declined' ? '<span class="st disputed">Not okay</span>' : t.response === 'pending' ? '<span class="st unpaid">Waiting</span>' : '');
+  const answer = (t) => (t.response === 'accepted' ? '<span class="st paid">Approved</span>' : t.response === 'declined' ? '<span class="st disputed">Changes requested</span>' : t.response === 'pending' ? '<span class="st unpaid">Waiting</span>' : '');
   openModal(`${mhead(esc(e.eventName))}
     <div class="row" style="gap:8px;flex-wrap:wrap"><span class="evdot" style="background:${personColor(e.createdByUserId)}"></span><b>${whenFull(e.eventDate)}${e.endDate ? ` to ${timeFmt(e.endDate)}` : ''}</b></div>
     <div class="hint">${esc(e.category === 'other' ? e.otherLabel || 'Other' : CATS.find(([k]) => k === e.category)?.[1] ?? '')}${e.location ? ` · ${esc(e.location)}` : ''}${e.reminderMinutesBefore != null ? ` · reminder ${e.reminderMinutesBefore >= 60 && e.reminderMinutesBefore % 60 === 0 ? `${e.reminderMinutesBefore / 60}h` : `${e.reminderMinutesBefore}m`} before` : ''}</div>
+    ${approvalChip(e)}
     ${e.description ? `<p>${esc(e.description)}</p>` : ''}
     <div class="hint">Added by ${esc(first(e.createdByUserId))}</div>
     ${e.tags.length ? `<div class="stack">${e.tags.map((t) => `<div class="item row">${avatar(who(t.userId))}<div class="grow"><b>${esc(first(t.userId))}</b></div>${answer(t)}</div>`).join('')}</div>` : ''}
-    ${mine?.response ? `<p class="hint">${esc(first(e.createdByUserId))} is asking if hosting is okay with you.</p><div class="acts" style="justify-content:flex-start">
-      ${mine.response !== 'accepted' ? `<button class="btn p" data-action="event-answer" data-id="${e.eventId}" data-response="accepted">That is okay</button>` : ''}
-      ${mine.response !== 'declined' ? `<button class="btn" data-action="event-answer" data-id="${e.eventId}" data-response="declined">Not okay</button>` : ''}</div>` : ''}
+    ${mine?.response ? `<p class="hint">${esc(first(e.createdByUserId))} is asking for your approval. The event stays pending until everyone selected approves it.</p><div class="acts" style="justify-content:flex-start">
+      ${mine.response !== 'accepted' ? `<button class="btn p" data-action="event-answer" data-id="${e.eventId}" data-response="accepted">Approve</button>` : ''}
+      ${mine.response !== 'declined' ? `<button class="btn" data-action="event-answer" data-id="${e.eventId}" data-response="declined">Request changes</button>` : ''}</div>` : ''}
     ${e.canEdit ? `<div class="acts" style="justify-content:flex-start"><button class="btn" data-action="edit-event" data-id="${e.eventId}">Edit</button><button class="btn d" data-action="delete-event" data-id="${e.eventId}">Delete</button></div>` : ''}`);
 };
 actions['event-answer'] = async (el) => { await api(path(`/events/${el.dataset.id}/respond`), { method: 'POST', body: { response: el.dataset.response } }); closeModal(); toast('Answer sent'); refresh(); };
@@ -160,15 +165,15 @@ function eventForm(e, day, linkToNote = false) {
   return `${mhead(e ? 'Edit event' : 'Add an event')}
   <form class="stack" data-form="event-save" ${e ? `data-id="${e.eventId}"` : ''} ${linkToNote ? 'data-link-to-note="1"' : ''} autocomplete="off">
     <label class="fld"><span>What is happening?</span><input class="input" name="eventName" required maxlength="120" value="${esc(e?.eventName ?? '')}" placeholder="House meeting"></label>
-    <div class="inline-grid"><label class="fld"><span>Date</span><input class="input" name="date" type="date" required value="${date}"></label>
-      <label class="fld"><span>Starts</span><input class="input" name="time" type="time" required value="${e ? hmIn(e.eventDate) : '18:00'}"></label>
+    <label class="fld"><span>Date</span><input class="input" name="date" type="date" required value="${date}"></label>
+    <div class="inline-grid event-time-range"><label class="fld"><span>Starts</span><input class="input" name="time" type="time" required value="${e ? hmIn(e.eventDate) : '18:00'}"></label>
       <label class="fld"><span>Ends (optional)</span><input class="input" name="endTime" type="time" value="${endSame ? hmIn(e.endDate) : ''}"></label></div>
     <label class="fld"><span>Where (optional)</span><input class="input" name="location" maxlength="120" value="${esc(e?.location ?? '')}" placeholder="Living room"></label>
     <div class="fld"><span>What kind?</span><div class="methods">${CATS.map(([k, l]) => `<label><input type="radio" name="category" value="${k}" ${(e?.category ?? 'meeting') === k ? 'checked' : ''} data-input="event-cat">${l}</label>`).join('')}</div></div>
     <label class="fld" id="other-label-field" ${e?.category === 'other' ? '' : 'hidden'}><span>Label for this event</span><input class="input" name="otherLabel" maxlength="40" value="${esc(e?.otherLabel ?? '')}" placeholder="Maintenance"><small class="hint">This label appears on the calendar card.</small></label>
     <label class="fld"><span>Reminder</span><select class="input" name="reminder">${[['', 'No reminder'], ['0', 'At the start'], ['30', '30 minutes before'], ['60', '1 hour before'], ['1440', '1 day before']].map(([v, l]) => `<option value="${v}" ${String(e?.reminderMinutesBefore ?? '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-    <div class="fld"><span id="tag-label">Tag roommates</span><div class="opt-list">${others.length ? others.map((m) => `<label class="chk"><input type="checkbox" name="tag" value="${m.userId}" ${tagged.has(m.userId) ? 'checked' : ''}> ${avatar(m, 'sm')} ${esc(fullName(m))}</label>`).join('') : '<span class="hint">No other roommates yet.</span>'}</div>
-      <span class="hint" id="tag-hint"></span></div>
+    <div class="fld"><span id="tag-label">Ask for approval</span><p class="hint" id="tag-hint">This event will appear on the calendar as Pending approval. Select the roommates who need to approve it before it’s confirmed. Leave everyone unchecked if no approval is needed.</p>${others.length ? `<label class="chk"><input type="checkbox" data-input="event-select-all" ${others.every((m) => tagged.has(m.userId)) ? 'checked' : ''}> Select all roommates</label>` : ''}<div class="opt-list">${others.length ? others.map((m) => `<label class="chk"><input type="checkbox" name="tag" data-input="event-approver" value="${m.userId}" ${tagged.has(m.userId) ? 'checked' : ''}> ${avatar(m, 'sm')} ${esc(fullName(m))}</label>`).join('') : '<span class="hint">No other roommates yet.</span>'}</div>
+      </div>
     <label class="fld"><span>Details (optional)</span><textarea class="input" name="description" rows="2" maxlength="500">${esc(e?.description ?? '')}</textarea></label>
     <div class="err" role="alert"></div>
     <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">${e ? 'Save' : 'Add event'}</button></div>
@@ -177,9 +182,19 @@ function eventForm(e, day, linkToNote = false) {
 inputs['event-cat'] = () => {
   const f = document.querySelector('form[data-form=event-save]'); if (!f) return;
   const otherField = document.getElementById('other-label-field'), otherInput = f.elements.otherLabel;
-  if (otherField && otherInput) { const isOther = f.category.value === 'other'; otherField.hidden = !isOther; otherInput.required = isOther; }
-  const hint = document.getElementById('tag-hint'); if (hint) hint.textContent = f.category.value === 'hosting' ? 'Tagged roommates are asked if hosting is okay with them.' : 'Tagged roommates are notified.';
+  if (otherField && otherInput) { const isOther = f.elements.namedItem('category').value === 'other'; otherField.hidden = !isOther; otherInput.required = isOther; otherInput.disabled = !isOther; }
+  syncSelectAll();
 };
+function syncSelectAll() {
+  const form = document.querySelector('form[data-form=event-save]');
+  const all = form?.querySelector('[data-input=event-select-all]');
+  if (!all) return;
+  const boxes = [...form.querySelectorAll('input[name=tag]')];
+  all.checked = boxes.every((box) => box.checked);
+  all.indeterminate = boxes.some((box) => box.checked) && !all.checked;
+}
+inputs['event-select-all'] = (el) => { el.form.querySelectorAll('input[name=tag]').forEach((box) => { box.checked = el.checked; }); syncSelectAll(); };
+inputs['event-approver'] = syncSelectAll;
 actions['add-event'] = (el) => { openModal(eventForm(null, el?.dataset?.day)); inputs['event-cat'](); };
 actions['add-and-link-event'] = () => { openModal(eventForm(null, null, true)); inputs['event-cat'](); };
 actions['edit-event'] = (el) => { const e = eventOf(Number(el.dataset.id)); if (!e) return; openModal(eventForm(e)); inputs['event-cat'](); };

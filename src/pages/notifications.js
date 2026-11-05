@@ -35,12 +35,12 @@ function card(n) {
   const gone = n.sourceGone, multi = S.households.length > 1;
   const status = n.sourceType === 'chore_swap_request' && n.sourceStatus && n.sourceStatus !== 'pending' ? `<span class="st ${n.sourceStatus === 'accepted' ? 'paid' : 'disputed'}">${n.sourceStatus === 'accepted' ? 'Accepted' : 'Declined'}</span>`
     : n.sourceType === 'payment' && n.sourceStatus === 'confirmed' ? '<span class="st paid">Confirmed</span>' : n.sourceType === 'payment' && n.sourceStatus === 'disputed' ? '<span class="st disputed">Disputed</span>'
-    : n.sourceType === 'event' && n.sourceStatus === 'accepted' ? '<span class="st paid">You said okay</span>' : n.sourceType === 'event' && n.sourceStatus === 'declined' ? '<span class="st disputed">You said no</span>' : '';
+    : n.sourceType === 'event' && n.sourceStatus === 'accepted' ? '<span class="st paid">You approved</span>' : n.sourceType === 'event' && n.sourceStatus === 'declined' ? '<span class="st disputed">Changes requested</span>' : '';
   const d = `data-id="${n.notificationId}" data-house="${n.householdId}" data-source="${n.sourceId ?? ''}"`;
   let buttons = '';
   if (n.canRespond && n.sourceType === 'chore_swap_request') buttons = `<button class="btn p s" data-action="nt-swap" data-answer="accept" ${d}>Accept</button><button class="btn s" data-action="nt-swap" data-answer="decline" ${d}>Decline</button>`;
   if (n.canRespond && n.sourceType === 'payment') buttons = `<button class="btn p s" data-action="nt-pay" data-answer="confirmed" ${d}>I got it</button>${n.sourceStatus === 'sent' ? `<button class="btn s" data-action="nt-pay" data-answer="disputed" ${d}>I did not</button>` : ''}`;
-  if (n.canRespond && n.sourceType === 'event') buttons = `${n.sourceStatus !== 'accepted' ? `<button class="btn p s" data-action="nt-event" data-answer="accepted" ${d}>That is okay</button>` : ''}${n.sourceStatus !== 'declined' ? `<button class="btn s" data-action="nt-event" data-answer="declined" ${d}>Not okay</button>` : ''}`;
+  if (n.canRespond && n.sourceType === 'event') buttons = `${n.sourceStatus !== 'accepted' ? `<button class="btn p s" data-action="nt-event" data-answer="accepted" ${d}>Approve</button>` : ''}${n.sourceStatus !== 'declined' ? `<button class="btn s" data-action="nt-event" data-answer="declined" ${d}>Request changes</button>` : ''}`;
   return `<article class="nt ${n.isRead ? '' : 'unread'} ${n.swapPending ? 'alert' : ''}">
     <span class="ntdot" aria-label="${n.isRead ? 'Read' : 'Unread'}"></span>
     <div class="grow stack" style="gap:6px"><div>${esc(n.message)}</div>

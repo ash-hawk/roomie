@@ -20,7 +20,7 @@ function profileForm() {
         <div class="payment-fields">${PAYMENT_APPS.map(([app, label]) => `<label class="fld"><span>${label}</span><input class="input" data-input="profile-dirty" name="pay_${app}" maxlength="120" value="${esc(methods[app]?.username ?? '')}" placeholder="${app === 'venmo' ? '@username' : 'Phone or email'}"></label>`).join('')}</div>
         <label class="fld preferred-app"><span>Preferred app</span><select class="input" data-input="profile-dirty" name="preferred">${PAYMENT_APPS.map(([app, label]) => `<option value="${app}" ${preferred === app ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
       </fieldset>
-      <div class="err" role="alert"></div><div class="row sp"><span class="save-status" id="profile-status" role="status" aria-live="polite"></span><button class="btn p" type="submit" disabled>Save profile</button></div>
+      <div class="err" role="alert"></div><div class="row sp"><span class="save-status" id="profile-status" role="status" aria-live="polite"></span><button class="btn p" type="submit">Save profile</button></div>
     </form></section>`;
 }
 
@@ -91,15 +91,26 @@ forms.profile = async (form) => {
     const username = String(data.get(`pay_${app}`) ?? '').trim();
     return username ? [{ app, username, isPreferred: app === preferred }] : [];
   });
+  const button = form.querySelector('[type=submit]');
+  const controls = [...form.querySelectorAll('input, select, button')].map((el) => [el, el.disabled]);
+  controls.forEach(([el]) => { el.disabled = true; });
+  button.textContent = 'Saving…';
   try {
     const saved = await api('/me', { method: 'PATCH', body: {
       firstName: data.get('firstName'), lastName: data.get('lastName'), phoneNumber: data.get('phoneNumber'), profilePhoto: data.get('profilePhoto'), paymentMethods,
     } });
-    S.user = saved.user; profileDirty = false; form.dataset.saved = '1'; form.querySelector('[type=submit]').disabled = true;
-    document.getElementById('profile-status').textContent = 'Saved'; document.getElementById('profile-avatar').innerHTML = avatar(S.user, 'lg'); toast('Profile saved');
+    S.user = saved.user; profileDirty = false;
+    // Rebuild from the server response so normalized fields and payment preferences are visible.
+    form.closest('.profile-card').outerHTML = profileForm();
+    document.getElementById('profile-status').textContent = 'Profile saved. All changes are up to date.';
+    window.dispatchEvent(new Event('roomie:profile-saved'));
+    toast('Profile saved');
   } catch (error) {
     if (/first name/i.test(error.message)) form.querySelector('[data-error-for=firstName]').textContent = error.message;
     else if (/photo/i.test(error.message)) form.querySelector('[data-error-for=profilePhoto]').textContent = error.message;
     else showError(form, error.message);
+  } finally {
+    controls.forEach(([el, disabled]) => { el.disabled = disabled; });
+    button.textContent = 'Save profile';
   }
 };

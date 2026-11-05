@@ -58,15 +58,14 @@ function eventFields(b: Record<string, unknown>) {
   };
 }
 
-/** Tag rows + notifications for roommates newly tagged on an event. Hosting events ask "is it OK?"; others just inform. */
+/** Tag rows + notifications for roommates newly tagged on an event. Selected roommates are asked to approve the event, for every category. */
 async function tagRoommates(tx: Tx, householdId: number, e: EventRow, userIds: number[], actor: CurrentUser, tz: string) {
   if (!userIds.length) return;
-  const hosting = e.category === 'hosting';
-  await tx.insert(s.eventTag).values(userIds.map((u) => ({ eventId: e.eventId, userId: u, response: hosting ? 'pending' : null })));
+  await tx.insert(s.eventTag).values(userIds.map((u) => ({ eventId: e.eventId, userId: u, response: 'pending' })));
   const me = await firstName(tx, actor.userId);
   const when = whenText(iso(e.eventDate), tz);
   await tx.insert(s.notification).values(userIds.map((u) => ({ userId: u, householdId, actorUserId: actor.userId, section: 'calendar_board', sourceType: 'event', sourceId: e.eventId,
-    message: hosting ? `${me} is hosting ${e.eventName} on ${when}. Is that okay with you?` : `${me} tagged you in ${e.eventName} on ${when}.` })));
+    message: `${me} is asking for your approval: ${e.eventName} on ${when}. This event is pending approval.` })));
 }
 
 export async function createEvent(user: CurrentUser, householdId: number, b: Record<string, unknown>) {
@@ -102,9 +101,12 @@ export async function updateEvent(user: CurrentUser, householdId: number, eventI
     if (end) { const ok = await tx.execute(sql`SELECT ${end} >= ${start} AS ok`); if (!(ok.rows[0] as { ok: boolean }).ok) throw new HttpError(400, 'The event cannot end before it starts'); }
     const [e] = await tx.update(s.event).set({ eventName: f.eventName, eventDate: start, endDate: end, location: f.location, category: f.category, color: f.otherLabel, reminderMinutesBefore: f.reminder, description: f.description })
       .where(eq(s.event.eventId, eventId)).returning();
-    const gone = have.filter((t) => !wanted.includes(t.userId)).map((t) => t.userId);
+    const planChanged = old.eventName !== e!.eventName || iso(old.eventDate) !== iso(e!.eventDate) || (old.endDate ? iso(old.endDate) : null) !== (e!.endDate ? iso(e!.endDate) : null) || old.location !== e!.location || old.category !== e!.category || old.color !== e!.color || old.description !== e!.description;
+    const active = await activeIds(tx, householdId);
+    const reset = planChanged ? have.filter((t) => wanted.includes(t.userId) && active.includes(t.userId)).map((t) => t.userId) : [];
+    const gone = have.filter((t) => !wanted.includes(t.userId) || reset.includes(t.userId)).map((t) => t.userId);
     if (gone.length) await tx.delete(s.eventTag).where(and(eq(s.eventTag.eventId, eventId), inArray(s.eventTag.userId, gone)));
-    await tagRoommates(tx, householdId, e!, added, user, tz);
+    await tagRoommates(tx, householdId, e!, [...new Set([...added, ...reset])], user, tz);
     const tags = await tx.select().from(s.eventTag).where(eq(s.eventTag.eventId, eventId));
     return eventOut(e!, tags, user.userId);
   });
@@ -119,13 +121,17 @@ export async function deleteEvent(user: CurrentUser, householdId: number, eventI
   });
 }
 
-/** A tagged roommate answers the hosting check. Only the person who was asked can answer, and only for themselves. */
+/** A tagged roommate answers an event approval request. Only the person who was asked can answer, and only for themselves. */
 export async function respondToEvent(user: CurrentUser, householdId: number, eventId: number, b: Record<string, unknown>) {
   if (b.response !== 'accepted' && b.response !== 'declined') throw new HttpError(400, 'Answer accepted or declined');
   return db.transaction(async (tx) => {
     const e = await loadEvent(tx, householdId, eventId, true);
     const [tag] = await tx.select().from(s.eventTag).where(and(eq(s.eventTag.eventId, eventId), eq(s.eventTag.userId, user.userId))).for('update');
     if (!tag || tag.response === null) throw new HttpError(400, 'You were not asked about this event');
+    if (tag.response === b.response) {
+      const tags = await tx.select().from(s.eventTag).where(eq(s.eventTag.eventId, eventId));
+      return eventOut(e, tags, user.userId);
+    }
     const now = new Date().toISOString();
     await tx.update(s.eventTag).set({ response: b.response as string, respondedDate: now }).where(and(eq(s.eventTag.eventId, eventId), eq(s.eventTag.userId, user.userId)));
     if (e.createdByUserId && e.createdByUserId !== user.userId && (await activeIds(tx, householdId)).includes(e.createdByUserId)) {
@@ -223,7 +229,8 @@ export async function sendEventReminders(opts: { nowIso?: string } = {}) {
         SELECT t.user_id FROM event_tag t WHERE t.event_id = e.event_id AND t.response IS DISTINCT FROM 'declined'
       ) r ON true
       JOIN household_member m ON m.household_id = e.household_id AND m.user_id = r.user_id AND m.left_date IS NULL
-      WHERE e.reminder_minutes_before IS NOT NULL AND e.event_date > ${nowIso}::timestamptz
+      WHERE NOT EXISTS (SELECT 1 FROM event_tag vote WHERE vote.event_id = e.event_id AND vote.response IN ('pending', 'declined'))
+        AND e.reminder_minutes_before IS NOT NULL AND e.event_date > ${nowIso}::timestamptz
         AND e.event_date - make_interval(mins => e.reminder_minutes_before) <= ${nowIso}::timestamptz + interval '24 hours'
         AND NOT EXISTS (SELECT 1 FROM notification n WHERE n.user_id = r.user_id AND n.source_type = 'event' AND n.source_id = e.event_id AND n.section = 'system')
       ORDER BY e.event_id, r.user_id
