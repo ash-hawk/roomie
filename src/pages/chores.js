@@ -37,10 +37,21 @@ export async function choresView() {
   D = { members, ...data };
   const people = active();
   return `${phead('Shared responsibilities', 'Chores', 'A clear view of what needs doing, and whose turn it is.', `<button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
+  ${choreRequestsBoard()}
   <div class="page-controls filters">${seg([['schedule', 'Schedule'], ['chart', 'Chore chart']], tab, 'chore-tab')}
     <select class="input" data-input="chore-filter" aria-label="Show chores for"><option value="all">Everyone</option><option value="me" ${filter === 'me' ? 'selected' : ''}>Just mine</option>${people.filter((m) => m.userId !== S.user.userId).map((m) => `<option value="${m.userId}" ${String(filter) === String(m.userId) ? 'selected' : ''}>${esc(m.firstName)}</option>`).join('')}</select>
     ${tab === 'chart' ? `<select class="input" data-input="chore-sort" aria-label="Sort by"><option value="added" ${sortBy === 'added' ? 'selected' : ''}>Sort: date added</option><option value="az" ${sortBy === 'az' ? 'selected' : ''}>Sort: A to Z</option><option value="assignee" ${sortBy === 'assignee' ? 'selected' : ''}>Sort: assignee</option></select>` : ''}</div>
   ${tab === 'schedule' ? scheduleView() : chartView()}`;
+}
+function choreRequestsBoard() {
+  const requests = D.swapRequests.filter((r) => r.requesterUserId === S.user.userId || r.targetUserId === S.user.userId || (r.type === 'skip' && r.requesterUserId !== S.user.userId));
+  return `<section class="card stack chore-requests-board"><div class="row sp"><h2>Chore requests</h2>${requests.length ? badge(String(requests.length), 'warn') : ''}</div>
+    ${requests.map((request) => {
+      const assignment = asgOf(request.requesterAssignmentId), target = asgOf(request.targetAssignmentId), mine = request.requesterUserId === S.user.userId;
+      return `<article class="item stack"><span class="home-kind">${request.type === 'skip' ? 'Cover request' : 'Swap request'}</span><b>${esc(first(request.requesterUserId))} ${request.type === 'skip' ? 'needs someone to cover' : 'wants to swap'} ${esc(choreOf(assignment?.choreId)?.choreName ?? 'a chore')}</b>
+        ${assignment ? `<p class="hint">${whenFmt(assignment.dueAt)}${target ? ` · For ${esc(choreOf(target.choreId)?.choreName ?? 'a chore')} (${whenFmt(target.dueAt)})` : ''}</p>` : ''}
+        <p class="home-board-message">${esc(request.requestMessage ?? '')}</p><div class="acts" style="justify-content:flex-start"><button class="btn s" data-action="open-request" data-id="${request.swapId}">${mine ? 'View / cancel request' : 'Respond'}</button></div></article>`;
+    }).join('') || '<p class="hint">No open cover or swap requests.</p>'}</section>`;
 }
 actions['chore-tab'] = (el) => { tab = el.dataset.value; window.dispatchEvent(new Event('roomie:render')); };
 inputs['chore-filter'] = (el) => { filter = el.value; window.dispatchEvent(new Event('roomie:render')); };
@@ -57,7 +68,7 @@ function row(a) {
     ${mine ? `<button class="doneb ${a.isCompleted ? 'on' : ''}" data-action="${a.isCompleted ? 'undo-chore' : 'done-chore'}" data-id="${a.assignmentId}" aria-label="${a.isCompleted ? 'Mark not done' : 'Mark done'}">${ico('check', 16)}</button>` : avatar(who(a.assignedUserId), '')}
     <div class="grow" style="min-width:0"><b class="nm truncate">${esc(c.choreName)}${c.repeats !== 'none' ? ' <span class="mute" title="Repeats">↻</span>' : ''}</b>
       <div class="hint">${mine ? 'You' : esc(first(a.assignedUserId))} · ${whenFmt(a.dueAt)}</div></div>
-    ${req ? '<span class="st pending">Swap asked</span>' : ''}${chip}${effortChip(c.effort)}<span class="row-chevron">${ico('chevron', 16)}</span></div>`;
+    ${req ? `<span class="st pending">${req.type === 'skip' ? 'Cover requested' : 'Swap requested'}</span>` : ''}${chip}${effortChip(c.effort)}<span class="row-chevron">${ico('chevron', 16)}</span></div>`;
 }
 function scheduleView() {
   const mineOnly = (a) => passes(a.assignedUserId);
@@ -69,18 +80,10 @@ function scheduleView() {
     ? empty('🧹', 'No chores yet', 'Add one yourself or start with a few common household chores.', '<button class="btn s" data-action="starter-chores">Add common chores</button>')
     : (open.length || recent.length ? `${groups.filter(([, l]) => l.length).map(([n, l]) => `<div class="grp">${n}</div>${l.map(row).join('')}`).join('')}${recent.length ? `<div class="grp">Done this week</div>${recent.map(row).join('')}` : ''}` : '<p class="mute" style="padding:10px 0">Nothing due. Enjoy it.</p>');
 
-  // open requests that need an answer from you, plus the ones you are waiting on
-  const reqs = D.swapRequests.filter((r) => r.requesterUserId === S.user.userId || r.targetUserId === S.user.userId || (r.type === 'skip' && r.requesterUserId !== S.user.userId));
-  const reqCard = reqs.length ? `<section class="card"><div class="row sp"><h2>Swap requests</h2>${badge(`${reqs.length}`, 'warn')}</div>${reqs.map((r) => {
-    const ra = asgOf(r.requesterAssignmentId), ta = r.targetAssignmentId ? asgOf(r.targetAssignmentId) : null, mineReq = r.requesterUserId === S.user.userId;
-    const text = r.type === 'swap' ? `<b>${esc(first(r.requesterUserId))}</b> ${mineReq ? 'asked' : 'asks'} <b>${esc(first(r.targetUserId))}</b> to swap <b>${esc(choreOf(ra?.choreId)?.choreName ?? 'a chore')}</b> for <b>${esc(choreOf(ta?.choreId)?.choreName ?? 'a chore')}</b>` : `<b>${esc(first(r.requesterUserId))}</b> ${mineReq ? 'asked' : 'asks'} someone to cover <b>${esc(choreOf(ra?.choreId)?.choreName ?? 'a chore')}</b>`;
-    return `<div class="item"><div style="font-size:14px">${text}</div><div class="hint">“${esc(r.requestMessage ?? '')}”</div><div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn s" data-action="open-request" data-id="${r.swapId}">${mineReq ? 'Withdraw' : 'Respond'}</button></div></div>`;
-  }).join('')}</section>` : '';
-
   const people = active(); const openCounts = people.map((m) => [m, D.assignments.filter((a) => !a.isCompleted && a.assignedUserId === m.userId).length]); const mx = Math.max(1, ...openCounts.map((x) => x[1]));
   const load = `<section class="card"><div class="row sp"><h2>Household workload</h2><span class="hint workload-label">Open chores</span></div>${openCounts.map(([m, n]) => `<div class="row" style="padding:7px 0">${avatar(m, 'sm')}<span class="truncate" style="width:74px">${esc(first(m.userId))}</span><div class="bar grow" style="--w:${Math.round((n / mx) * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${n}</b></div>`).join('')}</section>`;
 
-  return `<div class="page-content stack chores-content"><section class="card">${main}</section>${reqCard || load ? `<aside class="grid2 support-grid">${reqCard}${load}</aside>` : ''}</div>`;
+  return `<div class="page-content stack chores-content"><section class="card">${main}</section><aside>${load}</aside></div>`;
 }
 
 // ---- chore chart (the rules) ------------------------------------------------------------------
@@ -120,7 +123,7 @@ actions['chore-detail'] = (el) => {
     ${c.description ? `<p>${esc(c.description)}</p>` : ''}
     <div class="item row">${avatar(who(a.assignedUserId))}<div class="grow"><b>${mine ? 'You' : esc(fullName(who(a.assignedUserId)))}</b><div class="hint">${whenFmt(a.dueAt)}${who(a.assignedUserId)?.leftDate ? ' · moved out' : ''}</div></div></div>
     ${c.repeats !== 'none' && c.rotation.length > 1 ? `<p class="hint">Takes turns: ${c.rotation.map((u) => esc(first(u))).join(', ')}</p>` : ''}
-    ${req ? `<p class="hint">There is an open ${req.type === 'swap' ? 'swap' : 'cover'} request on this chore.</p>` : ''}
+    ${req ? `<p class="hint">There is an open ${req.type === 'swap' ? 'swap' : 'cover'} request on this chore.</p><button class="btn s" data-action="open-request" data-id="${req.swapId}">View request</button>` : ''}
     <div class="acts" style="justify-content:flex-start;flex-wrap:wrap">
       ${mine && !a.isCompleted ? `<button class="btn p" data-action="done-chore" data-id="${a.assignmentId}">Mark done</button>` : ''}
       ${mine && a.isCompleted ? `<button class="btn" data-action="undo-chore" data-id="${a.assignmentId}">Undo</button>` : ''}
