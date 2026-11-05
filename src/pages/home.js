@@ -5,7 +5,7 @@ import { S, household } from '../lib/state.js';
 import { avatar, closeModal, esc, mhead, money, openModal, personColor, phead, showError, toast } from '../lib/dom.js';
 import { addDays } from '../../shared/chore-dates.ts';
 import { monthDays, scheduleItems } from '../../shared/home-schedule.ts';
-import { householdBoard } from '../components/household-board.js';
+import { householdBoard, announcementForm } from '../components/household-board.js';
 import { toCents } from '../../shared/money.ts';
 
 const hid = () => household().householdId;
@@ -127,14 +127,15 @@ actions['home-board-response'] = async (button) => {
   toast(answer === 'withdraw' ? 'Request cancelled' : 'Response saved');
   try { await refreshHomeBoard(); } catch { card.innerHTML = '<p class="hint" role="status">Response saved. Refresh Home to see the latest requests.</p>'; }
 };
+actions['home-make-announcement'] = () => openModal(`${mhead('Make announcement')}${announcementForm(D.events)}`);
 const postHomeNote = async (form, reply) => {
   const data = new FormData(form), body = { messageText: data.get('messageText') };
   if (reply) body.parentMessageId = Number(form.dataset.id);
   else if (data.get('eventId')) body.eventId = Number(data.get('eventId'));
   try { await api(`/households/${D.householdId}/board`, { method: 'POST', body }); }
   catch (error) { showError(form, error.message); return; }
-  form.reset(); toast(reply ? 'Reply posted' : 'Announcement posted');
-  try { await refreshHomeBoard(); } catch { showError(form, 'Posted successfully. Refresh Home to see the latest announcements.'); }
+  form.reset(); if (!reply) closeModal(); toast(reply ? 'Reply posted' : 'Announcement posted');
+  try { await refreshHomeBoard(); } catch { if (form.isConnected) showError(form, 'Posted successfully. Refresh Home to see the latest announcements.'); else toast('Posted successfully. Refresh Home to see the latest announcements.'); }
 };
 forms['home-note-new'] = (form) => postHomeNote(form, false);
 forms['home-note-reply'] = (form) => postHomeNote(form, true);

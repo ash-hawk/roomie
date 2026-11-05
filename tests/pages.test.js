@@ -251,6 +251,7 @@ describe('Home household board', () => {
   });
   it('accepts cover through the existing endpoint and removes the resolved request, preserving an announcement draft', async () => {
     await renderBoard();
+    actions['home-make-announcement']();
     document.querySelector('[data-form=home-note-new] textarea').value = 'My unsent draft';
     boardChores = { ...boardChores, swapRequests: [] };
     const button = document.querySelector('[data-kind=chore][data-response=accept]');
@@ -285,12 +286,18 @@ describe('Home household board', () => {
   });
   it('posts and replies to the existing shared board records', async () => {
     await renderBoard();
+    expect(document.querySelector('[data-form=home-note-new]')).toBeNull();
+    expect(document.querySelector('[data-action=home-make-announcement]')).not.toBeNull();
+    actions['home-make-announcement']();
     const form = document.querySelector('[data-form=home-note-new]');
+    expect(form.closest('[role=dialog]')).not.toBeNull();
+    expect(form.elements.namedItem('eventId')).not.toBeNull();
     form.elements.namedItem('messageText').value = 'Pizza tonight';
     notes = [...notes, { messageId: 10, senderUserId: 1, messageText: 'Pizza tonight', postedDate: '2026-11-05T18:00:00Z', replies: [] }];
     await forms['home-note-new'](form);
     expect(mockedApi).toHaveBeenCalledWith('/households/1/board', { method: 'POST', body: { messageText: 'Pizza tonight' } });
     expect(document.getElementById('home-board').textContent).toContain('Pizza tonight');
+    expect(document.querySelector('[role=dialog]')).toBeNull();
     const reply = document.querySelector('[data-form=home-note-reply][data-id="8"]');
     reply.elements.namedItem('messageText').value = 'Sounds good';
     await forms['home-note-reply'](reply);

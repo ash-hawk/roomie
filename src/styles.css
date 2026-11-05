@@ -604,3 +604,5 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .home-board .replyf{flex-wrap:nowrap}.home-board .replyf input{min-width:0;flex:1}.home-board select{min-width:0;flex:1}
 .home-board-request b,.home-board .sticky{overflow-wrap:anywhere}
 @media(max-width:767px){.home-board-columns{grid-template-columns:1fr;gap:20px}.home-board-feed{max-height:320px}}
+
+.home-make-announcement{align-self:flex-start}

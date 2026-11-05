@@ -101,4 +101,4 @@
 
 ## Household board on Home
 - Home composes the same board, events, and chores endpoints into a Household board above the schedule. Current cover requests are open to other roommates; swaps show response controls only to their target; requesters can see and cancel their own open requests. Upcoming event approval requests and creator approval progress are shown too.
-- Announcements and replies use the same bulletin records as the Events board, with posting/replying on Home and linked events. Responses use existing server-validated endpoints and refresh the board and schedule. No new database schema or notifications copies.
+- Announcements and replies use the same bulletin records as the Events board, with a Make announcement button opening a modal for the message and optional event link, plus inline replies. Responses use existing server-validated endpoints and refresh the board and schedule. No new database schema or notifications copies.
