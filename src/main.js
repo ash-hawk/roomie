@@ -133,6 +133,12 @@ actions.account = () => {
 
 window.addEventListener('hashchange', render);
 window.addEventListener('roomie:render', render);
+window.addEventListener('roomie:profile-saved', () => {
+  const account = document.querySelector('.acct');
+  if (account) account.innerHTML = S.user.profilePhoto
+    ? `<img class="acct-photo" src="${esc(S.user.profilePhoto)}" alt="" referrerpolicy="no-referrer">`
+    : esc(((S.user.firstName || '?')[0]).toUpperCase());
+});
 window.addEventListener('roomie:signedin', () => { resetState(); render(); });
 window.addEventListener('roomie:reload', async () => { S.user = null; await render(); });
 
