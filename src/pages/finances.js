@@ -128,14 +128,15 @@ actions['add-expense'] = async (_el, _e, preset = {}) => {
   inputs.split();
 };
 inputs['wish-pick'] = (el) => {
-  const o = el.selectedOptions[0]; const f = el.form;
-  if (!o?.value) return;
-  f.itemName.value = o.dataset.name || ''; if (o.dataset.price) f.totalAmount.value = o.dataset.price; inputs.split();
+  const option = el.selectedOptions[0], form = el.form; if (!form) return;
+  form.elements.namedItem('itemName').value = option?.value ? option.dataset.name || '' : '';
+  form.elements.namedItem('totalAmount').value = option?.value ? option.dataset.price || '' : '';
+  inputs.split();
 };
 inputs.split = () => {
   const f = document.querySelector('form[data-form=expense]'); const out = document.getElementById('split-preview'); if (!f || !out) return;
   const picked = [...f.querySelectorAll('input[name=p]:checked')];
-  let total; try { total = toCents(f.totalAmount.value.trim()); } catch { total = 0; }
+  let total; try { total = toCents(f.elements.namedItem('totalAmount').value.trim()); } catch { total = 0; }
   if (!picked.length) { out.textContent = 'Pick at least one roommate to split with.'; return; }
   if (total <= 0) { out.textContent = `Split ${picked.length + 1} ways.`; return; }
   if (total < picked.length + 1) { out.textContent = 'That total is too small to split that many ways.'; return; }
