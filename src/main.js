@@ -10,17 +10,17 @@ import { householdView } from './pages/household.js';
 import { financesView } from './pages/finances.js';
 import { choresView } from './pages/chores.js';
 import { calendarView } from './pages/calendar.js';
-import { bellHtml, loadAlerts, notificationsView, paintBell } from './pages/notifications.js';
+import { bellHtml, loadAlerts, openActivityPanel, openPendingActivity, paintBell } from './pages/notifications.js';
 import { homeView } from './pages/home.js';
 import { soonView } from './pages/soon.js';
 import { toCents } from '../shared/money.ts';
 
 const NAV = [['home', 'home', 'Home'], ['calendar', 'calendar', 'Events'], ['finances', 'money', 'Finances'], ['chores', 'check', 'Chores'], ['household', 'users', 'Household']];
 // Real pages register here as each slice lands; everything else shows the "coming next" card.
-export const pages = { settings: settingsView, household: householdView, finances: financesView, chores: choresView, calendar: calendarView, notifications: notificationsView, home: homeView };
+export const pages = { settings: settingsView, household: householdView, finances: financesView, chores: choresView, calendar: calendarView, home: homeView };
 
 const root = $('#root');
-const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/')[0]; return r === 'notifications' || r === 'settings' || NAV.some(([k]) => k === r) ? r : 'home'; };
+const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/')[0]; return r === 'settings' || NAV.some(([k]) => k === r) ? r : 'home'; };
 const loading = `<div class="page-skeleton" aria-label="Loading page" aria-busy="true"><div class="sk sk-title"></div><div class="sk sk-sub"></div>
   <div class="sk-grid"><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div></div></div>`;
 
@@ -70,14 +70,18 @@ export async function render() {
     if (!S.user) { root.innerHTML = loading; await loadMe(); }
     if (mine !== seq) return;
     if (!S.households.length) { root.innerHTML = onboardingView(); return; }
+    const legacyActivity = location.hash.replace(/^#\/?/, '').split('/')[0] === 'notifications';
+    if (legacyActivity) history.replaceState(null, '', '#/home');
     const page = route();
-    await Promise.all([page !== 'notifications' ? loadAlerts().catch(() => {}) : Promise.resolve(), loadNavCounts().catch(() => {})]);
-    const keep = $('#page') && root.dataset.page === page; // soft refresh keeps the shell
+    await Promise.all([loadAlerts().catch(() => {}), loadNavCounts().catch(() => {})]);
+    const keep = $('#page') && root.dataset.page === page && root.dataset.hid === String(S.hid); // soft refresh keeps the shell
     if (!keep) root.innerHTML = shell(page, loading);
     const body = pages[page] ? await pages[page]() : soonView(page);
     if (mine !== seq) return;
-    root.dataset.page = page;
+    root.dataset.page = page; root.dataset.hid = String(S.hid);
     if (keep) { $('#page').innerHTML = body; paintBell(); } else root.innerHTML = shell(page, body);
+    openPendingActivity(page);
+    if (legacyActivity) await openActivityPanel();
   } catch (e) {
     if (mine !== seq) return;
     if (e.status === 401) { resetState(); root.innerHTML = authView(); return; }
