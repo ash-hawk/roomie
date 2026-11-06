@@ -128,6 +128,12 @@ export async function respondToEvent(user: CurrentUser, householdId: number, eve
     const e = await loadEvent(tx, householdId, eventId, true);
     const [tag] = await tx.select().from(s.eventTag).where(and(eq(s.eventTag.eventId, eventId), eq(s.eventTag.userId, user.userId))).for('update');
     if (!tag || tag.response === null) throw new HttpError(400, 'You were not asked about this event');
+    // Clear the caller's original approval questions, regardless of where they responded.
+    await tx.update(s.notification).set({ isRead: true }).where(and(
+      eq(s.notification.userId, user.userId), eq(s.notification.householdId, householdId),
+      eq(s.notification.sourceType, 'event'), eq(s.notification.sourceId, eventId), eq(s.notification.section, 'calendar_board'),
+      e.createdByUserId === null ? isNull(s.notification.actorUserId) : eq(s.notification.actorUserId, e.createdByUserId),
+    ));
     if (tag.response === b.response) {
       const tags = await tx.select().from(s.eventTag).where(eq(s.eventTag.eventId, eventId));
       return eventOut(e, tags, user.userId);

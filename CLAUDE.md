@@ -76,10 +76,12 @@
 - Board: a note is a `bulletin_message`; a reply has `parent_message_id` (one level only). Only the sender edits, pins or deletes; deleting a note removes its replies and notifications. A reply notifies the note's author. A note can link one event of the same household.
 - Not built: event reminders (`reminder_minutes_before` is stored, nothing sends it yet), calendar import and export, true push or websocket realtime (polling instead).
 
-## Notifications (slice d, built)
-- Server in `api/_lib/notifications.ts`: `GET /api/notifications` (the caller's latest 100, only from households they currently live in; a household they moved out of is hidden, rows are kept) returns each row with `sourceGone`, `sourceStatus`, `canRespond`, plus `unread` and `swapPending`. `POST /api/notifications/read-all {section?}` and `PATCH /api/notifications/:id` only ever touch the caller's own rows (user id from the token).
-- Page `src/pages/notifications.js`: five sections plus All, per-card "Check it out" (switches household if needed, opens the page; events open their detail), and answers on the card using the existing endpoints: swap Accept/Decline, payment "I got it"/"I did not" (payee only), hosting check Okay/Not okay. The bell in the top bar shows unread, and a red badge while a swap request waits on you (M-08). The bell refreshes every 30s and on each page load.
-- Not built: phone push notifications (S-06), email, per-type mute settings.
+## Personal activity (notifications)
+- The bell opens a compact Activity panel on the current page, with the caller’s personal updates, unread dots/count, and Mark all read. No duplicate approval, swap, or payment response buttons are shown in the panel.
+- Selecting an update marks it read, switches to its active household, and opens the relevant feature. Event and chore details open after page data loads; announcements scroll to their thread; payment updates focus their finance record without confirming anything. Expense and wish-list details open when available. Legacy `#/notifications` links open Home with the activity panel.
+- Approving/declining an event marks the caller’s original invitation read in the response transaction, including idempotent responses. Finalized cover/swaps clear their old invitations before sending the requester a new outcome update; personal cover declines clear only that viewer’s invitation. Read or already-resolved request questions are omitted from the inbox and badge counts, including legacy answered notifications. Fresh reapproval requests and separate outcome messages remain.
+- The existing authenticated notifications endpoints and 30-second count polling remain. The household board remains the shared announcements/request workspace. No database migration or notification deletion.
+- Not built: phone push notifications, email, per-type mute settings.
 
 ## Profile and household
 - The header account button opens the hidden `#/settings` route, which is now the signed-in user's Profile page. It owns editable contact details, profile photo, payment methods, and sign out.
@@ -101,4 +103,8 @@
 
 ## Household board on Home
 - Home composes the same board, events, and chores endpoints into one mixed Household board feed above the schedule, without separate request/announcement columns or internal scrolling. Current cover requests are open to other roommates; swaps show response controls only to their target; requesters can see and cancel their own open requests. Upcoming event approval requests and creator approval progress are shown too.
-- Announcements and replies use the same bulletin records as the Events board, with a Make announcement button opening a modal for the message and optional event link, plus inline replies. Responses use existing server-validated endpoints and refresh the board and schedule. Chores shows a Chore requests board above both schedule and chart, using the same open requests; each chore with a request also offers View request. No new database schema or notifications copies.
+- Announcements and replies use the same bulletin records as the Events board, with a Make announcement button opening a modal for the message and optional event link, plus inline replies. Responses use existing server-validated endpoints and refresh the board and schedule. Chores shows Cover Requests above both schedule and chart, with “No chores need to be covered” when empty, and a separate swap section only when needed. Cover cards and the detail popup share the same chore-details renderer, including description, schedule, avatar, and occurrence date grouped under the assignee; each chore with a request also offers View request. No new database schema or notifications copies.
+
+- Announcement authors and replies on both Home and Events show clickable photos/names. They open the existing roommate profile using freshly fetched current-household member data, including former-member privacy restrictions; no prior visit to Household is required.
+
+- View chore on Home opens the exact occurrence directly in the standard Chores detail modal, loaded fresh for the current household. Cover request responses on Chores reuse that same detail modal with the request reason and Decline / Cover it controls. Covering is submitted only after reviewing the details; the server’s existing per-viewer decline behavior stays unchanged.

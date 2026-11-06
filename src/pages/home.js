@@ -6,6 +6,7 @@ import { avatar, closeModal, esc, mhead, money, openModal, personColor, phead, s
 import { addDays } from '../../shared/chore-dates.ts';
 import { monthDays, scheduleItems } from '../../shared/home-schedule.ts';
 import { householdBoard, announcementForm } from '../components/household-board.js';
+import { openChoreDetails } from './chores.js';
 import { toCents } from '../../shared/money.ts';
 
 const hid = () => household().householdId;
@@ -61,7 +62,7 @@ export async function homeView() {
   const view = getView();
   const owed = balances.mine.reduce((sum, b) => sum + Math.max(0, -toCents(b.signedAmount)), 0);
   const owingMe = balances.mine.reduce((sum, b) => sum + Math.max(0, toCents(b.signedAmount)), 0);
-  return `${phead(esc(household().householdName), 'Shared household schedule', 'Here you can see an overview of what’s happening in your household!')}
+  return `${phead(esc(household().householdName), 'Shared household schedule', 'Here you can see an overview of what’s happening in your household')}
     <div class="page-content stack"><section class="card stack home-board" id="home-board">${householdBoard(D)}</section><section class="card stack home-schedule" aria-label="Shared household schedule">
     <div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content" data-view="${view}">${view === 'calendar' ? calendarView() : listView()}</div></section>
     <section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section></div>`;
@@ -147,3 +148,5 @@ setInterval(async () => {
   if (document.activeElement?.closest?.('form,input,textarea,select,button') || document.querySelector('#home-board [aria-busy=true]')) return;
   try { await refreshHomeBoard(true); } catch { /* Keep the last snapshot while offline. */ }
 }, 15000);
+
+actions['home-chore-detail'] = (button) => openChoreDetails(D.householdId, Number(button.dataset.id));

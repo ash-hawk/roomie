@@ -1,4 +1,5 @@
-import { ago, avatar, esc, fullName } from '../lib/dom.js';
+import { ago, esc, fullName } from '../lib/dom.js';
+import { boardIdentity } from './board-profile.js';
 import { approvalState } from '../../shared/event-approval.ts';
 
 export function householdBoard({ members, events, chores, notes, user, timezone }) {
@@ -18,7 +19,7 @@ export function householdBoard({ members, events, chores, notes, user, timezone 
       <p class="hint">${esc(when(a.dueAt))}${target ? ` · Swap with ${esc(choreName(target))} (${esc(when(target.dueAt))})` : ''}</p>
       ${request.requestMessage ? `<p class="home-board-message">${esc(request.requestMessage)}</p>` : ''}
       ${mine ? `<span class="st unpaid">${cover ? 'Waiting for a volunteer' : `Waiting for ${esc(name(request.targetUserId))}`}</span>` : ''}
-      <div class="acts"><a class="btn s" href="#/chores">View in Chores</a>${mine ? button('chore', request.swapId, 'withdraw', 'Cancel request') : `${button('chore', request.swapId, 'accept', cover ? 'I can cover' : 'Accept swap', true)}${cover ? '' : button('chore', request.swapId, 'decline', 'Decline swap')}`}</div><div class="err" role="alert"></div></article>`;
+      <div class="acts"><button type="button" class="btn s" data-action="home-chore-detail" data-id="${a.assignmentId}">View chore</button>${mine ? button('chore', request.swapId, 'withdraw', 'Cancel request') : cover ? '' : `${button('chore', request.swapId, 'accept', 'Accept swap', true)}${button('chore', request.swapId, 'decline', 'Decline swap')}`}</div><div class="err" role="alert"></div></article>`;
   };
   const openEvents = events.filter((e) => Date.parse(e.endDate ?? e.eventDate) >= Date.now());
   const incoming = [
@@ -31,8 +32,8 @@ export function householdBoard({ members, events, chores, notes, user, timezone 
   ].filter(Boolean);
   const note = (n) => {
     const event = events.find((e) => e.eventId === n.eventId);
-    return `<article class="sticky ${n.isPinned ? 'pinned' : ''}"><span class="home-kind">Announcement</span><div class="row">${avatar(who(n.senderUserId), 'sm')}<b>${esc(name(n.senderUserId))}</b><span class="hint">${ago(n.postedDate, timezone)}</span>${n.isPinned ? '<span class="pin-mark">Pinned</span>' : ''}</div><p>${esc(n.messageText)}</p>
-      ${event ? eventLink(event) : ''}${(n.replies ?? []).map((r) => `<div class="reply"><b>${esc(name(r.senderUserId))}</b><p>${esc(r.messageText)}</p></div>`).join('')}
+    return `<article class="sticky ${n.isPinned ? 'pinned' : ''}"><span class="home-kind">Announcement</span><div class="row">${boardIdentity(who(n.senderUserId), name(n.senderUserId))}<span class="hint">${ago(n.postedDate, timezone)}</span>${n.isPinned ? '<span class="pin-mark">Pinned</span>' : ''}</div><p>${esc(n.messageText)}</p>
+      ${event ? eventLink(event) : ''}${(n.replies ?? []).map((r) => `<div class="reply board-comment">${boardIdentity(who(r.senderUserId), null)}<div class="grow"><div class="row">${boardIdentity(who(r.senderUserId), name(r.senderUserId), false)}<span class="hint">${ago(r.postedDate, timezone)}</span></div><p>${esc(r.messageText)}</p></div></div>`).join('')}
       <form class="stack" data-form="home-note-reply" data-id="${n.messageId}"><div class="row replyf"><input class="input" name="messageText" maxlength="500" placeholder="Reply" aria-label="Reply to ${esc(fullName(who(n.senderUserId)))}" required><button class="btn s" type="submit">Reply</button></div><div class="err" role="alert"></div></form></article>`;
   };
   const feed = [...incoming, ...outgoing, ...notes.map((n) => entry(note(n), n.postedDate, `note-${n.messageId}`, Boolean(n.isPinned)))]
