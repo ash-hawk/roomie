@@ -59,7 +59,7 @@ function settleView() {
 
 
   return `<div class="stack finance-summary">
-    <section class="card"><div class="row sp"><h2>Your balances</h2>${badge(mine ? 'Open' : 'All square', mine ? 'warn' : 'good')}</div>
+    <section class="card"><div class="row sp"><h2>Your balances</h2></div>
       <p class="section-description">What you owe or should receive.</p>
       ${mine || `<p class="mute" style="padding:10px 0">You don't owe anyone, and no one owes you. Log an expense when you buy something for the house.</p>`}</section>
 
