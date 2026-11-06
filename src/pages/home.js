@@ -31,8 +31,7 @@ function getLayout() {
 let layout = defaultLayout(), editing = false, editingKey = null;
 const widgetSize = (id) => layout.find((w) => w.id === id)?.size;
 function widgetTools(id) {
-  const index = layout.findIndex((w) => w.id === id);
-  return `<div class="home-widget-tools" ${editing ? '' : 'hidden'}><span class="home-drag-handle" draggable="true" data-widget-drag="${id}" title="Drag to move ${widgetNames[id]}">⠿</span><b>${widgetNames[id]}</b><label><span class="sr-only">${widgetNames[id]} size</span><select class="input" data-input="home-widget-size" data-widget="${id}">${['compact', 'expanded'].map((size) => `<option value="${size}" ${widgetSize(id) === size ? 'selected' : ''}>${size === 'compact' ? 'Compact' : 'Expanded'}</option>`).join('')}</select></label><button class="btn s" data-action="home-widget-move" data-widget="${id}" data-step="-1" aria-label="Move ${widgetNames[id]} earlier" ${index === 0 ? 'disabled' : ''}>↑</button><button class="btn s" data-action="home-widget-move" data-widget="${id}" data-step="1" aria-label="Move ${widgetNames[id]} later" ${index === layout.length - 1 ? 'disabled' : ''}>↓</button></div>`;
+  return `<div class="home-widget-tools" ${editing ? '' : 'hidden'}><button type="button" class="home-drag-handle" data-widget-drag="${id}" aria-label="Move ${widgetNames[id]}" aria-describedby="home-layout-help" title="Drag to move; use arrow keys when focused">⠿</button><b>${widgetNames[id]}</b><label><span class="sr-only">${widgetNames[id]} size</span><select class="input" data-input="home-widget-size" data-widget="${id}">${['compact', 'expanded'].map((size) => `<option value="${size}" ${widgetSize(id) === size ? 'selected' : ''}>${size === 'compact' ? 'Compact' : 'Expanded'}</option>`).join('')}</select></label></div>`;
 }
 let monthStart = null, monthHousehold = null, D = null;
 
@@ -99,7 +98,7 @@ export async function homeView() {
     finances: `<section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section>`,
   };
   return `${phead('Shared household schedule', 'Here you can see an overview of what’s happening in your household', `<button class="btn s" data-action="home-edit-layout">${editing ? 'Done' : 'Edit dashboard'}</button>`)}
-    <div class="home-layout-status" role="status">${editing ? 'Drag a grip or use the arrows to move sections. Changes save automatically.' : ''}</div><div class="page-content home-dashboard">${layout.map(({ id, size }) => `<div class="home-widget ${size}" data-widget="${id}">${widgetTools(id)}${widgets[id]}</div>`).join('')}</div>`;
+    <div class="home-layout-status" id="home-layout-help" role="status">${editing ? 'Drag a section by its grip to move it. You can also focus the grip and use arrow keys.' : ''}</div><div class="page-content home-dashboard">${layout.map(({ id, size }) => `<div class="home-widget ${size}" data-widget="${id}">${widgetTools(id)}${widgets[id]}</div>`).join('')}</div>`;
 
 }
 
@@ -181,7 +180,7 @@ forms['home-note-reply'] = (form) => postHomeNote(form, true);
 
 // Like the Events board, refresh while idle; never interrupt editing or an in-flight response.
 setInterval(async () => {
-  if (document.hidden || document.getElementById('root')?.dataset.page !== 'home' || !D || document.getElementById('modal')) return;
+  if (widgetDrag || document.hidden || document.getElementById('root')?.dataset.page !== 'home' || !D || document.getElementById('modal')) return;
   if (document.activeElement?.closest?.('form,input,textarea,select,button') || document.querySelector('#home-board [aria-busy=true]')) return;
   try { await refreshHomeBoard(true); } catch { /* Keep the last snapshot while offline. */ }
 }, 15000);
@@ -206,7 +205,7 @@ function applyLayout(focusWidget, focusSelector) {
 actions['home-edit-layout'] = (button) => {
   editing = !editing;
   button.textContent = editing ? 'Done' : 'Edit dashboard';
-  document.querySelector('.home-layout-status').textContent = editing ? 'Drag a grip or use the arrows to move sections. Changes save automatically.' : '';
+  document.querySelector('.home-layout-status').textContent = editing ? 'Drag a section by its grip to move it. You can also focus the grip and use arrow keys.' : '';
   applyLayout();
 };
 inputs['home-widget-size'] = (select) => {
@@ -233,23 +232,85 @@ actions['home-widget-move'] = (button) => {
   const [widget] = layout.splice(index, 1); layout.splice(target, 0, widget);
   saveLayout(); applyLayout(widget.id, '[data-input="home-widget-size"]');
 };
-let draggingWidget = null;
-document.addEventListener('dragstart', (event) => {
-  const grip = event.target.closest?.('[data-widget-drag]');
-  if (!editing || !grip) return;
-  draggingWidget = grip.dataset.widgetDrag;
-  event.dataTransfer?.setData('text/plain', draggingWidget);
-});
-document.addEventListener('dragover', (event) => {
-  if (editing && draggingWidget && event.target.closest?.('.home-widget')) event.preventDefault();
-});
-document.addEventListener('drop', (event) => {
-  const target = event.target.closest?.('.home-widget')?.dataset.widget;
-  if (!editing || !draggingWidget || !target || target === draggingWidget) return;
-  event.preventDefault();
-  const from = layout.findIndex((w) => w.id === draggingWidget), to = layout.findIndex((w) => w.id === target);
+// Pointer events provide one live preview for mouse, pen, and touch.
+let widgetDrag = null;
+function arrangeWidgets() {
+  const grid = document.querySelector('.home-dashboard');
+  if (!grid) return;
+  for (const { id } of layout) {
+    const widget = grid.querySelector(`.home-widget[data-widget="${id}"]`);
+    if (widget) grid.appendChild(widget);
+  }
+}
+function finishWidgetDrag(cancel = false) {
+  const drag = widgetDrag;
+  if (!drag) return;
+  widgetDrag = null;
+  cancelAnimationFrame(drag.frame);
+  if (cancel) { layout = drag.original; arrangeWidgets(); }
+  else if (drag.active) saveLayout();
+  drag.ghost?.remove(); drag.widget.classList.remove('home-widget-dragging');
+  document.body.classList.remove('home-is-dragging');
+  if (drag.grip.hasPointerCapture?.(drag.pointerId)) drag.grip.releasePointerCapture(drag.pointerId);
+  drag.grip.focus({ preventScroll: true });
+  const status = document.querySelector('.home-layout-status');
+  if (status && drag.active) status.textContent = cancel ? 'Move cancelled.' : `${widgetNames[drag.id]} moved. Layout saved.`;
+}
+function previewWidgetMove(x, y) {
+  const drag = widgetDrag;
+  if (!drag?.active || !drag.widget.isConnected) return;
+  drag.ghost.style.transform = `translate(${x - drag.offsetX}px, ${y - drag.offsetY}px)`;
+  const target = document.elementFromPoint(x, y)?.closest('.home-widget');
+  if (!target || target === drag.widget || target.parentElement !== drag.widget.parentElement) return;
+  const from = layout.findIndex((w) => w.id === drag.id), to = layout.findIndex((w) => w.id === target.dataset.widget);
   if (from < 0 || to < 0) return;
   const [widget] = layout.splice(from, 1); layout.splice(to, 0, widget);
-  draggingWidget = null; saveLayout(); applyLayout(widget.id, '[data-input="home-widget-size"]');
+  arrangeWidgets();
+  drag.grip.setPointerCapture?.(drag.pointerId);
+}
+document.addEventListener('pointerdown', (event) => {
+  const grip = event.target.closest?.('[data-widget-drag]');
+  if (!editing || !grip || event.button !== 0 || widgetDrag) return;
+  const widget = grip.closest('.home-widget'), rect = widget.getBoundingClientRect();
+  widgetDrag = { id: grip.dataset.widgetDrag, grip, widget, pointerId: event.pointerId, original: layout.map((w) => ({ ...w })), startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, active: false };
+  grip.setPointerCapture?.(event.pointerId);
 });
-document.addEventListener('dragend', () => { draggingWidget = null; });
+document.addEventListener('pointermove', (event) => {
+  const drag = widgetDrag;
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  drag.x = event.clientX; drag.y = event.clientY;
+  if (!drag.active && Math.hypot(drag.x - drag.startX, drag.y - drag.startY) < 5) return;
+  if (!drag.active) {
+    drag.active = true;
+    const rect = drag.widget.getBoundingClientRect();
+    drag.ghost = drag.widget.cloneNode(true);
+    drag.ghost.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+    drag.ghost.className = `home-widget ${widgetSize(drag.id)} home-widget-ghost`;
+    drag.ghost.setAttribute('aria-hidden', 'true'); drag.ghost.inert = true;
+    drag.ghost.style.width = `${rect.width}px`;
+    document.body.appendChild(drag.ghost);
+    drag.widget.classList.add('home-widget-dragging');
+    document.body.classList.add('home-is-dragging');
+    const scroll = () => {
+      if (widgetDrag !== drag || !drag.widget.isConnected) { if (widgetDrag === drag) finishWidgetDrag(true); return; }
+      const speed = drag.y < 70 ? -12 : drag.y > window.innerHeight - 70 ? 12 : 0;
+      if (speed) { window.scrollBy(0, speed); previewWidgetMove(drag.x, drag.y); }
+      drag.frame = requestAnimationFrame(scroll);
+    };
+    drag.frame = requestAnimationFrame(scroll);
+  }
+  event.preventDefault(); previewWidgetMove(drag.x, drag.y);
+}, { passive: false });
+document.addEventListener('pointerup', (event) => { if (event.pointerId === widgetDrag?.pointerId) finishWidgetDrag(); });
+document.addEventListener('pointercancel', () => finishWidgetDrag(true));
+window.addEventListener('blur', () => finishWidgetDrag(true));
+window.addEventListener('hashchange', () => finishWidgetDrag(true));
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && widgetDrag) { event.preventDefault(); finishWidgetDrag(true); return; }
+  const grip = event.target.closest?.('[data-widget-drag]');
+  if (widgetDrag || !editing || !grip || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+  event.preventDefault();
+  actions['home-widget-move']({ dataset: { widget: grip.dataset.widgetDrag, step: ['ArrowUp', 'ArrowLeft'].includes(event.key) ? '-1' : '1' } });
+  document.querySelector(`.home-widget[data-widget="${grip.dataset.widgetDrag}"] .home-drag-handle`)?.focus();
+  document.querySelector('.home-layout-status').textContent = `${widgetNames[grip.dataset.widgetDrag]} moved. Layout saved.`;
+});
