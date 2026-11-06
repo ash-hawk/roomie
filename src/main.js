@@ -12,6 +12,7 @@ import { choresView } from './pages/chores.js';
 import { calendarView } from './pages/calendar.js';
 import { bellHtml, loadAlerts, openActivityPanel, openPendingActivity, paintBell } from './pages/notifications.js';
 import { homeView } from './pages/home.js';
+import { openPendingCalendarCreate } from './lib/calendar-create.js';
 import { connectHomeLayout } from './components/home-layout.js';
 import { soonView } from './pages/soon.js';
 import { toCents } from '../shared/money.ts';
@@ -82,6 +83,7 @@ export async function render() {
     root.dataset.page = page; root.dataset.hid = String(S.hid);
     if (keep) { $('#page').innerHTML = body; paintBell(); } else root.innerHTML = shell(page, body);
     connectHomeLayout();
+    openPendingCalendarCreate(page);
     openPendingActivity(page);
     if (legacyActivity) await openActivityPanel();
   } catch (e) {

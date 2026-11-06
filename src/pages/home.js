@@ -8,6 +8,7 @@ import { monthDays, scheduleItems } from '../../shared/home-schedule.ts';
 import { householdBoard, announcementForm } from '../components/household-board.js';
 import { openChoreDetails } from './chores.js';
 import { fitHomeWidgets, widgetDropSlot } from '../components/home-layout.js';
+import { queueCalendarCreate } from '../lib/calendar-create.js';
 import { toCents } from '../../shared/money.ts';
 
 const hid = () => household().householdId;
@@ -122,7 +123,12 @@ actions['home-month'] = (el) => {
 };
 actions['home-day'] = (el) => {
   const items = D.items.filter((item) => item.ymd === el.dataset.day);
-  openModal(`${mhead(esc(dayLabel(el.dataset.day)))}<div class="stack">${items.length ? items.map(row).join('') : '<p class="mute">No events or chores on this day.</p>'}</div>`);
+  openModal(`${mhead(esc(dayLabel(el.dataset.day)))}<div class="stack">${items.length ? items.map(row).join('') : '<p class="mute">No events or chores on this day.</p>'}</div><div class="acts"><button class="btn p" data-action="home-create" data-kind="event" data-day="${esc(el.dataset.day)}">Add event</button><button class="btn" data-action="home-create" data-kind="chore" data-day="${esc(el.dataset.day)}">Add chore</button></div>`);
+};
+actions['home-create'] = (button) => {
+  if (!D || D.householdId !== hid() || !queueCalendarCreate(button.dataset.kind, button.dataset.day)) return;
+  closeModal();
+  location.hash = button.dataset.kind === 'event' ? '#/calendar' : '#/chores';
 };
 actions['home-open'] = (el) => {
   closeModal();

@@ -1,3 +1,4 @@
+import { validCalendarDay } from '../lib/calendar-create.js';
 // Slice (b): chores. The server owns the rules (rotation, daylight saving, who may do what);
 // this page shows the data and sends the user's intent. Times are always shown in the household's timezone.
 import { actions, forms, inputs } from '../lib/events.js';
@@ -163,8 +164,10 @@ actions['chore-detail'] = (el) => {
 actions['chore-rule'] = (el) => { const c = choreOf(Number(el.dataset.id)); const a = nextAsg(c) ?? D.assignments.filter((x) => x.choreId === c.choreId).sort((x, y) => Date.parse(y.dueAt) - Date.parse(x.dueAt))[0]; if (a) actions['chore-detail']({ dataset: { id: a.assignmentId } }); else actions['edit-chore'](el); };
 
 // ---- add / edit / delete a chore --------------------------------------------------------------
-actions['add-chore'] = () => {
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: tz() }).format(new Date());
+actions['add-chore'] = (el) => {
+  const selectedDay = validCalendarDay(el?.dataset?.day) ? el.dataset.day : null;
+  const today = selectedDay ?? new Intl.DateTimeFormat('en-CA', { timeZone: tz() }).format(new Date());
+  const date = new Date(`${today}T12:00:00Z`);
   const people = active();
   openModal(`${mhead('Add a chore')}
     <form class="stack" data-form="chore-add" autocomplete="off">
@@ -173,12 +176,12 @@ actions['add-chore'] = () => {
       <div class="inline-grid"><label class="fld"><span>How hard?</span><select class="input" name="effort"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
         <label class="fld"><span>Time</span><input class="input" name="dueTime" type="time" value="19:00" required></label></div>
       <div class="fld"><span>How often?</span><div class="methods" style="grid-template-columns:repeat(3,1fr)">
-        <label><input type="radio" name="repeats" value="none" data-input="chore-type">One time</label>
-        <label><input type="radio" name="repeats" value="weekly" checked data-input="chore-type">Every week</label>
+        <label><input type="radio" name="repeats" value="none" ${selectedDay ? 'checked' : ''} data-input="chore-type">One time</label>
+        <label><input type="radio" name="repeats" value="weekly" ${selectedDay ? '' : 'checked'} data-input="chore-type">Every week</label>
         <label><input type="radio" name="repeats" value="monthly" data-input="chore-type">Every month</label></div></div>
       <label class="fld" id="f-date"><span id="l-date">Starting</span><input class="input" name="date" type="date" value="${today}"></label>
-      <label class="fld" id="f-dow"><span>Day of the week</span><select class="input" name="dow">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<option value="${d}">${dayName(d)}</option>`).join('')}</select></label>
-      <label class="fld hidden" id="f-dom"><span>Day of the month (31 means the last day)</span><input class="input" name="dom" type="number" min="1" max="31" value="1"></label>
+      <label class="fld" id="f-dow"><span>Day of the week</span><select class="input" name="dow">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<option value="${d}" ${selectedDay && d === date.getUTCDay() ? 'selected' : ''}>${dayName(d)}</option>`).join('')}</select></label>
+      <label class="fld hidden" id="f-dom"><span>Day of the month (31 means the last day)</span><input class="input" name="dom" type="number" min="1" max="31" value="${selectedDay ? date.getUTCDate() : 1}"></label>
       <div class="fld"><span>Who does it?</span><div class="methods" style="grid-template-columns:repeat(2,1fr)">
         <label><input type="radio" name="mode" value="person" checked data-input="chore-who">One person</label>
         <label id="mode-rotate"><input type="radio" name="mode" value="rotate" data-input="chore-who">Take turns</label></div></div>

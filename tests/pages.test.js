@@ -567,3 +567,50 @@ it('uses existing card headings for editing, without grip bars or repeated widge
   actions['home-edit-layout'](edit);
   expect(document.querySelector('[data-widget-drag]')).toBeNull();
 });
+
+
+describe('Create from a Home calendar day', () => {
+  it('offers both creation actions on empty and occupied days and opens the right form with the selected date', async () => {
+    const { openPendingCalendarCreate } = await import('../src/lib/calendar-create.js');
+    const { choresView } = await import('../src/pages/chores.js');
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => path.endsWith('/chores') ? Promise.resolve({ chores: [], assignments: [], swapRequests: [] }) : baseApi(path));
+    for (const [kind, day] of [['event', '2026-11-05'], ['chore', '2026-11-15']]) {
+      document.getElementById('page').innerHTML = await homeView();
+      actions['home-day']({ dataset: { day } });
+      const dialog = document.querySelector('[role="dialog"]');
+      expect(dialog.querySelector('[data-kind="event"][data-action="home-create"]').textContent).toBe('Add event');
+      expect(dialog.querySelector('[data-kind="chore"][data-action="home-create"]').textContent).toBe('Add chore');
+      actions['home-create'](dialog.querySelector(`[data-kind="${kind}"][data-action="home-create"]`));
+      const page = kind === 'event' ? 'calendar' : 'chores';
+      expect(location.hash).toBe(`#/${page}`);
+      expect(document.querySelector('[role="dialog"]')).toBeNull();
+      document.getElementById('page').innerHTML = kind === 'event' ? await calendarView() : await choresView();
+      expect(openPendingCalendarCreate(page)).toBe(true);
+      const form = document.querySelector(`form[data-form="${kind === 'event' ? 'event-save' : 'chore-add'}"]`);
+      expect(form.elements.namedItem('date').value).toBe(day);
+      if (kind === 'chore') {
+        expect(form.querySelector('[name="repeats"]:checked').value).toBe('none');
+        expect(form.elements.namedItem('dow').value).toBe('0');
+        expect(form.elements.namedItem('dom').value).toBe('15');
+      }
+      expect(openPendingCalendarCreate(page)).toBe(false);
+      document.getElementById('modal')?.remove();
+    }
+    expect(mockedApi.mock.calls.some(([, options]) => options?.method && options.method !== 'GET')).toBe(false);
+  });
+  it('rejects invalid dates and discards creation handoffs when the user or household changes', async () => {
+    const { queueCalendarCreate, openPendingCalendarCreate } = await import('../src/lib/calendar-create.js');
+    expect(queueCalendarCreate('event', '2026-02-30')).toBe(false);
+    expect(queueCalendarCreate('event', '<bad>')).toBe(false);
+    expect(queueCalendarCreate('other', '2026-11-15')).toBe(false);
+    expect(queueCalendarCreate('event', '2026-11-15')).toBe(true);
+    S.user = { ...S.user, userId: 99 };
+    expect(openPendingCalendarCreate('calendar')).toBe(false);
+    S.user = structuredClone(user);
+    queueCalendarCreate('chore', '2026-11-15');
+    S.households = [{ householdId: 2, timezone: 'America/Denver' }]; S.hid = 2;
+    expect(openPendingCalendarCreate('chores')).toBe(false);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+});

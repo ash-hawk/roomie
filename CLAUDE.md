@@ -119,3 +119,5 @@
 - Home sizing now follows the drag destination automatically; visible Compact/Expanded selectors are removed. A narrow destination uses the compact presentation, while a wider destination uses expanded details. The preview changes before dropping and saves the destination column with the existing per-user/household local preferences. Escape restores both size and order. Old saved sizes remain valid; no migration is needed.
 
 - Dashboard editing no longer adds separate grip toolbars or repeated section labels. The existing month/section heading becomes a focusable drag target only in Edit dashboard mode; subtle card outlines mark editability. Done removes drag semantics. Automatic sizing, keyboard movement, and live placement remain available.
+
+- Home calendar day popups offer Add event and Add chore on empty and occupied days. A validated, one-use in-memory handoff is scoped to the initiating user/household, consumed only after the matching destination page has loaded and rendered. Event date and chore date/weekday/day-of-month are prefilled; calendar-started chores default to one-time. No creation occurs until the normal form is submitted.
