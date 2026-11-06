@@ -16,7 +16,13 @@ import { openPendingCalendarCreate } from './lib/calendar-create.js';
 import { connectHomeLayout } from './components/home-layout.js';
 import { soonView } from './pages/soon.js';
 
-const NAV = [['home', 'home', 'Home'], ['calendar', 'calendar', 'Events'], ['finances', 'money', 'Finances'], ['chores', 'check', 'Chores'], ['household', 'users', 'Household']];
+const NAV = [
+  ['home', 'home', 'Home'],
+  ['calendar', 'calendar', 'Events'],
+  ['chores', 'check', 'Chores'],
+  ['finances', 'money', 'Finances'],
+  ['household', 'users', 'Household']
+];
 // Real pages register here as each slice lands; everything else shows the "coming next" card.
 export const pages = { settings: settingsView, household: householdView, finances: financesView, chores: choresView, calendar: calendarView, home: homeView };
 
