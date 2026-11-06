@@ -115,3 +115,5 @@
 - Compact board uses expandable summaries with the existing actions, announcement profiles, and replies inside. Resizing/moving retains reply drafts. Finances can be a compact tile or wider summary. The grid stacks on narrow screens.
 
 - Home widget movement uses pointer-based live dragging from a focusable grip (mouse/pen/touch), with a floating preview and the original widget as the grid placeholder. Other widgets move during drag; pointer release saves, Escape/pointercancel restores the original order. Dragging near screen edges scrolls. Arrow keys on the grip move earlier/later without visible arrow buttons. Board polling pauses during dragging, and existing widget DOM/drafts remain intact.
+
+- Home sizing now follows the drag destination automatically; visible Compact/Expanded selectors are removed. A narrow destination uses the compact presentation, while a wider destination uses expanded details. The preview changes before dropping and saves the destination column with the existing per-user/household local preferences. Escape restores both size and order. Old saved sizes remain valid; no migration is needed.

@@ -138,7 +138,7 @@ describe("Home views", () => {
     picker.value = 'list'; inputs['home-view'](picker);
     next();
     expect(content.textContent).toContain('February 2027');
-    expect(content.textContent).toContain('No events or chores this month.');
+    expect(content.textContent).toContain('No events or chores from today onward in this month.');
     actions['home-month'](content.querySelector('[data-n="-1"]'));
     expect(content.textContent).toContain('January plan');
     expect(mockedApi).toHaveBeenCalledTimes(5);
@@ -398,14 +398,10 @@ describe('Home household board', () => {
 describe('Home widget customization', () => {
   const layoutKey = 'roomie.home.layout.1.1';
   const render = async () => { document.getElementById('page').innerHTML = await homeView(); };
-  const size = (id, value) => {
-    const select = document.querySelector(`.home-widget[data-widget="${id}"] [data-input="home-widget-size"]`);
-    select.value = value; inputs['home-widget-size'](select);
-  };
   it('saves size and order per user and household, independently of Calendar/List', async () => {
     await render();
     actions['home-edit-layout'](document.querySelector('[data-action="home-edit-layout"]'));
-    size('schedule', 'compact');
+    actions['home-widget-move']({ dataset: { widget: 'schedule', step: '1' } });
     const view = document.querySelector('[data-input="home-view"]');
     view.value = 'calendar'; inputs['home-view'](view);
     const day = document.querySelector('[data-day="2026-11-05"]');
@@ -416,7 +412,7 @@ describe('Home widget customization', () => {
     expect(document.querySelector('[role="dialog"]').textContent).toContain('Dishes');
     document.getElementById('modal')?.remove();
     actions['home-widget-move']({ dataset: { widget: 'finances', step: '-1' } });
-    expect(JSON.parse(localStorage.getItem(layoutKey)).map((w) => w.id)).toEqual(['schedule', 'finances', 'board']);
+    expect(JSON.parse(localStorage.getItem(layoutKey)).map((w) => w.id)).toEqual(['board', 'finances', 'schedule']);
     await render();
     expect(document.querySelector('.home-widget').classList.contains('compact')).toBe(true);
     expect(document.querySelector('[data-input="home-view"]').value).toBe('calendar');
@@ -437,12 +433,12 @@ describe('Home widget customization', () => {
     expect(summary.textContent).toContain('House meeting');
     const input = document.querySelector('#home-board input[name="messageText"]');
     input.value = 'Keep my reply';
-    size('board', 'expanded');
+    actions['home-widget-move']({ dataset: { widget: 'board', step: '-1' } });
     expect(document.querySelector('.home-board-summary')).toBeNull();
     expect(document.querySelector('#home-board input').value).toBe('Keep my reply');
-    size('board', 'compact');
+    actions['home-widget-move']({ dataset: { widget: 'board', step: '2' } });
     expect(document.querySelector('#home-board input').value).toBe('Keep my reply');
-    actions['home-widget-move']({ dataset: { widget: 'board', step: '-1' } });
+    actions['home-widget-move']({ dataset: { widget: 'board', step: '-2' } });
     expect(document.querySelector('.home-widget').dataset.widget).toBe('board');
     expect(document.querySelector('#home-board input').value).toBe('Keep my reply');
   });
@@ -478,6 +474,27 @@ describe('Home live dragging', () => {
     expect(document.querySelector('.home-widget-ghost')).toBeNull();
     expect(document.querySelector('.home-widget-dragging')).toBeNull();
   });
+  it('automatically changes presentation to fit the drop space and rolls the size back on cancellation', async () => {
+    const grip = await setup();
+    const grid = document.querySelector('.home-dashboard');
+    grid.style.gridTemplateColumns = '300px 300px 300px'; grid.style.gridAutoRows = '2px';
+    grid.getBoundingClientRect = () => ({ left: 0, right: 900, width: 900, top: 0, bottom: 1000 });
+    const rects = { schedule: { left: 0, right: 600, top: 0, bottom: 900, width: 600, height: 900 }, board: { left: 600, right: 900, top: 0, bottom: 300, width: 300, height: 300 }, finances: { left: 600, right: 900, top: 320, bottom: 500, width: 300, height: 180 } };
+    [...grid.children].forEach((el) => { el.getBoundingClientRect = () => rects[el.dataset.widget]; });
+    const target = grid.querySelector('[data-widget="board"]');
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => target });
+    expect(document.querySelector('[data-input="home-widget-size"]')).toBeNull();
+    point(grip, 'pointerdown'); point(document, 'pointermove', 800, 100);
+    const widget = grid.querySelector('[data-widget="schedule"]');
+    expect(widget.classList.contains('compact')).toBe(true);
+    expect(widget.dataset.column).toBe('3');
+    expect(document.querySelector('.home-widget-ghost').classList.contains('compact')).toBe(true);
+    point(document, 'pointercancel');
+    expect(widget.classList.contains('expanded')).toBe(true);
+    expect(widget.dataset.column).toBe('');
+    point(grip, 'pointerdown'); point(document, 'pointermove', 800, 100); point(document, 'pointerup');
+    expect(JSON.parse(localStorage.getItem('roomie.home.layout.1.1')).find((w) => w.id === 'schedule')).toMatchObject({ size: 'compact', column: 3 });
+  });
   it('restores the original order on Escape or pointer cancellation and supports keyboard movement', async () => {
     let grip = await setup();
     Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => document.querySelector('.home-widget[data-widget="finances"]') });
@@ -490,5 +507,42 @@ describe('Home live dragging', () => {
     grip.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
     expect(order()).toEqual(['board', 'schedule', 'finances']);
     expect(document.activeElement.dataset.widgetDrag).toBe('schedule');
+  });
+});
+
+
+describe('Home upcoming list dates', () => {
+  it('hides previous household-local days in compact, expanded and View all, while calendar history stays accessible', async () => {
+    S.hid = 51; S.households = [{ ...S.households[0], householdId: 51 }];
+    // UTC has crossed midnight; Denver is still on November 5.
+    vi.setSystemTime(new Date('2026-11-06T03:00:00Z'));
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => {
+      if (path.endsWith('/events')) return Promise.resolve({ events: [
+        ...events,
+        { ...events[0], eventId: 99, eventName: 'Yesterday meeting', eventDate: '2026-11-04T20:00:00Z' },
+        ...Array.from({ length: 6 }, (_, i) => ({ ...events[0], eventId: 10 + i, eventName: `Future plan ${i}`, eventDate: `2026-11-${String(6 + i).padStart(2, '0')}T20:00:00Z` })),
+      ] });
+      if (path.endsWith('/chores')) return Promise.resolve({ ...chores, assignments: [...chores.assignments, { ...chores.assignments[0], assignmentId: 99, dueAt: '2026-11-04T19:00:00Z' }] });
+      return baseApi(path);
+    });
+    localStorage.setItem('roomie.home.layout.1.51', JSON.stringify([{ id: 'schedule', size: 'compact' }, { id: 'board', size: 'compact' }, { id: 'finances', size: 'compact' }]));
+    document.getElementById('page').innerHTML = await homeView();
+    let content = document.getElementById('home-schedule-content');
+    expect(content.textContent).toContain('Dinner');
+    expect(content.textContent).not.toContain('Yesterday meeting');
+    expect(content.querySelectorAll('.home-schedule-row')).toHaveLength(5);
+    const all = content.querySelector('[data-action="home-month-list"]');
+    expect(all.textContent).toBe('View all 8 items');
+    actions['home-month-list']();
+    expect(document.querySelector('[role="dialog"]').textContent).not.toContain('Yesterday meeting');
+    expect(document.querySelectorAll('[role="dialog"] .home-schedule-row')).toHaveLength(8);
+    document.getElementById('modal')?.remove();
+    localStorage.removeItem('roomie.home.layout.1.51');
+    document.getElementById('page').innerHTML = await homeView();
+    content = document.getElementById('home-schedule-content');
+    expect(content.querySelectorAll('.home-schedule-row')).toHaveLength(8);
+    const view = content.querySelector('[data-input="home-view"]'); view.value = 'calendar'; inputs['home-view'](view);
+    expect(content.querySelector('[data-day="2026-11-04"]').textContent).toContain('Yesterday meeting');
   });
 });

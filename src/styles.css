@@ -663,7 +663,6 @@ button.activity-item{cursor:pointer}button.activity-item:hover{background:var(--
 .home-widget.compact .home-finances>.btn{align-self:flex-start}
 @media(max-width:1000px){.home-dashboard{grid-template-columns:repeat(2,minmax(0,1fr))}.home-widget.expanded{grid-column:1/-1}}
 @media(max-width:640px){.home-dashboard{grid-template-columns:minmax(0,1fr);gap:14px}.home-widget.compact,.home-widget.expanded{grid-column:1/-1}.home-widget>.card{padding:14px}}
-@media(min-width:1001px){.home-dashboard:not(:has(>.compact))>.expanded{grid-column:1/-1}}
 
 /* Live dashboard dragging: the original stays in the grid as a drop preview. */
 button.home-drag-handle{border:0;background:transparent;font:inherit;font-size:24px;line-height:1;padding:5px 8px;color:var(--mute);cursor:grab;touch-action:none;border-radius:6px}
