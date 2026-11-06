@@ -138,7 +138,7 @@ describe("Home views", () => {
     picker.value = 'list'; inputs['home-view'](picker);
     next();
     expect(content.textContent).toContain('February 2027');
-    expect(content.textContent).toContain('No events or chores this month.');
+    expect(content.textContent).toContain('No events or chores from today onward in this month.');
     actions['home-month'](content.querySelector('[data-n="-1"]'));
     expect(content.textContent).toContain('January plan');
     expect(mockedApi).toHaveBeenCalledTimes(5);
@@ -507,5 +507,42 @@ describe('Home live dragging', () => {
     grip.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
     expect(order()).toEqual(['board', 'schedule', 'finances']);
     expect(document.activeElement.dataset.widgetDrag).toBe('schedule');
+  });
+});
+
+
+describe('Home upcoming list dates', () => {
+  it('hides previous household-local days in compact, expanded and View all, while calendar history stays accessible', async () => {
+    S.hid = 51; S.households = [{ ...S.households[0], householdId: 51 }];
+    // UTC has crossed midnight; Denver is still on November 5.
+    vi.setSystemTime(new Date('2026-11-06T03:00:00Z'));
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => {
+      if (path.endsWith('/events')) return Promise.resolve({ events: [
+        ...events,
+        { ...events[0], eventId: 99, eventName: 'Yesterday meeting', eventDate: '2026-11-04T20:00:00Z' },
+        ...Array.from({ length: 6 }, (_, i) => ({ ...events[0], eventId: 10 + i, eventName: `Future plan ${i}`, eventDate: `2026-11-${String(6 + i).padStart(2, '0')}T20:00:00Z` })),
+      ] });
+      if (path.endsWith('/chores')) return Promise.resolve({ ...chores, assignments: [...chores.assignments, { ...chores.assignments[0], assignmentId: 99, dueAt: '2026-11-04T19:00:00Z' }] });
+      return baseApi(path);
+    });
+    localStorage.setItem('roomie.home.layout.1.51', JSON.stringify([{ id: 'schedule', size: 'compact' }, { id: 'board', size: 'compact' }, { id: 'finances', size: 'compact' }]));
+    document.getElementById('page').innerHTML = await homeView();
+    let content = document.getElementById('home-schedule-content');
+    expect(content.textContent).toContain('Dinner');
+    expect(content.textContent).not.toContain('Yesterday meeting');
+    expect(content.querySelectorAll('.home-schedule-row')).toHaveLength(5);
+    const all = content.querySelector('[data-action="home-month-list"]');
+    expect(all.textContent).toBe('View all 8 items');
+    actions['home-month-list']();
+    expect(document.querySelector('[role="dialog"]').textContent).not.toContain('Yesterday meeting');
+    expect(document.querySelectorAll('[role="dialog"] .home-schedule-row')).toHaveLength(8);
+    document.getElementById('modal')?.remove();
+    localStorage.removeItem('roomie.home.layout.1.51');
+    document.getElementById('page').innerHTML = await homeView();
+    content = document.getElementById('home-schedule-content');
+    expect(content.querySelectorAll('.home-schedule-row')).toHaveLength(8);
+    const view = content.querySelector('[data-input="home-view"]'); view.value = 'calendar'; inputs['home-view'](view);
+    expect(content.querySelector('[data-day="2026-11-04"]').textContent).toContain('Yesterday meeting');
   });
 });

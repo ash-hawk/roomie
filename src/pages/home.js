@@ -50,17 +50,18 @@ function monthNav(view) {
   return `<div class="home-schedule-toolbar"><div class="month-nav"><button class="btn s" data-action="home-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="home-month" data-n="1" aria-label="Next month">›</button></div><select class="input home-view-select" data-input="home-view" aria-label="Schedule view">${[['calendar', 'Calendar view'], ['list', 'List view']].map(([key, label]) => `<option value="${key}" ${view === key ? 'selected' : ''}>${label}</option>`).join('')}</select></div>`;
 }
 
+const upcomingMonthItems = () => D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7) && item.ymd >= ymdIn(Date.now()));
 function monthList(items) {
-  return items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('') : '<p class="home-empty">No events or chores this month.</p>';
+  return items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('') : '<p class="home-empty">No events or chores from today onward in this month.</p>';
 }
 function listView() {
-  const items = D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7));
+  const items = upcomingMonthItems();
   const compact = widgetSize('schedule') === 'compact';
   return `${monthNav('list')}${monthList(compact ? items.slice(0, 5) : items)}${compact && items.length > 5 ? `<button class="btn s" data-action="home-month-list">View all ${items.length} items</button>` : ''}`;
 }
 actions['home-month-list'] = () => {
   const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-  openModal(`${mhead(esc(title))}<div class="stack">${monthList(D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7)))}</div>`);
+  openModal(`${mhead(esc(title))}<div class="stack">${monthList(upcomingMonthItems())}</div>`);
 };
 
 function calendarView() {
