@@ -325,7 +325,11 @@ export async function respondToSwap(user: CurrentUser, householdId: number, swap
     if (r.status !== 'pending') throw new HttpError(409, 'That request was already handled');
     const ra = A.get(r.requesterAssignmentId)!, ta = r.targetAssignmentId ? A.get(r.targetAssignmentId)! : null;
     const now = new Date().toISOString();
-    const finish = (status: 'accepted' | 'declined', message: string | null) => tx.update(s.choreSwapRequest).set({ status, responseMessage: message, respondedDate: now }).where(eq(s.choreSwapRequest.swapId, swapId));
+    const finish = async (status: 'accepted' | 'declined', message: string | null) => {
+      await tx.update(s.choreSwapRequest).set({ status, responseMessage: message, respondedDate: now }).where(eq(s.choreSwapRequest.swapId, swapId));
+      // Close the old invitations before creating the requester's separate outcome notification.
+      await tx.update(s.notification).set({ isRead: true }).where(and(eq(s.notification.householdId, householdId), eq(s.notification.sourceType, 'chore_swap_request'), eq(s.notification.sourceId, swapId)));
+    };
     const notifyRequester = async (requester: number, text: string) => {
       if ((await activeIds(tx, householdId)).includes(requester)) await tx.insert(s.notification).values({ userId: requester, householdId, actorUserId: user.userId, section: 'chores', sourceType: 'chore_swap_request', sourceId: swapId, message: text });
     };
@@ -357,7 +361,7 @@ export async function respondToSwap(user: CurrentUser, householdId: number, swap
     const requester = ra.assignedUserId;
     if (user.userId === requester) throw new HttpError(403, 'You cannot cover your own request');
     if (action === 'decline') { // "not me": nothing is recorded on the request, it stays open for others
-      await tx.update(s.notification).set({ isRead: true }).where(and(eq(s.notification.userId, user.userId), eq(s.notification.sourceType, 'chore_swap_request'), eq(s.notification.sourceId, swapId)));
+      await tx.update(s.notification).set({ isRead: true }).where(and(eq(s.notification.userId, user.userId), eq(s.notification.householdId, householdId), eq(s.notification.sourceType, 'chore_swap_request'), eq(s.notification.sourceId, swapId)));
       return { swapId, status: 'pending', dismissed: true };
     }
     if (ra.isCompleted) throw new HttpError(409, 'That chore was already done');

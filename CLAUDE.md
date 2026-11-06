@@ -79,6 +79,7 @@
 ## Personal activity (notifications)
 - The bell opens a compact Activity panel on the current page, with the caller’s personal updates, unread dots/count, and Mark all read. No duplicate approval, swap, or payment response buttons are shown in the panel.
 - Selecting an update marks it read, switches to its active household, and opens the relevant feature. Event and chore details open after page data loads; announcements scroll to their thread; payment updates focus their finance record without confirming anything. Expense and wish-list details open when available. Legacy `#/notifications` links open Home with the activity panel.
+- Approving/declining an event marks the caller’s original invitation read in the response transaction, including idempotent responses. Finalized cover/swaps clear their old invitations before sending the requester a new outcome update; personal cover declines clear only that viewer’s invitation. Read or already-resolved request questions are omitted from the inbox and badge counts, including legacy answered notifications. Fresh reapproval requests and separate outcome messages remain.
 - The existing authenticated notifications endpoints and 30-second count polling remain. The household board remains the shared announcements/request workspace. No database migration or notification deletion.
 - Not built: phone push notifications, email, per-type mute settings.
 
