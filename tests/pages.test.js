@@ -447,3 +447,48 @@ describe('Home widget customization', () => {
     expect(document.querySelector('#home-board input').value).toBe('Keep my reply');
   });
 });
+
+describe('Home live dragging', () => {
+  const order = () => [...document.querySelectorAll('.home-dashboard>.home-widget')].map((el) => el.dataset.widget);
+  const point = (target, type, x = 10, y = 100) => {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y });
+    Object.defineProperty(event, 'pointerId', { value: 42 });
+    target.dispatchEvent(event);
+  };
+  async function setup() {
+    document.getElementById('page').innerHTML = await homeView();
+    const edit = document.querySelector('[data-action="home-edit-layout"]');
+    if (edit.textContent === 'Edit dashboard') actions['home-edit-layout'](edit);
+    return document.querySelector('[data-widget-drag="schedule"]');
+  }
+  it('previews surrounding reordering before release, then saves without replacing widget content', async () => {
+    const grip = await setup();
+    const board = document.getElementById('home-board');
+    const target = document.querySelector('.home-widget[data-widget="finances"]');
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => target });
+    expect(document.querySelector('[data-action="home-widget-move"]')).toBeNull();
+    point(grip, 'pointerdown');
+    point(document, 'pointermove', 100, 110);
+    expect(order()).toEqual(['board', 'finances', 'schedule']);
+    expect(localStorage.getItem('roomie.home.layout.1.1')).toBeNull();
+    expect(document.querySelector('.home-widget-ghost').getAttribute('aria-hidden')).toBe('true');
+    expect(document.getElementById('home-board')).toBe(board);
+    point(document, 'pointerup', 100, 110);
+    expect(JSON.parse(localStorage.getItem('roomie.home.layout.1.1')).map((w) => w.id)).toEqual(order());
+    expect(document.querySelector('.home-widget-ghost')).toBeNull();
+    expect(document.querySelector('.home-widget-dragging')).toBeNull();
+  });
+  it('restores the original order on Escape or pointer cancellation and supports keyboard movement', async () => {
+    let grip = await setup();
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => document.querySelector('.home-widget[data-widget="finances"]') });
+    point(grip, 'pointerdown'); point(document, 'pointermove', 100, 110);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(order()).toEqual(['schedule', 'board', 'finances']);
+    expect(localStorage.getItem('roomie.home.layout.1.1')).toBeNull();
+    point(grip, 'pointerdown'); point(document, 'pointermove', 100, 110); point(document, 'pointercancel');
+    expect(order()).toEqual(['schedule', 'board', 'finances']);
+    grip.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    expect(order()).toEqual(['board', 'schedule', 'finances']);
+    expect(document.activeElement.dataset.widgetDrag).toBe('schedule');
+  });
+});

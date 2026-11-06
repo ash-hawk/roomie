@@ -664,3 +664,17 @@ button.activity-item{cursor:pointer}button.activity-item:hover{background:var(--
 @media(max-width:1000px){.home-dashboard{grid-template-columns:repeat(2,minmax(0,1fr))}.home-widget.expanded{grid-column:1/-1}}
 @media(max-width:640px){.home-dashboard{grid-template-columns:minmax(0,1fr);gap:14px}.home-widget.compact,.home-widget.expanded{grid-column:1/-1}.home-widget>.card{padding:14px}}
 @media(min-width:1001px){.home-dashboard:not(:has(>.compact))>.expanded{grid-column:1/-1}}
+
+/* Live dashboard dragging: the original stays in the grid as a drop preview. */
+button.home-drag-handle{border:0;background:transparent;font:inherit;font-size:24px;line-height:1;padding:5px 8px;color:var(--mute);cursor:grab;touch-action:none;border-radius:6px}
+button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.home-is-dragging,.home-is-dragging *{cursor:grabbing!important;user-select:none}
+.home-widget-dragging{outline:2px dashed var(--accent);outline-offset:3px;border-radius:12px;background:var(--soft)}
+.home-widget-dragging>*{opacity:.18;pointer-events:none}
+.home-widget-ghost{position:fixed!important;top:0;left:0;z-index:1000;max-height:360px;overflow:hidden;pointer-events:none!important;opacity:.92;box-shadow:0 16px 45px rgba(0,0,0,.2);border-radius:12px;will-change:transform}
+.home-widget-ghost .home-widget-tools{margin-bottom:8px}
+
+/* Independently measured rows let Finances sit directly below a short board. */
+.home-dashboard{grid-auto-flow:row dense;grid-auto-rows:2px;column-gap:18px;row-gap:0}
+.home-widget{align-self:start}
+@media(max-width:640px){.home-dashboard{grid-auto-flow:row;grid-auto-rows:auto;row-gap:14px}}
