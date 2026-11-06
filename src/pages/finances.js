@@ -28,7 +28,7 @@ export async function financesView() {
   D = { members, bal, expenses, wish: D?.wish ?? [] };
   if (tab === 'wish') D.wish = (await api(`/households/${h}/wishlist`)).items;
   const action = tab === 'settle' ? `<button class="btn p" data-action="add-expense">${ico('plus', 16)} Log expense</button>` : `<button class="btn p" data-action="add-wish">${ico('plus', 16)} Add item</button>`;
-  return `${phead('Shared money', 'Finances', 'Keep every shared cost clear and accounted for.', action)}
+  return `${phead('', 'Finances', '', action)}
   <div class="page-controls">${seg([['settle', 'Settle payments'], ['wish', 'Wish list']], tab, 'fin-tab')}</div>
   <div class="page-content stack">${tab === 'settle' ? settleView() : wishView()}</div>`;
 }
@@ -57,15 +57,12 @@ function settleView() {
       <div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="confirmed">${p.status === 'disputed' ? 'Mark received' : 'Got it'}</button>${p.status === 'sent' ? `<button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="disputed">Did not get it</button>` : ''}</div></div></div></div>`).join('');
   const outgoing = bal.outgoing.map((p) => `<div class="item row">${person(p.payeeUserId, `<div class="hint">You sent ${$m(p.amount)} via ${APP_LABEL[p.paidWith]}</div>`)}<div class="grow"></div>${stChip(p.status === 'sent' ? 'pending' : 'disputed')}</div>`).join('');
 
-  const pairs = bal.pairs.map((p) => `<div class="item row">${profileLink(p.debtorUserId, null)}<span class="grow">${profileLink(p.debtorUserId, first(p.debtorUserId), false)} ${p.debtorUserId === S.user.userId ? 'owe' : 'owes'} ${profileLink(p.creditorUserId, first(p.creditorUserId), false)}</span><b class="amount">${$m(p.amount)}</b></div>`).join('');
 
   return `<div class="stack finance-summary">
     <section class="card"><div class="row sp"><h2>Your balances</h2>${badge(mine ? 'Open' : 'All square', mine ? 'warn' : 'good')}</div>
       <p class="section-description">What you owe or should receive.</p>
       ${mine || `<p class="mute" style="padding:10px 0">You don't owe anyone, and no one owes you. Log an expense when you buy something for the house.</p>`}</section>
-    <details class="card household-balances"><summary><span class="household-balances-title">Who owes who</span>${badge(`${bal.pairs.length}`, 'gray')}</summary>
-      <p class="section-description">Payments needed across the whole household.</p>
-      ${pairs || `<p class="mute" style="padding:10px 0">Everyone in the house is square.</p>`}</details>
+
   </div>
   ${incoming || outgoing ? `<div class="grid2">
     ${incoming ? `<section class="card"><h2>Waiting on you</h2>${incoming}</section>` : ''}
