@@ -1,6 +1,8 @@
 // Slice (a): Expense tracker. Balances are CALCULATED on the server from expenses, shares and payments;
 // this page only displays them. Amounts arrive as strings ("12.34") and are converted to integer cents
 // with the same shared money helpers the API uses.
+import '../components/finance-profiles.css';
+import { boardIdentity as roommateIdentity } from '../components/board-profile.js';
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
@@ -32,8 +34,10 @@ export async function financesView() {
 }
 actions['fin-tab'] = (el) => { tab = el.dataset.value; window.dispatchEvent(new Event('roomie:render')); };
 
+const profileLink = (id, label = first(id), withAvatar = true) => roommateIdentity(who(id), label, withAvatar).replace('class="board-profile-link"', 'class="board-profile-link finance-profile-link"');
+
 // ---- settle tab -------------------------------------------------------------------------------
-function person(id, extra = '') { const m = who(id); return `<div class="row" style="gap:10px;min-width:0">${avatar(m)}<div style="min-width:0"><b class="truncate">${esc(first(id))}</b>${m?.leftDate ? ' <span class="mute" style="font-size:12px">(moved out)</span>' : ''}${extra}</div></div>`; }
+function person(id, extra = '') { const m = who(id); return `<div class="row" style="gap:10px;min-width:0">${profileLink(id, null)}<div style="min-width:0">${profileLink(id, first(id), false)}${m?.leftDate ? ' <span class="mute" style="font-size:12px">(moved out)</span>' : ''}${extra}</div></div>`; }
 
 function settleView() {
   const { bal } = D;
@@ -47,13 +51,13 @@ function settleView() {
       <div class="grow"></div>${owe && payable ? `<button class="btn s" data-action="pay" data-payee="${b.otherUserId}">Pay back</button>` : ''}</div>`;
   }).join('');
 
-  const incoming = bal.incoming.map((p) => `<div class="item"><div class="row t">${avatar(who(p.payerUserId))}<div class="grow"><b>${esc(first(p.payerUserId))}</b> says they paid you <b class="amount">${$m(p.amount)}</b> via ${APP_LABEL[p.paidWith]}
+  const incoming = bal.incoming.map((p) => `<div class="item"><div class="row t">${profileLink(p.payerUserId, null)}<div class="grow">${profileLink(p.payerUserId, first(p.payerUserId), false)} says they paid you <b class="amount">${$m(p.amount)}</b> via ${APP_LABEL[p.paidWith]}
       <div class="hint">${p.items.map((i) => esc(i.itemName)).join(', ')}</div>
       ${p.status === 'disputed' ? '<div style="margin-top:2px">' + stChip('disputed') + '</div>' : ''}
       <div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="confirmed">${p.status === 'disputed' ? 'Mark received' : 'Got it'}</button>${p.status === 'sent' ? `<button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="disputed">Did not get it</button>` : ''}</div></div></div></div>`).join('');
   const outgoing = bal.outgoing.map((p) => `<div class="item row">${person(p.payeeUserId, `<div class="hint">You sent ${$m(p.amount)} via ${APP_LABEL[p.paidWith]}</div>`)}<div class="grow"></div>${stChip(p.status === 'sent' ? 'pending' : 'disputed')}</div>`).join('');
 
-  const pairs = bal.pairs.map((p) => `<div class="item row">${avatar(who(p.debtorUserId), 'sm')}<span class="grow"><b>${esc(first(p.debtorUserId))}</b> ${p.debtorUserId === S.user.userId ? 'owe' : 'owes'} <b>${esc(first(p.creditorUserId))}</b></span><b class="amount">${$m(p.amount)}</b></div>`).join('');
+  const pairs = bal.pairs.map((p) => `<div class="item row">${profileLink(p.debtorUserId, null)}<span class="grow">${profileLink(p.debtorUserId, first(p.debtorUserId), false)} ${p.debtorUserId === S.user.userId ? 'owe' : 'owes'} ${profileLink(p.creditorUserId, first(p.creditorUserId), false)}</span><b class="amount">${$m(p.amount)}</b></div>`).join('');
 
   return `<div class="stack finance-summary">
     <section class="card"><div class="row sp"><h2>Your balances</h2>${badge(mine ? 'Open' : 'All square', mine ? 'warn' : 'good')}</div>
@@ -74,8 +78,8 @@ function settleView() {
 function expenseRow(e) {
   const others = e.shares.filter((s) => s.userId !== e.paidByUserId);
   return `<div class="item exp click click-row" data-action="expense" data-id="${e.expenseId}" tabindex="0"><div class="grow"><b class="truncate">${esc(e.itemName)}</b>
-    <div class="hint expense-detail">${fmtDay(e.purchaseDate)} · ${esc(first(e.paidByUserId))} paid</div>
-    <div class="chips">${others.map((s) => `<span class="sharechip">${avatar(who(s.userId), 'sm')}${$m(s.amountOwed)} ${stChip(s.status)}</span>`).join('')}</div></div>
+    <div class="hint expense-detail">${fmtDay(e.purchaseDate)} · ${profileLink(e.paidByUserId, first(e.paidByUserId), false)} paid</div>
+    <div class="chips">${others.map((s) => `<span class="sharechip">${profileLink(s.userId, null)}${$m(s.amountOwed)} ${stChip(s.status)}</span>`).join('')}</div></div>
     <div class="amt">${$m(e.totalAmount)}</div><span class="row-chevron">${ico('chevron', 16)}</span></div>`;
 }
 
@@ -91,7 +95,7 @@ actions.expense = (el) => {
   const e = D.expenses.find((x) => x.expenseId === Number(el.dataset.id)); if (!e) return;
   openModal(`${mhead(esc(e.itemName))}
     <div class="tot">${$m(e.totalAmount)}</div><p class="mute">${fmtDay(e.purchaseDate, { weekday: 'long', month: 'long', day: 'numeric' })} · paid by ${esc(first(e.paidByUserId).toLowerCase() === 'you' ? 'you' : first(e.paidByUserId))}</p>
-    <div>${e.shares.map((s) => `<div class="item row">${avatar(who(s.userId), 'sm')}<span class="grow">${esc(first(s.userId))}</span><b class="amount">${$m(s.amountOwed)}</b>${stChip(s.status)}</div>`).join('')}</div>
+    <div>${e.shares.map((s) => `<div class="item row">${profileLink(s.userId, null)}<span class="grow">${profileLink(s.userId, first(s.userId), false)}</span><b class="amount">${$m(s.amountOwed)}</b>${stChip(s.status)}</div>`).join('')}</div>
     <p class="hint">The buyer's own share is never owed. A share counts as paid back only after the buyer confirms the payment.</p>
     ${e.canDelete ? `<div class="acts"><button class="btn d" data-action="delete-expense" data-id="${e.expenseId}">Delete</button></div>` : ''}`);
 };
