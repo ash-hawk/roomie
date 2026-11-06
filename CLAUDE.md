@@ -128,3 +128,5 @@
 
 - On the wider Home board, full announcements remain visible but replies and reply composers sit in a closed conversation disclosure labelled with the reply count (or Reply). Compact board rendering stays unchanged. Conversation open states use unique board-entry keys so normal board refresh preserves them.
 - Empty-space drag sizing anchors to the column under the pointer and grows only to the right. A right-corner drop stays compact instead of widening left. Moving within the widget's own footprint still recalculates the destination, allowing a wide Finances panel to shrink into that corner.
+
+- Home, Events and Chores all render schedule controls through components/schedule-toolbar.js: month navigation is always the first row, with the left-aligned Calendar/List selector and page-specific filters together on the next row. This placement does not change between compact and wider cards. Events no longer wraps its filters in a separate outlined panel.

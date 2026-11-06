@@ -1,3 +1,4 @@
+import { scheduleToolbar } from '../components/schedule-toolbar.js';
 // Home shows one household schedule in two formats; feature pages own editing and responses.
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
@@ -45,7 +46,7 @@ function row(item) {
 
 function monthNav(view) {
   const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-  return `<div class="home-schedule-toolbar"><div class="month-nav"><button class="btn s" data-action="home-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="home-month" data-n="1" aria-label="Next month">›</button></div><select class="input home-view-select" data-input="home-view" aria-label="Schedule view">${[['calendar', 'Calendar view'], ['list', 'List view']].map(([key, label]) => `<option value="${key}" ${view === key ? 'selected' : ''}>${label}</option>`).join('')}</select></div>`;
+  return scheduleToolbar({ title, monthAction: 'home-month', viewInput: 'home-view', view });
 }
 
 const upcomingMonthItems = () => D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7) && item.ymd >= ymdIn(Date.now()));

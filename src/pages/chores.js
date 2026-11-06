@@ -1,3 +1,4 @@
+import { scheduleToolbar } from '../components/schedule-toolbar.js';
 import { validCalendarDay } from '../lib/calendar-create.js';
 // Slice (b): chores. The server owns the rules (rotation, daylight saving, who may do what);
 // this page shows the data and sends the user's intent. Times are always shown in the household's timezone.
@@ -113,7 +114,8 @@ function overdueView() {
 function scheduleView() {
   const title = new Date(`${choreMonth}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
   const people = active();
-  const toolbar = `<div class="home-schedule-toolbar event-schedule-toolbar"><div class="month-nav"><button class="btn s" data-action="chore-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="chore-month" data-n="1" aria-label="Next month">›</button></div><select class="input home-view-select" data-input="chore-view" aria-label="Schedule view"><option value="calendar" ${choreView === 'calendar' ? 'selected' : ''}>Calendar view</option><option value="list" ${choreView === 'list' ? 'selected' : ''}>List view</option></select></div><div class="filters event-schedule-filters"><select class="input" data-input="chore-filter" aria-label="Show chores for"><option value="all" ${filter === 'all' ? 'selected' : ''}>Everyone</option><option value="me" ${filter === 'me' ? 'selected' : ''}>Just mine</option>${people.filter((m) => m.userId !== S.user.userId).map((m) => `<option value="${m.userId}" ${String(filter) === String(m.userId) ? 'selected' : ''}>${esc(m.firstName)}</option>`).join('')}</select></div>`;
+  const filters = `<select class="input" data-input="chore-filter" aria-label="Show chores for"><option value="all" ${filter === 'all' ? 'selected' : ''}>Everyone</option><option value="me" ${filter === 'me' ? 'selected' : ''}>Just mine</option>${people.filter((m) => m.userId !== S.user.userId).map((m) => `<option value="${m.userId}" ${String(filter) === String(m.userId) ? 'selected' : ''}>${esc(m.firstName)}</option>`).join('')}</select>`;
+  const toolbar = scheduleToolbar({ title, monthAction: 'chore-month', viewInput: 'chore-view', view: choreView, filters });
   const items = visibleAssignments();
   if (!D.chores.length) return toolbar + empty('🧹', 'No chores yet', 'Add one yourself or start with a few common household chores.', '<button class="btn s" data-action="starter-chores">Add common chores</button>');
   if (choreView === 'list') {

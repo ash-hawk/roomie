@@ -1,3 +1,4 @@
+import { scheduleToolbar } from '../components/schedule-toolbar.js';
 // Slice (c): household events + sticky-note board. The server owns the rules (who may edit, who was
 // asked about hosting, who gets notified); this page shows data and sends intent.
 // Times are always shown in the household's timezone. The board and calendar poll every 15 seconds,
@@ -126,9 +127,8 @@ actions['day-detail'] = (el) => {
 // ---- the page ---------------------------------------------------------------------------------
 function scheduleContent() {
   const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-  return `<div class="home-schedule-toolbar event-schedule-toolbar"><div class="month-nav"><button class="btn s" data-action="month-nav" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="month-nav" data-n="1" aria-label="Next month">›</button></div><select class="input home-view-select" data-input="cal-view" aria-label="Schedule view"><option value="month" ${view === 'month' ? 'selected' : ''}>Calendar view</option><option value="list" ${view === 'list' ? 'selected' : ''}>List view</option></select></div>
-    <div class="filters calendar-controls event-schedule-filters"><select class="input" data-input="cal-event-type" aria-label="Filter events by type"><option value="all">All event types</option>${CATS.map(([key, label]) => `<option value="${key}" ${eventType === key ? 'selected' : ''}>${label}</option>`).join('')}</select>${view === 'list' ? `<select class="input" data-input="cal-sort" aria-label="Sort by"><option value="date" ${sortBy === 'date' ? 'selected' : ''}>Sort: date</option><option value="color" ${sortBy === 'color' ? 'selected' : ''}>Sort: roommate</option></select>` : ''}</div>
-    <div class="event-schedule-content">${view === 'list' ? listView() : monthView()}</div>`;
+  const filters = `<select class="input" data-input="cal-event-type" aria-label="Filter events by type"><option value="all">All event types</option>${CATS.map(([key, label]) => `<option value="${key}" ${eventType === key ? 'selected' : ''}>${label}</option>`).join('')}</select>${view === 'list' ? `<select class="input" data-input="cal-sort" aria-label="Sort by"><option value="date" ${sortBy === 'date' ? 'selected' : ''}>Sort: date</option><option value="color" ${sortBy === 'color' ? 'selected' : ''}>Sort: roommate</option></select>` : ''}`;
+  return `${scheduleToolbar({ title, monthAction: 'month-nav', viewInput: 'cal-view', view, calendarValue: 'month', filters })}<div class="event-schedule-content">${view === 'list' ? listView() : monthView()}</div>`;
 }
 function refreshSchedule(focusInput) {
   const content = document.getElementById('cal-main');
