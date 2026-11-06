@@ -7,6 +7,7 @@ import { addDays } from '../../shared/chore-dates.ts';
 import { monthDays, scheduleItems } from '../../shared/home-schedule.ts';
 import { householdBoard, announcementForm } from '../components/household-board.js';
 import { openChoreDetails } from './chores.js';
+import { fitHomeWidgets } from '../components/home-layout.js';
 import { toCents } from '../../shared/money.ts';
 
 const hid = () => household().householdId;
@@ -200,6 +201,7 @@ function applyLayout(focusWidget, focusSelector) {
     widget.querySelector('.home-widget-tools').outerHTML = widgetTools(id);
     grid.appendChild(widget);
   }
+  fitHomeWidgets(grid);
   if (focusWidget) grid.querySelector(`.home-widget[data-widget="${focusWidget}"] ${focusSelector}`)?.focus();
 }
 actions['home-edit-layout'] = (button) => {
@@ -241,6 +243,7 @@ function arrangeWidgets() {
     const widget = grid.querySelector(`.home-widget[data-widget="${id}"]`);
     if (widget) grid.appendChild(widget);
   }
+  fitHomeWidgets(grid);
 }
 function finishWidgetDrag(cancel = false) {
   const drag = widgetDrag;

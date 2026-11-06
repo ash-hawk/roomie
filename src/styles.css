@@ -673,3 +673,8 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .home-widget-dragging>*{opacity:.18;pointer-events:none}
 .home-widget-ghost{position:fixed!important;top:0;left:0;z-index:1000;max-height:360px;overflow:hidden;pointer-events:none!important;opacity:.92;box-shadow:0 16px 45px rgba(0,0,0,.2);border-radius:12px;will-change:transform}
 .home-widget-ghost .home-widget-tools{margin-bottom:8px}
+
+/* Independently measured rows let Finances sit directly below a short board. */
+.home-dashboard{grid-auto-flow:row dense;grid-auto-rows:2px;column-gap:18px;row-gap:0}
+.home-widget{align-self:start}
+@media(max-width:640px){.home-dashboard{grid-auto-flow:row;grid-auto-rows:auto;row-gap:14px}}
