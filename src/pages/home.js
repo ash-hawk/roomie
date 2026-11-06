@@ -15,9 +15,25 @@ const ymdIn = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: tz() }).format
 const timeFmt = (d) => new Date(d).toLocaleTimeString('en-US', { timeZone: tz(), hour: 'numeric', minute: '2-digit' });
 const dayLabel = (day) => day === ymdIn(Date.now()) ? 'Today' : day === addDays(ymdIn(Date.now()), 1) ? 'Tomorrow'
   : new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', month: 'short', day: 'numeric' });
-// Only the display format is remembered. Old card-order and visibility preferences are ignored.
+// Display preferences are local to each user and household; shared data is unchanged.
 const viewKey = () => `roomie.home.view.${S.user.userId}.${hid()}`;
 const getView = () => { try { return localStorage.getItem(viewKey()) === 'calendar' ? 'calendar' : 'list'; } catch { return 'list'; } };
+const layoutKey = () => `roomie.home.layout.${S.user.userId}.${hid()}`;
+const widgetNames = { schedule: 'Schedule', board: 'Household board', finances: 'Finances' };
+const defaultLayout = () => [{ id: 'schedule', size: 'expanded' }, { id: 'board', size: 'compact' }, { id: 'finances', size: 'compact' }];
+function getLayout() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(layoutKey()));
+    if (Array.isArray(saved) && saved.length === 3 && new Set(saved.map((w) => w.id)).size === 3 && saved.every((w) => Object.hasOwn(widgetNames, w.id) && ['compact', 'expanded'].includes(w.size))) return saved;
+  } catch { /* Use the default when storage is unavailable or invalid. */ }
+  return defaultLayout();
+}
+let layout = defaultLayout(), editing = false, editingKey = null;
+const widgetSize = (id) => layout.find((w) => w.id === id)?.size;
+function widgetTools(id) {
+  const index = layout.findIndex((w) => w.id === id);
+  return `<div class="home-widget-tools" ${editing ? '' : 'hidden'}><span class="home-drag-handle" draggable="true" data-widget-drag="${id}" title="Drag to move ${widgetNames[id]}">⠿</span><b>${widgetNames[id]}</b><label><span class="sr-only">${widgetNames[id]} size</span><select class="input" data-input="home-widget-size" data-widget="${id}">${['compact', 'expanded'].map((size) => `<option value="${size}" ${widgetSize(id) === size ? 'selected' : ''}>${size === 'compact' ? 'Compact' : 'Expanded'}</option>`).join('')}</select></label><button class="btn s" data-action="home-widget-move" data-widget="${id}" data-step="-1" aria-label="Move ${widgetNames[id]} earlier" ${index === 0 ? 'disabled' : ''}>↑</button><button class="btn s" data-action="home-widget-move" data-widget="${id}" data-step="1" aria-label="Move ${widgetNames[id]} later" ${index === layout.length - 1 ? 'disabled' : ''}>↓</button></div>`;
+}
 let monthStart = null, monthHousehold = null, D = null;
 
 function row(item) {
@@ -34,22 +50,35 @@ function monthNav(view) {
   return `<div class="home-schedule-toolbar"><div class="month-nav"><button class="btn s" data-action="home-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="home-month" data-n="1" aria-label="Next month">›</button></div><select class="input home-view-select" data-input="home-view" aria-label="Schedule view">${[['calendar', 'Calendar view'], ['list', 'List view']].map(([key, label]) => `<option value="${key}" ${view === key ? 'selected' : ''}>${label}</option>`).join('')}</select></div>`;
 }
 
+function monthList(items) {
+  return items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('') : '<p class="home-empty">No events or chores this month.</p>';
+}
 function listView() {
   const items = D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7));
-  return `${monthNav('list')}${items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('')
-    : '<p class="home-empty">No events or chores this month.</p>'}`;
+  const compact = widgetSize('schedule') === 'compact';
+  return `${monthNav('list')}${monthList(compact ? items.slice(0, 5) : items)}${compact && items.length > 5 ? `<button class="btn s" data-action="home-month-list">View all ${items.length} items</button>` : ''}`;
 }
+actions['home-month-list'] = () => {
+  const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
+  openModal(`${mhead(esc(title))}<div class="stack">${monthList(D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7)))}</div>`);
+};
 
 function calendarView() {
+  const compact = widgetSize('schedule') === 'compact';
   const today = ymdIn(Date.now());
   return `${monthNav('calendar')}
     <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div>
     <div class="mgrid home-month">${monthDays(monthStart).map((day) => {
       const items = D.items.filter((item) => item.ymd === day);
       return `<button class="day2 ${day.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${day === today ? 'today' : ''}" data-action="home-day" data-day="${day}" aria-label="${esc(dayLabel(day))}, ${items.length} items" ${day === today ? 'aria-current="date"' : ''}>
-        <span class="dn">${Number(day.slice(8))}</span>${items.slice(0, 3).map((item) => `<span class="home-calendar-item ${item.completed ? 'completed' : ''}" style="--ev:${personColor(item.userId)}"><span>${timeFmt(item.at)} · ${esc(item.label)}</span><b>${esc(item.name)}</b>${item.approval?.total ? `<span class="home-calendar-approval">${item.approval.label} · ${item.approval.approved}/${item.approval.total}</span>` : ''}</span>`).join('')}
-        ${items.length > 3 ? `<span class="home-more">+${items.length - 3} more</span>` : ''}<span class="home-mobile-count" aria-hidden="true">${items.length || ''}</span></button>`;
-    }).join('')}</div>`;
+        <span class="dn">${Number(day.slice(8))}</span>${compact ? `<span class="home-day-dots" aria-hidden="true">${items.slice(0, 3).map((item) => `<i style="background:${personColor(item.userId)}"></i>`).join('')}</span>` : `${items.slice(0, 3).map((item) => `<span class="home-calendar-item ${item.completed ? 'completed' : ''}" style="--ev:${personColor(item.userId)}"><span>${timeFmt(item.at)} · ${esc(item.label)}</span><b>${esc(item.name)}</b>${item.approval?.total ? `<span class="home-calendar-approval">${item.approval.label} · ${item.approval.approved}/${item.approval.total}</span>` : ''}</span>`).join('')}
+        ${items.length > 3 ? `<span class="home-more">+${items.length - 3} more</span>` : ''}<span class="home-mobile-count" aria-hidden="true">${items.length || ''}</span>` }</button>`;
+    }).join('')}</div>${compact ? compactUpcoming() : ''}`;
+}
+
+function compactUpcoming() {
+  const monthItems = D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7) && !item.completed && Date.parse(item.at) >= Date.now());
+  return `<div class="home-compact-upcoming"><h3>Coming up</h3>${monthItems.slice(0, 3).map((item) => `<div><span class="hint">${esc(dayLabel(item.ymd))}</span>${row(item)}</div>`).join('') || '<p class="hint">Nothing else coming up this month.</p>'}</div>`;
 }
 
 export async function homeView() {
@@ -59,13 +88,19 @@ export async function homeView() {
   D = { householdId: hid(), members, events, chores, notes, user: S.user, timezone: tz(), items: scheduleItems(events, chores, tz()) };
   if (monthHousehold !== hid()) { monthStart = null; monthHousehold = hid(); }
   monthStart ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
+  if (editingKey !== layoutKey()) { editing = false; editingKey = layoutKey(); }
+  layout = getLayout();
   const view = getView();
   const owed = balances.mine.reduce((sum, b) => sum + Math.max(0, -toCents(b.signedAmount)), 0);
   const owingMe = balances.mine.reduce((sum, b) => sum + Math.max(0, toCents(b.signedAmount)), 0);
-  return `${phead(esc(household().householdName), 'Shared household schedule', 'Here you can see an overview of what’s happening in your household')}
-    <div class="page-content stack"><section class="card stack home-board" id="home-board">${householdBoard(D)}</section><section class="card stack home-schedule" aria-label="Shared household schedule">
-    <div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content" data-view="${view}">${view === 'calendar' ? calendarView() : listView()}</div></section>
-    <section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section></div>`;
+  const widgets = {
+    board: `<section class="card stack home-board" id="home-board">${householdBoard({ ...D, compact: widgetSize('board') === 'compact' })}</section>`,
+    schedule: `<section class="card stack home-schedule" aria-label="Shared household schedule"><div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content" data-view="${view}">${view === 'calendar' ? calendarView() : listView()}</div></section>`,
+    finances: `<section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section>`,
+  };
+  return `${phead('Shared household schedule', 'Here you can see an overview of what’s happening in your household', `<button class="btn s" data-action="home-edit-layout">${editing ? 'Done' : 'Edit dashboard'}</button>`)}
+    <div class="home-layout-status" role="status">${editing ? 'Drag a grip or use the arrows to move sections. Changes save automatically.' : ''}</div><div class="page-content home-dashboard">${layout.map(({ id, size }) => `<div class="home-widget ${size}" data-widget="${id}">${widgetTools(id)}${widgets[id]}</div>`).join('')}</div>`;
+
 }
 
 inputs['home-view'] = (el) => {
@@ -102,9 +137,11 @@ async function refreshHomeBoard(onlyChanged = false) {
   const [{ events }, chores, { notes }] = await Promise.all([api(`/households/${householdId}/events`), api(`/households/${householdId}/chores`), api(`/households/${householdId}/board`)]);
   if (hid() !== householdId || !document.getElementById('home-board')) return;
   if (onlyChanged && JSON.stringify([events, chores, notes]) === JSON.stringify([D.events, D.chores, D.notes])) return;
+  const expandedEntries = [...document.querySelectorAll('#home-board details[open]')].map((el) => el.dataset.boardEntry);
   const drafts = [...document.querySelectorAll('#home-board form')].map((form) => ({ kind: form.dataset.form, id: form.dataset.id, message: form.elements.namedItem('messageText')?.value ?? '', eventId: form.elements.namedItem('eventId')?.value ?? '' }));
   D = { ...D, events, chores, notes, items: scheduleItems(events, chores, tz()) };
-  document.getElementById('home-board').innerHTML = householdBoard(D);
+  document.getElementById('home-board').innerHTML = householdBoard({ ...D, compact: widgetSize('board') === 'compact' });
+  document.querySelectorAll('#home-board details').forEach((el) => { el.open = expandedEntries.includes(el.dataset.boardEntry); });
   for (const form of document.querySelectorAll('#home-board form')) {
     const draft = drafts.find((d) => d.kind === form.dataset.form && d.id === form.dataset.id);
     if (!draft) continue;
@@ -150,3 +187,69 @@ setInterval(async () => {
 }, 15000);
 
 actions['home-chore-detail'] = (button) => openChoreDetails(D.householdId, Number(button.dataset.id));
+
+function saveLayout() {
+  try { localStorage.setItem(layoutKey(), JSON.stringify(layout)); }
+  catch { toast('Layout changed for this visit. Your browser could not save it.'); }
+}
+function applyLayout(focusWidget, focusSelector) {
+  const grid = document.querySelector('.home-dashboard');
+  if (!grid) return;
+  for (const { id, size } of layout) {
+    const widget = grid.querySelector(`.home-widget[data-widget="${id}"]`);
+    widget.className = `home-widget ${size}`;
+    widget.querySelector('.home-widget-tools').outerHTML = widgetTools(id);
+    grid.appendChild(widget);
+  }
+  if (focusWidget) grid.querySelector(`.home-widget[data-widget="${focusWidget}"] ${focusSelector}`)?.focus();
+}
+actions['home-edit-layout'] = (button) => {
+  editing = !editing;
+  button.textContent = editing ? 'Done' : 'Edit dashboard';
+  document.querySelector('.home-layout-status').textContent = editing ? 'Drag a grip or use the arrows to move sections. Changes save automatically.' : '';
+  applyLayout();
+};
+inputs['home-widget-size'] = (select) => {
+  const widget = layout.find((w) => w.id === select.dataset.widget);
+  if (!widget || !['compact', 'expanded'].includes(select.value)) return;
+  const drafts = [...document.querySelectorAll('#home-board form')].map((form) => ({ id: form.dataset.id, value: form.elements.namedItem('messageText')?.value }));
+  if (widget.id === 'board' && document.querySelector('#home-board [aria-busy=true]')) { select.value = widget.size; return; }
+  widget.size = select.value; saveLayout(); applyLayout(widget.id, '[data-input="home-widget-size"]');
+  if (widget.id === 'schedule') {
+    const content = document.getElementById('home-schedule-content');
+    content.innerHTML = content.dataset.view === 'calendar' ? calendarView() : listView();
+  }
+  if (widget.id === 'board') {
+    document.getElementById('home-board').innerHTML = householdBoard({ ...D, compact: widget.size === 'compact' });
+    for (const form of document.querySelectorAll('#home-board form')) {
+      const draft = drafts.find((d) => d.id === form.dataset.id);
+      if (draft) form.elements.namedItem('messageText').value = draft.value;
+    }
+  }
+};
+actions['home-widget-move'] = (button) => {
+  const index = layout.findIndex((w) => w.id === button.dataset.widget), target = index + Number(button.dataset.step);
+  if (index < 0 || target < 0 || target >= layout.length) return;
+  const [widget] = layout.splice(index, 1); layout.splice(target, 0, widget);
+  saveLayout(); applyLayout(widget.id, '[data-input="home-widget-size"]');
+};
+let draggingWidget = null;
+document.addEventListener('dragstart', (event) => {
+  const grip = event.target.closest?.('[data-widget-drag]');
+  if (!editing || !grip) return;
+  draggingWidget = grip.dataset.widgetDrag;
+  event.dataTransfer?.setData('text/plain', draggingWidget);
+});
+document.addEventListener('dragover', (event) => {
+  if (editing && draggingWidget && event.target.closest?.('.home-widget')) event.preventDefault();
+});
+document.addEventListener('drop', (event) => {
+  const target = event.target.closest?.('.home-widget')?.dataset.widget;
+  if (!editing || !draggingWidget || !target || target === draggingWidget) return;
+  event.preventDefault();
+  const from = layout.findIndex((w) => w.id === draggingWidget), to = layout.findIndex((w) => w.id === target);
+  if (from < 0 || to < 0) return;
+  const [widget] = layout.splice(from, 1); layout.splice(to, 0, widget);
+  draggingWidget = null; saveLayout(); applyLayout(widget.id, '[data-input="home-widget-size"]');
+});
+document.addEventListener('dragend', () => { draggingWidget = null; });

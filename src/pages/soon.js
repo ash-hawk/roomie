@@ -7,6 +7,6 @@ const COPY = {
   chores: ['Shared responsibilities', 'Chores', 'Whose turn it is, and when.', 'Chore chart', 'Chores, rotation and swap requests are the second slice.'],
 };
 export function soonView(name) {
-  const [eyebrow, title, sub, what, why] = COPY[name];
-  return `${phead(eyebrow, title, sub)}<section class="card">${empty('🛠️', `${what} is coming next`, why, '<a class="btn p" href="#/finances">Open Finances</a>')}</section>`;
+  const [, title, sub, what, why] = COPY[name];
+  return `${phead(title, sub)}<section class="card">${empty('🛠️', `${what} is coming next`, why, '<a class="btn p" href="#/finances">Open Finances</a>')}</section>`;
 }

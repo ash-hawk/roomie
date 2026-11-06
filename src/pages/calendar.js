@@ -122,7 +122,7 @@ actions['day-detail'] = (el) => {
 // ---- the page ---------------------------------------------------------------------------------
 export async function calendarView() {
   await load();
-  const head = phead('Household plans', 'Events', 'Meetings, hosting and other plans for your house.', `<button class="btn p" data-action="add-event">${ico('plus', 16)} Add event</button>`);
+  const head = phead('Events', 'Meetings, hosting and other plans for your house.', `<button class="btn p" data-action="add-event">${ico('plus', 16)} Add event</button>`);
   const filters = `<div class="page-controls filters calendar-controls">${seg([['list', 'List'], ['month', 'Month']], view, 'cal-view')}
     <select class="input" data-input="cal-event-type" aria-label="Filter events by type"><option value="all">All event types</option>${CATS.map(([key, label]) => `<option value="${key}" ${eventType === key ? 'selected' : ''}>${label}</option>`).join('')}</select>
     ${view === 'list' ? `<select class="input" data-input="cal-sort" aria-label="Sort by"><option value="date">Sort: date</option><option value="color" ${sortBy === 'color' ? 'selected' : ''}>Sort: roommate</option></select>` : ''}</div>`;

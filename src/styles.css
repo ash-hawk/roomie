@@ -628,3 +628,39 @@ button.activity-item{cursor:pointer}button.activity-item:hover{background:var(--
 @media(max-width:520px){.ovl.activity-overlay{padding:72px 12px 12px}.activity-overlay .sheet{max-height:calc(100dvh - 84px)}}
 
 .activity-source-target:focus{outline:2px solid var(--accent);outline-offset:4px}
+
+/* Home widgets share one responsive grid; DOM order is also the reading order. */
+.home-dashboard{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+.home-widget{min-width:0}.home-widget.expanded{grid-column:span 2}.home-widget.compact{grid-column:span 1}
+.home-widget>.card{margin:0;min-width:0;padding:18px}
+.home-layout-status:empty{display:none}.home-layout-status{font-size:13px;color:var(--mute);margin-bottom:12px}
+.home-widget-tools{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:10px;margin-bottom:8px;border:1px dashed var(--line);border-radius:10px;background:var(--card)}
+.home-widget-tools b{font-size:12px;margin-right:auto}.home-widget-tools label{min-width:0}.home-widget-tools select.input{width:auto;font-size:12px;padding:6px 25px 6px 8px;min-height:32px}
+.home-widget-tools .btn{padding:6px 9px;min-height:32px}.home-drag-handle{cursor:grab;font-size:22px;padding:2px 6px;color:var(--mute)}
+.home-widget .home-board-heading{gap:10px;align-items:center}.home-widget .home-board-heading h2{font-size:18px}
+.home-widget .home-make-announcement{font-size:12px;padding:8px 10px;box-shadow:none}
+.home-widget .home-board-request{gap:8px;padding:12px}.home-widget .home-board-request p{margin:0}
+.home-widget .home-board-request .acts{margin-top:4px}.home-widget .home-board-feed{gap:10px}
+.home-board-summary{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.home-board-summary>summary{display:grid;gap:5px;cursor:pointer;padding:12px;list-style:none;position:relative;padding-right:28px}
+.home-board-summary>summary::after{content:'›';position:absolute;right:12px;top:12px;color:var(--mute)}
+.home-board-summary[open]>summary::after{content:'⌄'}.home-board-summary>summary b{font-size:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.home-board-summary>summary .hint{font-size:11px}.home-board-summary>article{border:0;border-radius:0;margin:0;padding:12px}
+.home-board-summary>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.home-widget.compact .home-schedule-toolbar{gap:8px}.home-widget.compact .month-nav{min-width:0;flex-basis:100%;gap:6px}
+.home-widget .month-nav h2{font-size:18px}.home-widget.compact .home-view-select{margin-left:0}
+.home-widget.compact .home-month .day2{min-height:42px;padding:5px;gap:5px;align-items:center}
+.home-widget.compact .home-month{gap:4px}.home-widget.compact .mhead{font-size:11px}
+.home-day-dots{display:flex;gap:3px;min-height:5px}.home-day-dots i{display:block;width:4px;height:4px;border-radius:50%}
+.home-compact-upcoming{display:grid;gap:10px;margin-top:14px}.home-compact-upcoming h3{font-size:13px}
+.home-widget.compact .home-schedule-row{padding:8px;gap:7px}.home-widget.compact .home-schedule-row .av{display:none}
+.home-widget.compact .home-schedule-row b{font-size:13px}.home-widget.compact .home-schedule-row .hint{font-size:11px}
+.home-widget.compact .home-item-heading{gap:4px}.home-widget.compact .home-item-heading .st{font-size:10px;white-space:normal}
+.home-widget.compact .home-day{gap:7px;margin-top:10px}.home-widget.compact .home-day h3{font-size:13px}
+.home-widget.compact .home-finances{display:flex;flex-direction:column;align-items:stretch;gap:16px}
+.home-widget.compact .home-finances h2{font-size:18px}.home-widget.compact .home-balance{flex-direction:column;gap:14px}
+.home-widget.compact .home-balance span{justify-content:space-between;align-items:center;font-size:13px}.home-widget.compact .home-balance b{font-size:22px}
+.home-widget.compact .home-finances>.btn{align-self:flex-start}
+@media(max-width:1000px){.home-dashboard{grid-template-columns:repeat(2,minmax(0,1fr))}.home-widget.expanded{grid-column:1/-1}}
+@media(max-width:640px){.home-dashboard{grid-template-columns:minmax(0,1fr);gap:14px}.home-widget.compact,.home-widget.expanded{grid-column:1/-1}.home-widget>.card{padding:14px}}
+@media(min-width:1001px){.home-dashboard:not(:has(>.compact))>.expanded{grid-column:1/-1}}

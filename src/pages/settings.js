@@ -26,7 +26,7 @@ function profileForm() {
 
 export function settingsView() {
   return `
-    ${phead('Your account', 'Profile', 'Manage the information your roommates can see.')}
+    ${phead('Profile', 'Manage the information your roommates can see.')}
 
     <div class="stack">
       ${profileForm()}
