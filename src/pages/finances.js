@@ -30,7 +30,7 @@ export async function financesView() {
   D = { members, bal, expenses, wish: D?.wish ?? [] };
   if (tab === 'wish') D.wish = (await api(`/households/${h}/wishlist`)).items;
   const action = tab === 'settle' ? `<button class="btn p" data-action="add-expense">${ico('plus', 16)} Log expense</button>` : `<button class="btn p" data-action="add-wish">${ico('plus', 16)} Add item</button>`;
-  return `${phead('', 'Finances', '', action)}
+  return `${phead('Finances', '', action)}
   <div class="page-controls">${seg([['settle', 'Settle payments'], ['wish', 'Wish list']], tab, 'fin-tab')}</div>
   <div class="page-content stack">${tab === 'settle' ? settleView() : wishView()}</div>`;
 }

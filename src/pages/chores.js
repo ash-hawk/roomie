@@ -36,7 +36,7 @@ export async function choresView() {
   const [{ members }, data] = await Promise.all([api(`/households/${h}/members`), api(`/households/${h}/chores`)]);
   D = { members, ...data };
   const people = active();
-  return `${phead('Shared responsibilities', 'Chores', 'A clear view of what needs doing, and whose turn it is.', `<button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
+  return `${phead('Chores', 'A clear view of what needs doing, and whose turn it is.', `<button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
   ${choreRequestsBoard()}
   <div class="page-controls filters">${seg([['schedule', 'Schedule'], ['chart', 'Chore chart']], tab, 'chore-tab')}
     <select class="input" data-input="chore-filter" aria-label="Show chores for"><option value="all">Everyone</option><option value="me" ${filter === 'me' ? 'selected' : ''}>Just mine</option>${people.filter((m) => m.userId !== S.user.userId).map((m) => `<option value="${m.userId}" ${String(filter) === String(m.userId) ? 'selected' : ''}>${esc(m.firstName)}</option>`).join('')}</select>

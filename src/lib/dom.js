@@ -47,8 +47,8 @@ export function toast(msg) {
   $('#toast').appendChild(t); setTimeout(() => t.remove(), 3200);
 }
 
-export const phead = (eyebrow, title, sub = '', actions = '') =>
-  `<header class="ph page-header"><div>${eyebrow ? `<div class="eyebrow">${eyebrow}</div>` : ''}<h1>${title}</h1>${sub ? `<p class="mute">${sub}</p>` : ''}</div>${actions ? `<div class="row page-actions">${actions}</div>` : ''}</header>`;
+export const phead = (title, sub = '', actions = '') =>
+  `<header class="ph page-header"><div><h1>${title}</h1>${sub ? `<p class="mute">${sub}</p>` : ''}</div>${actions ? `<div class="row page-actions">${actions}</div>` : ''}</header>`;
 export const badge = (text, kind = '') => `<span class="badge ${kind}">${text}</span>`;
 export const empty = (icon, title, sub, action = '') => `<div class="empty"><div style="font-size:34px">${icon}</div><b>${title}</b><p class="mute" style="font-size:14px">${sub}</p>${action}</div>`;
 export const seg = (options, current, action) =>

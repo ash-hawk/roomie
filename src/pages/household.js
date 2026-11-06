@@ -15,8 +15,8 @@ export async function householdView() {
   const h = household(), response = await api(`/households/${h.householdId}/members`);
   members = response.members;
   const current = members.filter((m) => !m.leftDate), former = members.filter((m) => m.leftDate);
-  return `${phead('Your household', 'Household', 'See who you live with and how to reach them.')}
-    <div class="stack"><section class="card invite-card"><div class="eyebrow">Your household</div><h2>${esc(h.householdName)}</h2>
+  return `${phead('Household', 'See who you live with and how to reach them.')}
+    <div class="stack"><section class="card invite-card"><h2>${esc(h.householdName)}</h2>
       <p class="mute">${current.length} ${current.length === 1 ? 'member' : 'members'} · ${esc(h.timezone)}</p><hr class="hr">
       <h3>Roommates</h3>${current.map((m) => memberRow(m, h)).join('')}
       ${former.length ? `<details style="margin-top:16px"><summary>Former roommates (${former.length})</summary>${former.map((m) => memberRow(m, h)).join('')}</details>` : ''}
