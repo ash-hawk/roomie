@@ -20,6 +20,8 @@ const active = () => D.members.filter((m) => !m.leftDate);
 const STATUS = { buyer: ['buyer', 'Bought it'], unpaid: ['unpaid', 'Owes'], pending: ['pending', 'Sent, waiting'], paid: ['paid', 'Paid back'], disputed: ['disputed', 'Disputed'] };
 const stChip = (status) => `<span class="st ${STATUS[status][0]}">${STATUS[status][1]}</span>`;
 
+export function prepareFinanceActivity(type) { tab = type === 'wishlist_item' ? 'wish' : 'settle'; }
+
 export async function financesView() {
   const h = hid();
   const [{ members }, bal, { expenses }] = await Promise.all([api(`/households/${h}/members`), api(`/households/${h}/balances`), api(`/households/${h}/expenses`)]);
@@ -47,11 +49,11 @@ function settleView() {
       <div class="grow"></div>${owe && payable ? `<button class="btn s" data-action="pay" data-payee="${b.otherUserId}">Pay back</button>` : ''}</div>`;
   }).join('');
 
-  const incoming = bal.incoming.map((p) => `<div class="item"><div class="row t">${avatar(who(p.payerUserId))}<div class="grow"><b>${esc(first(p.payerUserId))}</b> says they paid you <b class="amount">${$m(p.amount)}</b> via ${APP_LABEL[p.paidWith]}
+  const incoming = bal.incoming.map((p) => `<div class="item" data-activity-payment="${p.paymentId}"><div class="row t">${avatar(who(p.payerUserId))}<div class="grow"><b>${esc(first(p.payerUserId))}</b> says they paid you <b class="amount">${$m(p.amount)}</b> via ${APP_LABEL[p.paidWith]}
       <div class="hint">${p.items.map((i) => esc(i.itemName)).join(', ')}</div>
       ${p.status === 'disputed' ? '<div style="margin-top:2px">' + stChip('disputed') + '</div>' : ''}
       <div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="confirmed">${p.status === 'disputed' ? 'Mark received' : 'Got it'}</button>${p.status === 'sent' ? `<button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="disputed">Did not get it</button>` : ''}</div></div></div></div>`).join('');
-  const outgoing = bal.outgoing.map((p) => `<div class="item row">${person(p.payeeUserId, `<div class="hint">You sent ${$m(p.amount)} via ${APP_LABEL[p.paidWith]}</div>`)}<div class="grow"></div>${stChip(p.status === 'sent' ? 'pending' : 'disputed')}</div>`).join('');
+  const outgoing = bal.outgoing.map((p) => `<div class="item row" data-activity-payment="${p.paymentId}">${person(p.payeeUserId, `<div class="hint">You sent ${$m(p.amount)} via ${APP_LABEL[p.paidWith]}</div>`)}<div class="grow"></div>${stChip(p.status === 'sent' ? 'pending' : 'disputed')}</div>`).join('');
 
   const pairs = bal.pairs.map((p) => `<div class="item row">${avatar(who(p.debtorUserId), 'sm')}<span class="grow"><b>${esc(first(p.debtorUserId))}</b> ${p.debtorUserId === S.user.userId ? 'owe' : 'owes'} <b>${esc(first(p.creditorUserId))}</b></span><b class="amount">${$m(p.amount)}</b></div>`).join('');
 

@@ -222,7 +222,7 @@ forms['event-save'] = async (form) => {
 // ---- the board ----------------------------------------------------------------------------------
 function noteHtml(n) {
   const ev = n.eventId ? eventOf(n.eventId) : null;
-  return `<article class="sticky ${n.isPinned ? 'pinned' : ''}">
+  return `<article data-board-message-ids="${[n.messageId, ...n.replies.map((r) => r.messageId)].join(' ')}" class="sticky ${n.isPinned ? 'pinned' : ''}">
     <div class="row t" style="gap:8px">${avatar(who(n.senderUserId), 'sm')}<div class="grow"><b>${esc(first(n.senderUserId))}</b> <span class="hint">${ago(n.postedDate)}</span></div>
       ${n.canEdit ? `<button class="x" data-action="note-pin" data-id="${n.messageId}" data-pinned="${n.isPinned ? '' : '1'}" aria-label="${n.isPinned ? 'Unpin' : 'Pin'}" title="${n.isPinned ? 'Unpin' : 'Pin'}">📌</button><button class="x" data-action="note-delete" data-id="${n.messageId}" aria-label="Delete note">✕</button>` : (n.isPinned ? '<span title="Pinned">📌</span>' : '')}</div>
     ${n.isPinned ? '<div class="pin-mark"><span aria-hidden="true">📌</span> Pinned</div>' : ''}
