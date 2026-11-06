@@ -148,10 +148,13 @@ actions['event-detail'] = (el) => {
     ${e.description ? `<p>${esc(e.description)}</p>` : ''}
     <div class="hint">Added by ${esc(first(e.createdByUserId))}</div>
     ${e.tags.length ? `<div class="stack">${e.tags.map((t) => `<div class="item row">${avatar(who(t.userId))}<div class="grow"><b>${esc(first(t.userId))}</b></div>${answer(t)}</div>`).join('')}</div>` : ''}
-    ${mine?.response ? `<p class="hint">${esc(first(e.createdByUserId))} is asking for your approval. The event stays pending until everyone selected approves it.</p><div class="acts" style="justify-content:flex-start">
-      ${mine.response !== 'accepted' ? `<button class="btn p" data-action="event-answer" data-id="${e.eventId}" data-response="accepted">Approve</button>` : ''}
-      ${mine.response !== 'declined' ? `<button class="btn" data-action="event-answer" data-id="${e.eventId}" data-response="declined">Request changes</button>` : ''}</div>` : ''}
+    ${mine?.response ? mine.response === 'pending' ? `<p class="hint">${esc(first(e.createdByUserId))} is asking for your approval. The event stays pending until everyone selected approves it.</p><div class="acts" style="justify-content:flex-start"><button class="btn p" data-action="event-answer" data-id="${e.eventId}" data-response="accepted">Approve</button><button class="btn" data-action="event-answer" data-id="${e.eventId}" data-response="declined">Request changes</button></div>` : `<p class="hint">${mine.response === 'accepted' ? 'You approved this event.' : 'You requested changes to this event.'}</p><button class="btn" style="align-self:flex-start" data-action="event-edit-response" aria-expanded="false">Edit response</button><div class="acts" data-response-options hidden style="justify-content:flex-start"><button class="btn p" data-action="event-answer" data-id="${e.eventId}" data-response="accepted" ${mine.response === 'accepted' ? 'disabled' : ''}>${mine.response === 'accepted' ? 'Approved' : 'Approve'}</button><button class="btn" data-action="event-answer" data-id="${e.eventId}" data-response="declined" ${mine.response === 'declined' ? 'disabled' : ''}>${mine.response === 'declined' ? 'Changes requested' : 'Request changes'}</button></div>` : ''}
     ${e.canEdit ? `<div class="acts" style="justify-content:flex-start"><button class="btn" data-action="edit-event" data-id="${e.eventId}">Edit</button><button class="btn d" data-action="delete-event" data-id="${e.eventId}">Delete</button></div>` : ''}`);
+};
+actions['event-edit-response'] = (button) => {
+  const options = button.closest('[role="dialog"]').querySelector('[data-response-options]');
+  options.hidden = !options.hidden;
+  button.setAttribute('aria-expanded', String(!options.hidden));
 };
 actions['event-answer'] = async (el) => { await api(path(`/events/${el.dataset.id}/respond`), { method: 'POST', body: { response: el.dataset.response } }); closeModal(); toast('Answer sent'); refresh(); };
 actions['delete-event'] = async (el) => { if (!await confirmDialog('Delete event?', 'This removes the event for everyone in the household.')) return;

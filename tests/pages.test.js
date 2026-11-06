@@ -614,3 +614,31 @@ describe('Create from a Home calendar day', () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 });
+
+
+describe('Editing an event approval response', () => {
+  for (const response of ['accepted', 'declined']) {
+    it(`offers Edit response after ${response} without immediately changing the answer`, async () => {
+      const baseApi = mockedApi.getMockImplementation();
+      mockedApi.mockImplementation((path) => path.endsWith('/events') ? Promise.resolve({ events: [{ ...events[0], createdByUserId: 2, canEdit: false, tags: [{ userId: 1, response }, { userId: 3, response: 'pending' }] }] }) : baseApi(path));
+      document.getElementById('page').innerHTML = await calendarView();
+      actions['event-detail']({ dataset: { id: '1' } });
+      const dialog = document.querySelector('[role="dialog"]');
+      expect(dialog.textContent).toContain(response === 'accepted' ? 'You approved this event.' : 'You requested changes to this event.');
+      expect(dialog.textContent).not.toContain('is asking for your approval');
+      const edit = dialog.querySelector('[data-action="event-edit-response"]');
+      expect(edit.textContent).toBe('Edit response');
+      const options = dialog.querySelector('[data-response-options]');
+      expect(options.hidden).toBe(true);
+      const count = mockedApi.mock.calls.length;
+      actions['event-edit-response'](edit);
+      expect(options.hidden).toBe(false);
+      expect(edit.getAttribute('aria-expanded')).toBe('true');
+      expect(options.querySelector(`[data-response="${response}"]`).disabled).toBe(true);
+      expect(options.querySelector(`[data-response="${response === 'accepted' ? 'declined' : 'accepted'}"]`).disabled).toBe(false);
+      expect(mockedApi.mock.calls.length).toBe(count);
+      actions['event-edit-response'](edit);
+      expect(options.hidden).toBe(true);
+    });
+  }
+});
