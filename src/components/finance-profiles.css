@@ -1,0 +1,3 @@
+.finance-profile-link{display:inline-flex;align-items:center;gap:8px;border:0;padding:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;border-radius:6px;max-width:100%}
+.finance-profile-link b{overflow-wrap:anywhere}.finance-profile-link .av{flex:none}
+.finance-profile-link:hover b{text-decoration:underline}.finance-profile-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
