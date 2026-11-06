@@ -1,3 +1,4 @@
+import { scheduleToolbar } from '../components/schedule-toolbar.js';
 import { validCalendarDay } from '../lib/calendar-create.js';
 // Slice (b): chores. The server owns the rules (rotation, daylight saving, who may do what);
 // this page shows the data and sends the user's intent. Times are always shown in the household's timezone.
@@ -39,30 +40,23 @@ export async function choresView() {
   D = { members, ...data };
   loadChoreDisplay();
   choreMonth ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
-  return `${phead('Chores', 'A clear view of what needs doing, and whose turn it is.', `<button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
-    ${choreRequestsBoard()}<div class="page-content stack chores-content"><section class="card" id="chore-schedule">${scheduleView()}</section><div id="chore-overdue">${overdueView()}</div><details class="card chore-management"><summary>Manage chores</summary><div id="chore-rules">${chartView()}</div></details>${workloadView()}</div>`;
+  return `${phead('Chores', 'A clear view of what needs doing, and whose turn it is.', `<button class="btn s" data-action="all-chores">All chores</button><button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
+    <div class="page-content split cal chores-content chore-dashboard-layout"><section class="card" id="chore-schedule">${scheduleView()}</section><aside class="card stack chore-attention-board" aria-label="Chore board"><h2>Chore board</h2><div id="chore-overdue">${overdueView()}</div>${choreRequestsBoard()}</aside></div>${workloadView()}`;
 
 }
-function choreRequestsBoard() {
-  const requests = D.swapRequests.filter((r) => r.requesterUserId === S.user.userId || r.targetUserId === S.user.userId || (r.type === 'skip' && r.requesterUserId !== S.user.userId));
-  const covers = requests.filter((r) => r.type === 'skip' && asgOf(r.requesterAssignmentId) && choreOf(asgOf(r.requesterAssignmentId).choreId));
-  const swaps = requests.filter((r) => r.type === 'swap');
-  const coverBoard = `<section class="card stack chore-requests-board"><div class="row sp"><h2>Cover Requests</h2>${covers.length ? badge(String(covers.length), 'warn') : ''}</div>
-    ${covers.map((request) => {
-      const assignment = asgOf(request.requesterAssignmentId), chore = choreOf(assignment.choreId);
-      return `<article class="item stack cover-request-card"><h3>${esc(chore.choreName)}</h3>${choreDetailBody(assignment, chore)}
-        <div class="stack"><h4>Cover request</h4><p class="home-board-message">${esc(request.requestMessage ?? '')}</p></div>
-        <div class="acts" style="justify-content:flex-start"><button class="btn s" data-action="open-request" data-id="${request.swapId}">View chore</button></div></article>`;
-    }).join('') || '<p class="hint">No chores need to be covered.</p>'}</section>`;
-  const swapBoard = swaps.length ? `<section class="card stack chore-swap-board"><h2>Swap requests</h2>${swaps.map((request) => {
-    const assignment = asgOf(request.requesterAssignmentId), target = asgOf(request.targetAssignmentId);
-    return `<article class="item stack"><b>${esc(first(request.requesterUserId))} wants to swap ${esc(choreOf(assignment?.choreId)?.choreName ?? 'a chore')}</b>
-      ${assignment ? `<div class="item row">${avatar(who(assignment.assignedUserId))}<div><b>${esc(fullName(who(assignment.assignedUserId)))}</b><div class="hint">${whenFmt(assignment.dueAt)}</div></div></div>` : ''}
-      ${target ? `<p class="hint">For ${esc(choreOf(target.choreId)?.choreName ?? 'a chore')} (${whenFmt(target.dueAt)})</p>` : ''}
-      <p class="home-board-message">${esc(request.requestMessage ?? '')}</p><div class="acts" style="justify-content:flex-start"><button class="btn s" data-action="open-request" data-id="${request.swapId}">${request.requesterUserId === S.user.userId ? 'View / cancel request' : 'Respond'}</button></div></article>`;
-  }).join('')}</section>` : '';
-  return coverBoard + swapBoard;
+function choreIdentity(assignment) {
+  return `<div class="row chore-occurrence" style="gap:8px">${avatar(who(assignment.assignedUserId), 'sm')}<div><b>${esc(fullName(who(assignment.assignedUserId)))}</b><div class="hint">${whenFmt(assignment.dueAt)}</div></div></div>`;
 }
+function choreRequestsBoard() {
+  const requests = D.swapRequests.filter((r) => r.requesterUserId === S.user.userId || r.targetUserId === S.user.userId || r.type === 'skip').filter((r) => { const a = asgOf(r.requesterAssignmentId); return a && !a.isCompleted && choreOf(a.choreId); });
+  const cards = (list) => list.map((request) => {
+    const assignment = asgOf(request.requesterAssignmentId);
+    return `<article class="chore-board-item stack"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}${request.requestMessage ? `<p class="hint chore-board-preview">${esc(request.requestMessage)}</p>` : ''}<button class="btn s" data-action="open-request" data-id="${request.swapId}">View chore</button></article>`;
+  }).join('');
+  const covers = requests.filter((r) => r.type === 'skip'), swaps = requests.filter((r) => r.type === 'swap');
+  return `<section class="stack chore-requests-board"><h3>Cover Requests${covers.length ? ` (${covers.length})` : ''}</h3>${cards(covers) || '<p class="hint">No chores need to be covered.</p>'}</section>${swaps.length ? `<section class="stack chore-swap-board"><h3>Swap requests (${swaps.length})</h3>${cards(swaps)}</section>` : ''}`;
+}
+actions['all-chores'] = () => openModal(`${mhead('All chores')}<div id="chore-rules">${chartView()}</div>`);
 const chorePrefsKey = () => `roomie.chores.display.${S.user.userId}.${hid()}`;
 function loadChoreDisplay() {
   if (choreScope === chorePrefsKey()) return;
@@ -76,9 +70,11 @@ function saveChoreDisplay() { try { localStorage.setItem(chorePrefsKey(), JSON.s
 function refreshChoreSchedule(focusInput) {
   const schedule = document.getElementById('chore-schedule');
   if (!schedule) return;
+  const filterWasOpen = Boolean(schedule.querySelector('.schedule-filter-menu[open]'));
   schedule.innerHTML = scheduleView();
+  if (filterWasOpen && focusInput && !focusInput.endsWith('-view')) schedule.querySelector('.schedule-filter-menu').open = true;
   document.getElementById('chore-overdue').innerHTML = overdueView();
-  document.getElementById('chore-rules').innerHTML = chartView();
+  const rules = document.getElementById('chore-rules'); if (rules) rules.innerHTML = chartView();
   if (focusInput) schedule.querySelector(`[data-input="${focusInput}"]`)?.focus();
 }
 inputs['chore-view'] = (el) => { if (!['calendar', 'list'].includes(el.value)) return; choreView = el.value; saveChoreDisplay(); refreshChoreSchedule('chore-view'); };
@@ -108,12 +104,13 @@ function workloadView() {
 }
 function overdueView() {
   const overdue = visibleAssignments().filter((a) => !a.isCompleted && ymdIn(a.dueAt) < ymdIn(Date.now()));
-  return overdue.length ? `<details class="card"><summary>Overdue (${overdue.length})</summary><div class="stack">${overdue.map(row).join('')}</div></details>` : '';
+  return `<section class="stack"><h3>Overdue${overdue.length ? ` (${overdue.length})` : ''}</h3>${overdue.map((assignment) => `<article class="chore-board-item stack"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}<button class="btn s" data-action="chore-detail" data-id="${assignment.assignmentId}">View chore</button></article>`).join('') || '<p class="hint">No overdue chores.</p>'}</section>`;
 }
 function scheduleView() {
   const title = new Date(`${choreMonth}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
   const people = active();
-  const toolbar = `<div class="home-schedule-toolbar event-schedule-toolbar"><div class="month-nav"><button class="btn s" data-action="chore-month" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="chore-month" data-n="1" aria-label="Next month">›</button></div><select class="input home-view-select" data-input="chore-view" aria-label="Schedule view"><option value="calendar" ${choreView === 'calendar' ? 'selected' : ''}>Calendar view</option><option value="list" ${choreView === 'list' ? 'selected' : ''}>List view</option></select></div><div class="filters event-schedule-filters"><select class="input" data-input="chore-filter" aria-label="Show chores for"><option value="all" ${filter === 'all' ? 'selected' : ''}>Everyone</option><option value="me" ${filter === 'me' ? 'selected' : ''}>Just mine</option>${people.filter((m) => m.userId !== S.user.userId).map((m) => `<option value="${m.userId}" ${String(filter) === String(m.userId) ? 'selected' : ''}>${esc(m.firstName)}</option>`).join('')}</select></div>`;
+  const filters = `<select class="input" data-input="chore-filter" aria-label="Show chores for"><option value="all" ${filter === 'all' ? 'selected' : ''}>Everyone</option><option value="me" ${filter === 'me' ? 'selected' : ''}>Just mine</option>${people.filter((m) => m.userId !== S.user.userId).map((m) => `<option value="${m.userId}" ${String(filter) === String(m.userId) ? 'selected' : ''}>${esc(m.firstName)}</option>`).join('')}</select>`;
+  const toolbar = scheduleToolbar({ title, monthAction: 'chore-month', viewInput: 'chore-view', view: choreView, filters });
   const items = visibleAssignments();
   if (!D.chores.length) return toolbar + empty('🧹', 'No chores yet', 'Add one yourself or start with a few common household chores.', '<button class="btn s" data-action="starter-chores">Add common chores</button>');
   if (choreView === 'list') {

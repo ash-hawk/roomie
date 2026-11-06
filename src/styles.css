@@ -647,7 +647,7 @@ button.activity-item{cursor:pointer}button.activity-item:hover{background:var(--
 .home-board-summary[open]>summary::after{content:'⌄'}.home-board-summary>summary b{font-size:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .home-board-summary>summary .hint{font-size:11px}.home-board-summary>article{border:0;border-radius:0;margin:0;padding:12px}
 .home-board-summary>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-.home-widget.compact .home-schedule-toolbar{gap:8px}.home-widget.compact .month-nav{min-width:0;flex-basis:100%;gap:6px}
+.home-widget.compact .month-nav{gap:6px}
 .home-widget .month-nav h2{font-size:18px}.home-widget.compact .home-view-select{margin-left:0}
 .home-widget.compact .home-month .day2{min-height:42px;padding:5px;gap:5px;align-items:center}
 .home-widget.compact .home-month{gap:4px}.home-widget.compact .mhead{font-size:11px}
@@ -694,3 +694,34 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .home-board-conversation>form{margin-top:12px}
 
 .home-board-view{align-self:flex-start;width:auto}
+
+/* Identical control placement on Home, Events and Chores at every width. */
+.home-schedule-toolbar{flex-direction:column;align-items:stretch;gap:12px}
+.home-schedule-toolbar .month-nav{flex:none;min-width:0;width:100%}
+.home-schedule-toolbar .month-nav h2{font-size:18px}
+.schedule-display-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.home-schedule-toolbar .schedule-display-controls select.input{flex:none;width:auto;max-width:100%;min-height:36px;padding:7px 30px 7px 10px;font-size:13px}
+.home-schedule-toolbar .schedule-display-controls select.home-view-select{margin-left:0}
+
+.schedule-display-controls{position:relative}
+.schedule-filter-menu{position:static}
+.schedule-filter-menu>summary{list-style:none;cursor:pointer;min-height:36px;box-sizing:border-box}
+.schedule-filter-menu>summary::-webkit-details-marker{display:none}
+.schedule-filter-menu>summary::after{content:'⌄';margin-left:8px}
+.schedule-filter-menu>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.schedule-filter-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:20;box-sizing:border-box;width:min(300px,100%);display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:var(--shadow)}
+.home-schedule-toolbar .schedule-filter-panel select.input{width:100%}
+.schedule-filter-menu:not([open])>.schedule-filter-panel{display:none}
+
+.chore-attention-board{gap:20px;min-width:0}
+.chore-attention-board>h2{font-size:20px}
+.chore-attention-board h3{font-size:14px}
+.chore-attention-board h4{font-size:14px;overflow-wrap:anywhere}
+.chore-attention-board .chore-requests-board{margin:0}
+.chore-attention-board .chore-board-item{gap:9px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.chore-attention-board .chore-occurrence{align-items:center}
+.chore-attention-board .chore-occurrence b{font-size:12px}
+.chore-attention-board .hint{font-size:12px;line-height:1.4}
+.chore-attention-board .chore-board-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:0}
+.chore-attention-board .btn{align-self:flex-start}
+.chore-dashboard-layout{margin-bottom:18px}

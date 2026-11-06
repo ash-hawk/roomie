@@ -261,8 +261,8 @@ describe('Home household board', () => {
     document.getElementById('page').innerHTML = await choresView();
     const board = document.querySelector('.chore-requests-board');
     expect(board.textContent).toContain('Cover Requests');
-    expect(board.textContent).toContain('Cover request');
-    expect(board.textContent).toContain('Wash, dry, and fold the laundry.');
+    expect(board.textContent).toContain('Cover Requests');
+    expect(board.querySelector('[data-action=open-request]')).not.toBeNull();
     expect(board.querySelector('.chore-occurrence').textContent).toContain('Jordan');
     expect(board.querySelector('.chore-occurrence').textContent).toContain('Mon Nov 16');
     expect(board.textContent).toContain('Laundry');
@@ -284,7 +284,7 @@ describe('Home household board', () => {
     boardChores = { ...boardChores, swapRequests: [{ ...request, type: 'swap', targetUserId: 1 }] };
     const { choresView } = await import('../src/pages/chores.js');
     document.getElementById('page').innerHTML = await choresView();
-    expect(document.querySelector('.chore-requests-board h2').textContent).toBe('Cover Requests');
+    expect(document.querySelector('.chore-requests-board h3').textContent).toBe('Cover Requests');
     expect(document.querySelector('.chore-requests-board').textContent).toContain('No chores need to be covered.');
     expect(document.querySelector('.chore-swap-board').textContent).toContain('Laundry');
   });
@@ -721,7 +721,11 @@ describe('Chores schedule formats', () => {
     expect(schedule.querySelectorAll('[data-action="chore-detail"]')).toHaveLength(1);
     expect(document.getElementById('chore-overdue').textContent).toContain('Overdue (1)');
     expect(document.querySelector('#chore-overdue [data-action="chore-detail"]').dataset.id).toBe('1');
-    expect(document.querySelector('.chore-management').textContent).toContain('Unscheduled rule');
+    expect(document.querySelector('.chore-attention-board .chore-requests-board')).not.toBeNull();
+    expect(document.querySelector('.chore-management')).toBeNull();
+    actions['all-chores']();
+    expect(document.querySelector('[role=dialog]').textContent).toContain('Unscheduled rule');
+    document.getElementById('modal')?.remove();
     picker().value = 'calendar'; inputs['chore-view'](picker());
     actions['chore-day'](schedule.querySelector('[data-day="2026-11-05"]'));
     expect(document.querySelector('[role="dialog"] [data-action="chore-detail"]').dataset.id).toBe('2');
@@ -762,5 +766,34 @@ describe('Wider household board conversations', () => {
     document.getElementById('page').innerHTML = await homeView();
     expect(document.querySelector('#home-board .home-board-summary')).not.toBeNull();
     expect(document.querySelector('#home-board .home-board-conversation')).toBeNull();
+  });
+});
+
+describe('Schedule filtering menus', () => {
+  it('hides secondary controls until opened, retains the menu while filtering, and closes on Escape or outside clicks', async () => {
+    const { choresView } = await import('../src/pages/chores.js');
+    S.hid = 94; S.households = [{ ...S.households[0], householdId: 94 }];
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => path.endsWith('/chores') ? Promise.resolve({ chores: [], assignments: [], swapRequests: [] }) : baseApi(path));
+    for (const [render, filterInput, value] of [[calendarView, 'cal-event-type', 'hosting'], [choresView, 'chore-filter', 'me']]) {
+      document.getElementById('page').innerHTML = await render();
+      let menu = document.querySelector('.schedule-filter-menu');
+      expect(menu.open).toBe(false);
+      expect(menu.querySelector('summary').textContent).toBe('Filtering options');
+      expect(document.querySelectorAll('.schedule-display-controls > select')).toHaveLength(1);
+      const filter = menu.querySelector(`[data-input="${filterInput}"]`);
+      expect(filter.closest('.schedule-filter-panel')).not.toBeNull();
+      menu.open = true;
+      filter.value = value; inputs[filterInput](filter);
+      menu = document.querySelector('.schedule-filter-menu');
+      expect(menu.open).toBe(true);
+      expect(menu.querySelector(`[data-input="${filterInput}"]`).value).toBe(value);
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      expect(menu.open).toBe(false);
+      expect(document.activeElement).toBe(menu.querySelector('summary'));
+      menu.open = true;
+      document.getElementById('page').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(menu.open).toBe(false);
+    }
   });
 });
