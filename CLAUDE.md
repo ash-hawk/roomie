@@ -130,3 +130,5 @@
 - Empty-space drag sizing anchors to the column under the pointer and grows only to the right. A right-corner drop stays compact instead of widening left. Moving within the widget's own footprint still recalculates the destination, allowing a wide Finances panel to shrink into that corner.
 
 - Home, Events and Chores all render schedule controls through components/schedule-toolbar.js: month navigation is always the first row, with the left-aligned Calendar/List selector and page-specific filters together on the next row. This placement does not change between compact and wider cards. Events no longer wraps its filters in a separate outlined panel.
+
+- Secondary Events/Chores schedule controls live inside a closed Filtering options menu beside the Calendar/List selector. The menu preserves open state/focus during filter changes, closes on Escape or outside clicks, and keeps the Events poll from repainting while it is open.

@@ -702,3 +702,13 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .schedule-display-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
 .home-schedule-toolbar .schedule-display-controls select.input{flex:none;width:auto;max-width:100%;min-height:36px;padding:7px 30px 7px 10px;font-size:13px}
 .home-schedule-toolbar .schedule-display-controls select.home-view-select{margin-left:0}
+
+.schedule-display-controls{position:relative}
+.schedule-filter-menu{position:static}
+.schedule-filter-menu>summary{list-style:none;cursor:pointer;min-height:36px;box-sizing:border-box}
+.schedule-filter-menu>summary::-webkit-details-marker{display:none}
+.schedule-filter-menu>summary::after{content:'⌄';margin-left:8px}
+.schedule-filter-menu>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.schedule-filter-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:20;box-sizing:border-box;width:min(300px,100%);display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:var(--shadow)}
+.home-schedule-toolbar .schedule-filter-panel select.input{width:100%}
+.schedule-filter-menu:not([open])>.schedule-filter-panel{display:none}

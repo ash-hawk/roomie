@@ -764,3 +764,32 @@ describe('Wider household board conversations', () => {
     expect(document.querySelector('#home-board .home-board-conversation')).toBeNull();
   });
 });
+
+describe('Schedule filtering menus', () => {
+  it('hides secondary controls until opened, retains the menu while filtering, and closes on Escape or outside clicks', async () => {
+    const { choresView } = await import('../src/pages/chores.js');
+    S.hid = 94; S.households = [{ ...S.households[0], householdId: 94 }];
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => path.endsWith('/chores') ? Promise.resolve({ chores: [], assignments: [], swapRequests: [] }) : baseApi(path));
+    for (const [render, filterInput, value] of [[calendarView, 'cal-event-type', 'hosting'], [choresView, 'chore-filter', 'me']]) {
+      document.getElementById('page').innerHTML = await render();
+      let menu = document.querySelector('.schedule-filter-menu');
+      expect(menu.open).toBe(false);
+      expect(menu.querySelector('summary').textContent).toBe('Filtering options');
+      expect(document.querySelectorAll('.schedule-display-controls > select')).toHaveLength(1);
+      const filter = menu.querySelector(`[data-input="${filterInput}"]`);
+      expect(filter.closest('.schedule-filter-panel')).not.toBeNull();
+      menu.open = true;
+      filter.value = value; inputs[filterInput](filter);
+      menu = document.querySelector('.schedule-filter-menu');
+      expect(menu.open).toBe(true);
+      expect(menu.querySelector(`[data-input="${filterInput}"]`).value).toBe(value);
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      expect(menu.open).toBe(false);
+      expect(document.activeElement).toBe(menu.querySelector('summary'));
+      menu.open = true;
+      document.getElementById('page').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(menu.open).toBe(false);
+    }
+  });
+});

@@ -77,7 +77,9 @@ function saveChoreDisplay() { try { localStorage.setItem(chorePrefsKey(), JSON.s
 function refreshChoreSchedule(focusInput) {
   const schedule = document.getElementById('chore-schedule');
   if (!schedule) return;
+  const filterWasOpen = Boolean(schedule.querySelector('.schedule-filter-menu[open]'));
   schedule.innerHTML = scheduleView();
+  if (filterWasOpen && focusInput && !focusInput.endsWith('-view')) schedule.querySelector('.schedule-filter-menu').open = true;
   document.getElementById('chore-overdue').innerHTML = overdueView();
   document.getElementById('chore-rules').innerHTML = chartView();
   if (focusInput) schedule.querySelector(`[data-input="${focusInput}"]`)?.focus();

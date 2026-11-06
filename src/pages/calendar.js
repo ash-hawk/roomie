@@ -133,7 +133,9 @@ function scheduleContent() {
 function refreshSchedule(focusInput) {
   const content = document.getElementById('cal-main');
   if (!content) return;
+  const filterWasOpen = Boolean(content.querySelector('.schedule-filter-menu[open]'));
   content.innerHTML = scheduleContent();
+  if (filterWasOpen && focusInput && !focusInput.endsWith('-view')) content.querySelector('.schedule-filter-menu').open = true;
   if (focusInput) content.querySelector(`[data-input="${focusInput}"]`)?.focus();
 }
 export async function calendarView() {
@@ -288,7 +290,7 @@ actions['note-delete'] = async (el) => { if (!await confirmDialog('Delete this n
 setInterval(async () => {
   try {
     if (document.hidden || document.getElementById('root')?.dataset.page !== 'calendar' || document.getElementById('modal') || !D) return;
-    if (document.activeElement?.closest?.('form,textarea,input,select')) return;
+    if (document.activeElement?.closest?.('form,textarea,input,select') || document.querySelector('.schedule-filter-menu[open]')) return;
     const [{ events }, { notes }] = await Promise.all([api(path('/events')), api(path('/board'))]);
     if (JSON.stringify([events, notes]) !== seen) refresh();
   } catch { /* offline or signed out: try again next tick */ }
