@@ -2,7 +2,7 @@ import { ago, esc, fullName } from '../lib/dom.js';
 import { boardIdentity } from './board-profile.js';
 import { approvalState } from '../../shared/event-approval.ts';
 
-export function householdBoard({ members, events, chores, notes, user, timezone }) {
+export function householdBoard({ members, events, chores, notes, user, timezone, compact = false }) {
   const who = (id) => members.find((m) => m.userId === id);
   const name = (id) => id === user.userId ? 'You' : fullName(who(id));
   const when = (at) => new Date(at).toLocaleString('en-US', { timeZone: timezone, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -39,8 +39,17 @@ export function householdBoard({ members, events, chores, notes, user, timezone 
   const feed = [...incoming, ...outgoing, ...notes.map((n) => entry(note(n), n.postedDate, `note-${n.messageId}`, Boolean(n.isPinned)))]
     .filter((item) => item.html)
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.at - a.at || a.key.localeCompare(b.key));
+  const compactEntry = (item) => {
+    const [kind, id] = item.key.split('-');
+    const event = kind === 'event' ? events.find((e) => e.eventId === Number(id)) : null;
+    const request = kind === 'chore' ? (chores.swapRequests ?? []).find((r) => r.swapId === Number(id)) : null;
+    const announcement = kind === 'note' ? notes.find((n) => n.messageId === Number(id)) : null;
+    const title = event ? event.eventName : request ? choreName(assignment(request.requesterAssignmentId)) : announcement?.messageText ?? '';
+    const type = event ? 'Event approval' : request ? (request.type === 'skip' ? 'Cover request' : 'Swap request') : `Announcement · ${name(announcement?.senderUserId)}`;
+    return `<details class="home-board-summary" data-board-entry="${item.key}"><summary><span class="home-kind">${esc(type)}</span><b>${esc(title)}</b><span class="hint">${event ? esc(when(event.eventDate)) : request ? esc(when(assignment(request.requesterAssignmentId)?.dueAt)) : esc(ago(announcement?.postedDate, timezone))}</span></summary>${item.html}</details>`;
+  };
   return `<div class="row sp home-board-heading"><h2>Household board</h2><button type="button" class="btn p home-make-announcement" data-action="home-make-announcement">Make announcement</button></div>
-    <div class="stack home-board-feed" aria-label="Household announcements and requests">${feed.map((item) => item.html).join('') || '<p class="hint">No announcements or open requests right now.</p>'}</div>`;
+    <div class="stack home-board-feed" aria-label="Household announcements and requests">${feed.map((item) => compact ? compactEntry(item) : item.html).join('') || '<p class="hint">No announcements or open requests right now.</p>'}</div>`;
 
 }
 

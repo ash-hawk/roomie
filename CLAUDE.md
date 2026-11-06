@@ -108,3 +108,8 @@
 - Announcement authors and replies on both Home and Events show clickable photos/names. They open the existing roommate profile using freshly fetched current-household member data, including former-member privacy restrictions; no prior visit to Household is required.
 
 - View chore on Home opens the exact occurrence directly in the standard Chores detail modal, loaded fresh for the current household. Cover request responses on Chores reuse that same detail modal with the request reason and Decline / Cover it controls. Covering is submitted only after reviewing the details; the server’s existing per-viewer decline behavior stays unchanged.
+
+## Home dashboard display preferences
+- Edit dashboard reveals Compact / Expanded sizing and drag grips plus accessible earlier/later controls for Schedule, Household board, and Finances. DOM order follows the saved widget order. Preferences are stored in localStorage per user and household; malformed layouts fall back safely. This is display-only; no API or database changes.
+- Compact calendar uses day markers and the next three remaining items in the selected month; day buttons retain full details. Compact List previews five items with View all for the selected month. Expanded schedule keeps the detailed month/list; Calendar / List remains independent of widget size.
+- Compact board uses expandable summaries with the existing actions, announcement profiles, and replies inside. Resizing/moving retains reply drafts. Finances can be a compact tile or wider summary. The grid stacks on narrow screens.

@@ -248,7 +248,7 @@ describe('Home household board', () => {
     expect(board.textContent).toContain('Same announcement as Events');
     expect(board.querySelector('.home-board-columns')).toBeNull();
     expect(board.textContent).not.toMatch(/Needs your response|Your requests/);
-    expect(board.querySelector('[aria-label="Household announcements and requests"] > article')).not.toBeNull();
+    expect(board.querySelector('[aria-label="Household announcements and requests"] article')).not.toBeNull();
     expect(board.querySelector('[data-kind=event][data-response=accepted]')).not.toBeNull();
     boardChores.swapRequests = [{ ...request, type: 'swap', targetUserId: 3 }];
     document.getElementById('page').innerHTML = await homeView();
@@ -391,5 +391,59 @@ describe('Home household board', () => {
     reply.elements.namedItem('messageText').value = 'Sounds good';
     await forms['home-note-reply'](reply);
     expect(mockedApi).toHaveBeenCalledWith('/households/1/board', { method: 'POST', body: { messageText: 'Sounds good', parentMessageId: 8 } });
+  });
+});
+
+
+describe('Home widget customization', () => {
+  const layoutKey = 'roomie.home.layout.1.1';
+  const render = async () => { document.getElementById('page').innerHTML = await homeView(); };
+  const size = (id, value) => {
+    const select = document.querySelector(`.home-widget[data-widget="${id}"] [data-input="home-widget-size"]`);
+    select.value = value; inputs['home-widget-size'](select);
+  };
+  it('saves size and order per user and household, independently of Calendar/List', async () => {
+    await render();
+    actions['home-edit-layout'](document.querySelector('[data-action="home-edit-layout"]'));
+    size('schedule', 'compact');
+    const view = document.querySelector('[data-input="home-view"]');
+    view.value = 'calendar'; inputs['home-view'](view);
+    const day = document.querySelector('[data-day="2026-11-05"]');
+    expect(day.querySelectorAll('.home-day-dots i')).toHaveLength(2);
+    expect(day.querySelector('.home-calendar-item')).toBeNull();
+    expect(document.querySelector('.home-compact-upcoming').textContent).toContain('Dinner');
+    actions['home-day'](day);
+    expect(document.querySelector('[role="dialog"]').textContent).toContain('Dishes');
+    document.getElementById('modal')?.remove();
+    actions['home-widget-move']({ dataset: { widget: 'finances', step: '-1' } });
+    expect(JSON.parse(localStorage.getItem(layoutKey)).map((w) => w.id)).toEqual(['schedule', 'finances', 'board']);
+    await render();
+    expect(document.querySelector('.home-widget').classList.contains('compact')).toBe(true);
+    expect(document.querySelector('[data-input="home-view"]').value).toBe('calendar');
+    actions['home-month'](document.querySelector('[data-n="1"]'));
+    expect(document.querySelector('#home-schedule-content').textContent).toContain('December 2026');
+    S.user = { ...S.user, userId: 2 };
+    await render();
+    expect(document.querySelector('.home-widget').classList.contains('expanded')).toBe(true);
+    expect(document.querySelector('[data-input="home-view"]').value).toBe('list');
+  });
+  it('falls back from invalid preferences and keeps board reply drafts when resizing or moving', async () => {
+    localStorage.setItem(layoutKey, JSON.stringify([{ id: 'bad', size: 'giant' }]));
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => path.endsWith('/board') ? Promise.resolve({ notes: [{ messageId: 77, senderUserId: 2, messageText: 'House meeting', postedDate: '2026-11-05T17:00:00Z', replies: [] }] }) : baseApi(path));
+    await render();
+    expect(document.querySelectorAll('.home-widget')).toHaveLength(3);
+    const summary = document.querySelector('[data-board-entry="note-77"] summary');
+    expect(summary.textContent).toContain('House meeting');
+    const input = document.querySelector('#home-board input[name="messageText"]');
+    input.value = 'Keep my reply';
+    size('board', 'expanded');
+    expect(document.querySelector('.home-board-summary')).toBeNull();
+    expect(document.querySelector('#home-board input').value).toBe('Keep my reply');
+    size('board', 'compact');
+    expect(document.querySelector('#home-board input').value).toBe('Keep my reply');
+    actions['home-widget-move']({ dataset: { widget: 'board', step: '-1' } });
+    expect(document.querySelector('.home-widget').dataset.widget).toBe('board');
+    expect(document.querySelector('#home-board input').value).toBe('Keep my reply');
   });
 });
