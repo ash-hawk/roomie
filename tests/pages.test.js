@@ -6,6 +6,7 @@ import { S } from "../src/lib/state.js";
 import { actions, forms, inputs } from "../src/lib/events.js";
 import { calendarView } from "../src/pages/calendar.js";
 import { settingsView } from "../src/pages/settings.js";
+import { connectHomeLayout } from "../src/components/home-layout.js";
 import { homeView } from "../src/pages/home.js";
 const user = { userId: 1, firstName: "Alex", lastName: "Rivera", profilePhoto: null, phoneNumber: "", paymentMethods: [] };
 const members = [user, { userId: 2, firstName: "Jordan" }, { userId: 3, firstName: "Sam" }];
@@ -453,6 +454,7 @@ describe('Home live dragging', () => {
   };
   async function setup() {
     document.getElementById('page').innerHTML = await homeView();
+    connectHomeLayout();
     const edit = document.querySelector('[data-action="home-edit-layout"]');
     if (edit.textContent === 'Edit dashboard') actions['home-edit-layout'](edit);
     return document.querySelector('[data-widget-drag="schedule"]');
@@ -475,7 +477,7 @@ describe('Home live dragging', () => {
     expect(document.querySelector('.home-widget-dragging')).toBeNull();
   });
   it('automatically changes presentation to fit the drop space and rolls the size back on cancellation', async () => {
-    const grip = await setup();
+    let grip = await setup();
     const grid = document.querySelector('.home-dashboard');
     grid.style.gridTemplateColumns = '300px 300px 300px'; grid.style.gridAutoRows = '2px';
     grid.getBoundingClientRect = () => ({ left: 0, right: 900, width: 900, top: 0, bottom: 1000 });
@@ -492,6 +494,7 @@ describe('Home live dragging', () => {
     point(document, 'pointercancel');
     expect(widget.classList.contains('expanded')).toBe(true);
     expect(widget.dataset.column).toBe('');
+    grip = document.querySelector('[data-widget-drag="schedule"]');
     point(grip, 'pointerdown'); point(document, 'pointermove', 800, 100); point(document, 'pointerup');
     expect(JSON.parse(localStorage.getItem('roomie.home.layout.1.1')).find((w) => w.id === 'schedule')).toMatchObject({ size: 'compact', column: 3 });
   });
@@ -502,7 +505,9 @@ describe('Home live dragging', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(order()).toEqual(['schedule', 'board', 'finances']);
     expect(localStorage.getItem('roomie.home.layout.1.1')).toBeNull();
+    grip = document.querySelector('[data-widget-drag="schedule"]');
     point(grip, 'pointerdown'); point(document, 'pointermove', 100, 110); point(document, 'pointercancel');
+    grip = document.querySelector('[data-widget-drag="schedule"]');
     expect(order()).toEqual(['schedule', 'board', 'finances']);
     grip.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
     expect(order()).toEqual(['board', 'schedule', 'finances']);
@@ -545,4 +550,20 @@ describe('Home upcoming list dates', () => {
     const view = content.querySelector('[data-input="home-view"]'); view.value = 'calendar'; inputs['home-view'](view);
     expect(content.querySelector('[data-day="2026-11-04"]').textContent).toContain('Yesterday meeting');
   });
+});
+
+
+it('uses existing card headings for editing, without grip bars or repeated widget labels', async () => {
+  document.getElementById('page').innerHTML = await homeView();
+  const edit = document.querySelector('[data-action="home-edit-layout"]');
+  if (edit.textContent === 'Done') actions['home-edit-layout'](edit);
+  expect(document.querySelector('[data-widget-drag]')).toBeNull();
+  actions['home-edit-layout'](edit);
+  expect(document.querySelector('.home-widget-tools')).toBeNull();
+  expect(document.querySelector('.home-drag-handle')).toBeNull();
+  const headings = [...document.querySelectorAll('.home-dashboard [data-widget-drag]')];
+  expect(headings).toHaveLength(3);
+  expect(headings.every((el) => el.tagName === 'H2' && el.tabIndex === 0)).toBe(true);
+  actions['home-edit-layout'](edit);
+  expect(document.querySelector('[data-widget-drag]')).toBeNull();
 });
