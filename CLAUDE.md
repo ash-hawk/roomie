@@ -121,3 +121,5 @@
 - Dashboard editing no longer adds separate grip toolbars or repeated section labels. The existing month/section heading becomes a focusable drag target only in Edit dashboard mode; subtle card outlines mark editability. Done removes drag semantics. Automatic sizing, keyboard movement, and live placement remain available.
 
 - Home calendar day popups offer Add event and Add chore on empty and occupied days. A validated, one-use in-memory handoff is scoped to the initiating user/household, consumed only after the matching destination page has loaded and rendered. Event date and chore date/weekday/day-of-month are prefilled; calendar-started chores default to one-time. No creation occurs until the normal form is submitted.
+
+- Events now uses the same compact Calendar view / List view selector beside shared month navigation inside the schedule card. Both views retain the selected month; List shows today onward within that month. Type/sort filters stay inside the card, and local view/filter/month changes preserve board drafts. Display preferences are scoped per user and household. The separate Today shortcut and List/Month tab buttons are removed.

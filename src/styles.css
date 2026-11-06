@@ -683,3 +683,7 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .home-widget [data-widget-drag]{cursor:grab;touch-action:none;user-select:none;border-radius:5px}
 .home-widget [data-widget-drag]:hover{color:var(--accent)}
 .home-widget [data-widget-drag]:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+
+.event-schedule-toolbar .month-nav h2{font-size:18px}
+.event-schedule-filters{margin:14px 0;gap:8px;flex-wrap:wrap}
+.event-schedule-filters select.input{width:auto;max-width:100%;min-height:36px;padding:7px 30px 7px 10px;font-size:13px}

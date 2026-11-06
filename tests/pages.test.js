@@ -642,3 +642,44 @@ describe('Editing an event approval response', () => {
     });
   }
 });
+
+describe('Events schedule display', () => {
+  it('uses a compact dropdown inside the schedule and preserves the selected month across formats', async () => {
+    S.hid = 73; S.households = [{ ...S.households[0], householdId: 73 }];
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => path.endsWith('/events') ? Promise.resolve({ events: [
+      ...events,
+      { ...events[0], eventId: 21, eventName: 'December plan', eventDate: '2026-12-01T20:00:00Z' },
+      { ...events[0], eventId: 22, eventName: 'January plan', eventDate: '2027-01-01T20:00:00Z' },
+    ] }) : baseApi(path));
+    document.getElementById('page').innerHTML = await calendarView();
+    const schedule = document.getElementById('cal-main');
+    const dropdown = () => schedule.querySelector('[data-input="cal-view"]');
+    expect([...dropdown().options].map((option) => option.textContent)).toEqual(['Calendar view', 'List view']);
+    expect(document.querySelector('[data-action="cal-view"]')).toBeNull();
+    expect(schedule.textContent).toContain('November 2026');
+    expect(schedule.textContent).toContain('Dinner');
+    expect(schedule.textContent).not.toContain('December plan');
+    const board = document.querySelector('[data-board]');
+    const draft = board.querySelector('textarea'); draft.value = 'Keep this announcement';
+    dropdown().value = 'month'; inputs['cal-view'](dropdown());
+    expect(schedule.querySelector('[data-action="calendar-today"]')).toBeNull();
+    actions['month-nav'](schedule.querySelector('[data-n="1"]'));
+    expect(schedule.textContent).toContain('December 2026');
+    dropdown().value = 'list'; inputs['cal-view'](dropdown());
+    expect(schedule.textContent).toContain('December plan');
+    expect(schedule.textContent).not.toContain('January plan');
+    expect(schedule.textContent).not.toContain('Dinner');
+    expect(document.activeElement).toBe(dropdown());
+    actions['month-nav'](schedule.querySelector('[data-n="1"]'));
+    expect(schedule.textContent).toContain('January 2027');
+    expect(schedule.textContent).toContain('January plan');
+    expect(board.querySelector('textarea').value).toBe('Keep this announcement');
+    expect(mockedApi).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(localStorage.getItem('roomie.calendar.1.73')).view).toBe('list');
+    S.user = { ...S.user, userId: 2 };
+    document.getElementById('page').innerHTML = await calendarView();
+    expect(document.getElementById('cal-main').textContent).toContain('November 2026');
+    expect(document.querySelector('[data-input="cal-event-type"]').value).toBe('all');
+  });
+});

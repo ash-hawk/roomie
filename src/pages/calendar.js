@@ -5,18 +5,25 @@
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { ago as agoIn, avatar, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, personColor, phead, seg, showError, toast } from '../lib/dom.js';
+import { ago as agoIn, avatar, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, personColor, phead, showError, toast } from '../lib/dom.js';
 
 import { boardIdentity } from '../components/board-profile.js';
 import { approvalState } from '../../shared/event-approval.ts';
 
 const CATS = [['meeting', 'Meeting'], ['hosting', 'Hosting guests'], ['other', 'Other']];
 
-const savedPrefs = (() => { try { return JSON.parse(localStorage.getItem('roomie.calendar') || '{}'); } catch { return {}; } })();
-let view = ['list', 'month'].includes(savedPrefs.view) ? savedPrefs.view : 'list';
-let sortBy = ['date', 'color'].includes(savedPrefs.sortBy) ? savedPrefs.sortBy : 'date';
-let eventType = ['all', ...CATS.map(([key]) => key)].includes(savedPrefs.eventType) ? savedPrefs.eventType : 'all';
-let monthStart = null;    // 'YYYY-MM-01' being shown in the month view
+let view = 'list', sortBy = 'date', eventType = 'all';
+let monthStart = null, prefsScope = null;
+const prefsKey = () => `roomie.calendar.${S.user.userId}.${hid()}`;
+function loadPrefs() {
+  if (prefsScope === prefsKey()) return;
+  prefsScope = prefsKey(); monthStart = null;
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(prefsScope) || '{}') ?? {}; } catch { /* Defaults remain usable. */ }
+  view = ['list', 'month'].includes(saved.view) ? saved.view : 'list';
+  sortBy = ['date', 'color'].includes(saved.sortBy) ? saved.sortBy : 'date';
+  eventType = ['all', ...CATS.map(([key]) => key)].includes(saved.eventType) ? saved.eventType : 'all';
+}
 let D = null;             // { members, events, notes }
 let seen = '';            // what the last poll saw, to repaint only on change
 
@@ -41,7 +48,7 @@ const ago = (iso) => agoIn(iso, tz());
 const takeHandoff = () => { try { const v = JSON.parse(sessionStorage.getItem('roomie.open') || 'null'); sessionStorage.removeItem('roomie.open'); return v; } catch { return null; } };
 const refresh = () => window.dispatchEvent(new Event('roomie:render'));
 const path = (p) => `/households/${hid()}${p}`;
-const savePrefs = () => { try { localStorage.setItem('roomie.calendar', JSON.stringify({ view, sortBy, eventType })); } catch { /* preferences are optional */ } };
+const savePrefs = () => { try { localStorage.setItem(prefsKey(), JSON.stringify({ view, sortBy, eventType })); } catch { /* preferences are optional */ } };
 
 // ---- data -------------------------------------------------------------------------------------
 async function load() {
@@ -81,9 +88,9 @@ function row(it) {
 
 // ---- list view --------------------------------------------------------------------------------
 function listView() {
-  const today = ymdIn(Date.now()), end = addDays(today, 90);
-  let list = items().filter((i) => i.ymd >= today && i.ymd <= end);
-  if (!list.length) return empty('📅', 'No matching events', 'Add an event or choose a different event type.');
+  const today = ymdIn(Date.now());
+  let list = items().filter((i) => i.ymd >= today && i.ymd.slice(0, 7) === monthStart.slice(0, 7));
+  if (!list.length) return empty('📅', 'No matching events', 'No upcoming events match this month and event type.');
   if (sortBy === 'color') {
     list = [...list].sort((x, y) => (x.color === y.color ? Date.parse(x.at) - Date.parse(y.at) : x.color < y.color ? -1 : 1));
     return list.map((i) => `${row(i)}`).join('');
@@ -98,7 +105,6 @@ function monthView() {
   monthStart ??= `${today.slice(0, 7)}-01`;
   const lead = new Date(`${monthStart}T12:00:00Z`).getUTCDay();
   const gridStart = addDays(monthStart, -lead);
-  const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
   const all = items();
   const cells = [];
   for (let i = 0; i < 42; i++) {
@@ -108,11 +114,9 @@ function monthView() {
     cells.push(`<button class="day2 ${d.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${d === today ? 'today' : ''}" data-action="day-detail" data-day="${d}" aria-label="${esc(dayLabel(d))}, ${todays.length} items">
       <span class="dn">${Number(d.slice(8))}</span>${todays.slice(0, 3).map((x) => { const state = approvalState(x.e.tags); return `<i class="dpill ${state.total && state.status !== 'confirmed' ? 'pending-event' : ''}" style="background:${esc(x.color)}" title="${esc(x.e.eventName)}${state.total ? ` · ${state.label} · ${state.approved} of ${state.total} approved` : ''}">${esc(x.e.eventName)}${state.total && state.status !== 'confirmed' ? ` · ${state.label}` : ''}</i>`; }).join('')}${todays.length > 3 ? `<small>+${todays.length - 3} more</small>` : ''}</button>`);
   }
-  return `<div class="month-nav"><button class="btn s" data-action="month-nav" data-n="-1" aria-label="Previous month">‹</button><div class="row"><b>${title}</b><button class="btn s" data-action="calendar-today">Today</button></div><button class="btn s" data-action="month-nav" data-n="1" aria-label="Next month">›</button></div>
-    <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div><div class="mgrid">${cells.join('')}</div>`;
+  return `<div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div><div class="mgrid">${cells.join('')}</div>`;
 }
-actions['month-nav'] = (el) => { const t = new Date(`${monthStart}T12:00:00Z`); t.setUTCMonth(t.getUTCMonth() + Number(el.dataset.n)); monthStart = t.toISOString().slice(0, 7) + '-01'; refresh(); };
-actions['calendar-today'] = () => { monthStart = `${ymdIn(Date.now()).slice(0, 7)}-01`; refresh(); };
+actions['month-nav'] = (el) => { const t = new Date(`${monthStart}T12:00:00Z`); t.setUTCMonth(t.getUTCMonth() + Number(el.dataset.n)); monthStart = t.toISOString().slice(0, 7) + '-01'; refreshSchedule(); };
 actions['day-detail'] = (el) => {
   const d = el.dataset.day, todays = items().filter((x) => x.ymd === d);
   openModal(`${mhead(esc(dayLabel(d)))}<div class="stack">${todays.length ? todays.map(row).join('') : '<p class="mute">Nothing on this day.</p>'}</div>
@@ -120,21 +124,33 @@ actions['day-detail'] = (el) => {
 };
 
 // ---- the page ---------------------------------------------------------------------------------
+function scheduleContent() {
+  const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
+  return `<div class="home-schedule-toolbar event-schedule-toolbar"><div class="month-nav"><button class="btn s" data-action="month-nav" data-n="-1" aria-label="Previous month">‹</button><div class="row"><h2>${title}</h2></div><button class="btn s" data-action="month-nav" data-n="1" aria-label="Next month">›</button></div><select class="input home-view-select" data-input="cal-view" aria-label="Schedule view"><option value="month" ${view === 'month' ? 'selected' : ''}>Calendar view</option><option value="list" ${view === 'list' ? 'selected' : ''}>List view</option></select></div>
+    <div class="filters calendar-controls event-schedule-filters"><select class="input" data-input="cal-event-type" aria-label="Filter events by type"><option value="all">All event types</option>${CATS.map(([key, label]) => `<option value="${key}" ${eventType === key ? 'selected' : ''}>${label}</option>`).join('')}</select>${view === 'list' ? `<select class="input" data-input="cal-sort" aria-label="Sort by"><option value="date" ${sortBy === 'date' ? 'selected' : ''}>Sort: date</option><option value="color" ${sortBy === 'color' ? 'selected' : ''}>Sort: roommate</option></select>` : ''}</div>
+    <div class="event-schedule-content">${view === 'list' ? listView() : monthView()}</div>`;
+}
+function refreshSchedule(focusInput) {
+  const content = document.getElementById('cal-main');
+  if (!content) return;
+  content.innerHTML = scheduleContent();
+  if (focusInput) content.querySelector(`[data-input="${focusInput}"]`)?.focus();
+}
 export async function calendarView() {
+  loadPrefs();
   await load();
+  monthStart ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   const head = phead('Events', 'Meetings, hosting and other plans for your house.', `<button class="btn p" data-action="add-event">${ico('plus', 16)} Add event</button>`);
-  const filters = `<div class="page-controls filters calendar-controls">${seg([['list', 'List'], ['month', 'Month']], view, 'cal-view')}
-    <select class="input" data-input="cal-event-type" aria-label="Filter events by type"><option value="all">All event types</option>${CATS.map(([key, label]) => `<option value="${key}" ${eventType === key ? 'selected' : ''}>${label}</option>`).join('')}</select>
-    ${view === 'list' ? `<select class="input" data-input="cal-sort" aria-label="Sort by"><option value="date">Sort: date</option><option value="color" ${sortBy === 'color' ? 'selected' : ''}>Sort: roommate</option></select>` : ''}</div>`;
   const handoff = takeHandoff();
   if (handoff?.type === 'event') setTimeout(() => actions['event-detail']({ dataset: { id: String(handoff.id) } }), 60);
-  return `${head}${filters}<div class="page-content split cal">
-    <section class="card" id="cal-main"><div>${view === 'list' ? listView() : monthView()}</div></section>
-    <section class="card board" data-board>${boardInner()}</section></div>`;
+  return `${head}<div class="page-content split cal"><section class="card" id="cal-main">${scheduleContent()}</section><section class="card board" data-board>${boardInner()}</section></div>`;
 }
-actions['cal-view'] = (el) => { view = el.dataset.value; savePrefs(); refresh(); };
-inputs['cal-event-type'] = (el) => { eventType = el.value; savePrefs(); refresh(); };
-inputs['cal-sort'] = (el) => { sortBy = el.value; savePrefs(); refresh(); };
+inputs['cal-view'] = (el) => {
+  if (!['list', 'month'].includes(el.value)) return;
+  view = el.value; savePrefs(); refreshSchedule('cal-view');
+};
+inputs['cal-event-type'] = (el) => { eventType = el.value; savePrefs(); refreshSchedule('cal-event-type'); };
+inputs['cal-sort'] = (el) => { sortBy = el.value; savePrefs(); refreshSchedule('cal-sort'); };
 
 // ---- event detail -----------------------------------------------------------------------------
 actions['event-detail'] = (el) => {
