@@ -398,14 +398,10 @@ describe('Home household board', () => {
 describe('Home widget customization', () => {
   const layoutKey = 'roomie.home.layout.1.1';
   const render = async () => { document.getElementById('page').innerHTML = await homeView(); };
-  const size = (id, value) => {
-    const select = document.querySelector(`.home-widget[data-widget="${id}"] [data-input="home-widget-size"]`);
-    select.value = value; inputs['home-widget-size'](select);
-  };
   it('saves size and order per user and household, independently of Calendar/List', async () => {
     await render();
     actions['home-edit-layout'](document.querySelector('[data-action="home-edit-layout"]'));
-    size('schedule', 'compact');
+    actions['home-widget-move']({ dataset: { widget: 'schedule', step: '1' } });
     const view = document.querySelector('[data-input="home-view"]');
     view.value = 'calendar'; inputs['home-view'](view);
     const day = document.querySelector('[data-day="2026-11-05"]');
@@ -416,7 +412,7 @@ describe('Home widget customization', () => {
     expect(document.querySelector('[role="dialog"]').textContent).toContain('Dishes');
     document.getElementById('modal')?.remove();
     actions['home-widget-move']({ dataset: { widget: 'finances', step: '-1' } });
-    expect(JSON.parse(localStorage.getItem(layoutKey)).map((w) => w.id)).toEqual(['schedule', 'finances', 'board']);
+    expect(JSON.parse(localStorage.getItem(layoutKey)).map((w) => w.id)).toEqual(['board', 'finances', 'schedule']);
     await render();
     expect(document.querySelector('.home-widget').classList.contains('compact')).toBe(true);
     expect(document.querySelector('[data-input="home-view"]').value).toBe('calendar');
@@ -437,12 +433,12 @@ describe('Home widget customization', () => {
     expect(summary.textContent).toContain('House meeting');
     const input = document.querySelector('#home-board input[name="messageText"]');
     input.value = 'Keep my reply';
-    size('board', 'expanded');
+    actions['home-widget-move']({ dataset: { widget: 'board', step: '-1' } });
     expect(document.querySelector('.home-board-summary')).toBeNull();
     expect(document.querySelector('#home-board input').value).toBe('Keep my reply');
-    size('board', 'compact');
+    actions['home-widget-move']({ dataset: { widget: 'board', step: '2' } });
     expect(document.querySelector('#home-board input').value).toBe('Keep my reply');
-    actions['home-widget-move']({ dataset: { widget: 'board', step: '-1' } });
+    actions['home-widget-move']({ dataset: { widget: 'board', step: '-2' } });
     expect(document.querySelector('.home-widget').dataset.widget).toBe('board');
     expect(document.querySelector('#home-board input').value).toBe('Keep my reply');
   });
@@ -477,6 +473,27 @@ describe('Home live dragging', () => {
     expect(JSON.parse(localStorage.getItem('roomie.home.layout.1.1')).map((w) => w.id)).toEqual(order());
     expect(document.querySelector('.home-widget-ghost')).toBeNull();
     expect(document.querySelector('.home-widget-dragging')).toBeNull();
+  });
+  it('automatically changes presentation to fit the drop space and rolls the size back on cancellation', async () => {
+    const grip = await setup();
+    const grid = document.querySelector('.home-dashboard');
+    grid.style.gridTemplateColumns = '300px 300px 300px'; grid.style.gridAutoRows = '2px';
+    grid.getBoundingClientRect = () => ({ left: 0, right: 900, width: 900, top: 0, bottom: 1000 });
+    const rects = { schedule: { left: 0, right: 600, top: 0, bottom: 900, width: 600, height: 900 }, board: { left: 600, right: 900, top: 0, bottom: 300, width: 300, height: 300 }, finances: { left: 600, right: 900, top: 320, bottom: 500, width: 300, height: 180 } };
+    [...grid.children].forEach((el) => { el.getBoundingClientRect = () => rects[el.dataset.widget]; });
+    const target = grid.querySelector('[data-widget="board"]');
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => target });
+    expect(document.querySelector('[data-input="home-widget-size"]')).toBeNull();
+    point(grip, 'pointerdown'); point(document, 'pointermove', 800, 100);
+    const widget = grid.querySelector('[data-widget="schedule"]');
+    expect(widget.classList.contains('compact')).toBe(true);
+    expect(widget.dataset.column).toBe('3');
+    expect(document.querySelector('.home-widget-ghost').classList.contains('compact')).toBe(true);
+    point(document, 'pointercancel');
+    expect(widget.classList.contains('expanded')).toBe(true);
+    expect(widget.dataset.column).toBe('');
+    point(grip, 'pointerdown'); point(document, 'pointermove', 800, 100); point(document, 'pointerup');
+    expect(JSON.parse(localStorage.getItem('roomie.home.layout.1.1')).find((w) => w.id === 'schedule')).toMatchObject({ size: 'compact', column: 3 });
   });
   it('restores the original order on Escape or pointer cancellation and supports keyboard movement', async () => {
     let grip = await setup();
