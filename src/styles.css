@@ -554,7 +554,6 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .exp>.amt{flex-shrink:0;white-space:nowrap}
 
 /* Home: one shared schedule, with only a format toggle. */
-.home-view-select{width:auto;min-width:160px}
 .home-day{margin-top:12px}.home-day h3{font-size:15px;color:var(--mute)}
 .home-item-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
 .home-kind{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
@@ -571,7 +570,7 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .home-balance{display:flex;gap:24px;flex-wrap:wrap}.home-balance span{display:flex;gap:8px;color:var(--mute)}.home-balance b{color:var(--ink)}
 .home-schedule button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:767px){.home-month .day2{min-height:100px;padding:4px}.home-calendar-item{padding:2px 3px;font-size:10px}.home-calendar-item span{font-size:9px}}
-@media(max-width:520px){.home-view-select{width:100%}.home-month .day2{min-height:64px}.home-calendar-item,.home-more{display:none}.home-mobile-count{display:block;font-size:12px;text-align:center;color:var(--accent);font-weight:700}.home-finances{align-items:flex-start}.home-balance{gap:12px;flex-direction:column}}
+@media(max-width:520px){.home-month .day2{min-height:64px}.home-calendar-item,.home-more{display:none}.home-mobile-count{display:block;font-size:12px;text-align:center;color:var(--accent);font-weight:700}.home-finances{align-items:flex-start}.home-balance{gap:12px;flex-direction:column}}
 
 /* Category-dependent fields must respect hidden even when .fld sets display:flex. */
 [hidden]{display:none!important}
@@ -607,5 +606,4 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 
 .home-schedule-toolbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .home-schedule-toolbar .month-nav{flex:1;min-width:240px;margin-bottom:0}
-.home-schedule-toolbar .home-view-select{flex:none}
-@media(max-width:520px){.home-schedule-toolbar{flex-direction:column;align-items:stretch}.home-schedule-toolbar .home-view-select{width:100%}}
+.home-schedule-toolbar select.home-view-select{flex:none;width:auto;min-width:0;max-width:100%;min-height:36px;padding:7px 30px 7px 10px;font-size:13px;border-radius:8px;background-color:var(--card);margin-left:auto}
