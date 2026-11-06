@@ -7,6 +7,7 @@ import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
 import { ago as agoIn, avatar, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, personColor, phead, seg, showError, toast } from '../lib/dom.js';
 
+import { boardIdentity } from '../components/board-profile.js';
 import { approvalState } from '../../shared/event-approval.ts';
 
 const CATS = [['meeting', 'Meeting'], ['hosting', 'Hosting guests'], ['other', 'Other']];
@@ -223,12 +224,12 @@ forms['event-save'] = async (form) => {
 function noteHtml(n) {
   const ev = n.eventId ? eventOf(n.eventId) : null;
   return `<article class="sticky ${n.isPinned ? 'pinned' : ''}">
-    <div class="row t" style="gap:8px">${avatar(who(n.senderUserId), 'sm')}<div class="grow"><b>${esc(first(n.senderUserId))}</b> <span class="hint">${ago(n.postedDate)}</span></div>
+    <div class="row t" style="gap:8px">${boardIdentity(who(n.senderUserId), first(n.senderUserId))}<div class="grow"> <span class="hint">${ago(n.postedDate)}</span></div>
       ${n.canEdit ? `<button class="x" data-action="note-pin" data-id="${n.messageId}" data-pinned="${n.isPinned ? '' : '1'}" aria-label="${n.isPinned ? 'Unpin' : 'Pin'}" title="${n.isPinned ? 'Unpin' : 'Pin'}">📌</button><button class="x" data-action="note-delete" data-id="${n.messageId}" aria-label="Delete note">✕</button>` : (n.isPinned ? '<span title="Pinned">📌</span>' : '')}</div>
     ${n.isPinned ? '<div class="pin-mark"><span aria-hidden="true">📌</span> Pinned</div>' : ''}
     <p>${esc(n.messageText)}</p>
     ${ev ? `<button class="chip" data-action="event-detail" data-id="${ev.eventId}">${ico('calendar', 13)} ${esc(ev.eventName)}</button>` : ''}
-    ${n.replies.map((r) => `<div class="reply row t" style="gap:8px">${avatar(who(r.senderUserId), 'sm')}<div class="grow"><b>${esc(first(r.senderUserId))}</b> <span class="hint">${ago(r.postedDate)}</span><div>${esc(r.messageText)}</div></div>
+    ${n.replies.map((r) => `<div class="reply row t" style="gap:8px">${boardIdentity(who(r.senderUserId), null)}<div class="grow">${boardIdentity(who(r.senderUserId), first(r.senderUserId), false)} <span class="hint">${ago(r.postedDate)}</span><div>${esc(r.messageText)}</div></div>
       ${r.canEdit ? `<button class="x" data-action="note-delete" data-id="${r.messageId}" aria-label="Delete reply">✕</button>` : ''}</div>`).join('')}
     <form class="row replyf" data-form="note-reply" data-id="${n.messageId}"><input class="input" name="messageText" maxlength="500" placeholder="Reply" aria-label="Reply" required><button class="btn s" type="submit">Send</button></form></article>`;
 }

@@ -272,6 +272,36 @@ describe('Home household board', () => {
     expect(document.querySelector('.chore-requests-board').textContent).toContain('Laundry');
     actions['chore-tab']({ dataset: { value: 'schedule' } });
   });
+  it('shows reply photos and opens roommate profiles on Home and Events without visiting Household first', async () => {
+    await renderBoard();
+    notes[0].replies = [{ messageId: 11, senderUserId: 3, messageText: 'Sounds good', postedDate: '2026-11-05T17:30:00Z' }];
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path, options) => path.endsWith('/members') ? Promise.resolve({ members: members.map((m) => m.userId === 3 ? { ...m, profilePhoto: 'https://images.example/sam.jpg', email: 'sam@example.test' } : m) }) : baseApi(path, options));
+    for (const page of [homeView, calendarView]) {
+      document.getElementById('page').innerHTML = await page();
+      const reply = document.querySelector('.reply');
+      expect(reply.textContent).toContain('Sam');
+      expect(reply.querySelector('img').getAttribute('src')).toBe('https://images.example/sam.jpg');
+      const profile = reply.querySelector('[data-action=board-roommate-profile]');
+      expect(profile.getAttribute('aria-label')).toContain('Sam');
+      const before = mockedApi.mock.calls.length;
+      await actions['board-roommate-profile'](profile);
+      expect(mockedApi.mock.calls[before][0]).toBe('/households/1/members');
+      expect(document.querySelector('[role=dialog]').textContent).toContain('sam@example.test');
+      document.getElementById('modal').remove();
+    }
+  });
+  it('keeps former-roommate contact and payment details hidden when opened from a comment', async () => {
+    await renderBoard();
+    notes[0].replies = [{ messageId: 11, senderUserId: 3, messageText: 'Earlier reply', postedDate: '2026-11-05T17:30:00Z' }];
+    document.getElementById('page').innerHTML = await homeView();
+    mockedApi.mockResolvedValueOnce({ members: [{ userId: 3, firstName: 'Sam', leftDate: '2026-11-01', email: 'hidden@example.test', paymentMethods: [{ app: 'venmo', username: '@hidden' }] }] });
+    await actions['board-roommate-profile'](document.querySelector('.reply [data-action=board-roommate-profile]'));
+    const profile = document.querySelector('[role=dialog]');
+    expect(profile.textContent).toContain('Contact details are hidden for former roommates');
+    expect(profile.textContent).not.toContain('hidden@example.test');
+    expect(profile.textContent).not.toContain('@hidden');
+  });
   it('accepts cover through the existing endpoint and removes the resolved request, preserving an announcement draft', async () => {
     await renderBoard();
     actions['home-make-announcement']();

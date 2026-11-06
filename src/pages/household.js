@@ -27,7 +27,9 @@ export async function householdView() {
 
 actions['copy-code'] = async (el) => { try { await navigator.clipboard.writeText(el.dataset.code); toast('Join code copied'); } catch { toast(`Your code is ${el.dataset.code}`); } };
 actions['roommate-profile'] = (el) => {
-  const m = members.find((member) => member.userId === Number(el.dataset.id)); if (!m) return;
+  const m = members.find((member) => member.userId === Number(el.dataset.id)); if (m) openRoommateProfile(m);
+};
+export function openRoommateProfile(m) {
   const methods = [...(m.paymentMethods ?? [])].sort((a, b) => Number(b.isPreferred) - Number(a.isPreferred));
   const contact = m.leftDate ? '<p class="mute">Contact details are hidden for former roommates.</p>' : `<div class="profile-contact">
     <div><span class="hint">Email</span><b>${m.email ? `<a href="mailto:${encodeURIComponent(m.email)}">${esc(m.email)}</a>` : 'Not added'}</b></div>
@@ -36,5 +38,5 @@ actions['roommate-profile'] = (el) => {
   openModal(`${mhead(esc(fullName(m)))}<div class="roommate-profile-head">${avatar(m, 'lg')}<div><h3>${esc(fullName(m))}</h3><p class="mute">${m.role === 'owner' ? 'Household owner' : 'Household member'}</p></div></div>
     <h4>Contact</h4>${contact}<h4>Payment methods</h4>${payments}
     ${m.userId === S.user.userId ? '<div class="acts"><button class="btn p" data-action="open-profile">Edit my profile</button></div>' : ''}`);
-};
+}
 actions['open-profile'] = () => { closeModal(); location.hash = '#/settings'; };
