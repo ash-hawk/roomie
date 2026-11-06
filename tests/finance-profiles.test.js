@@ -57,3 +57,34 @@ describe('finance roommate profiles', () => {
     expect(modal.textContent).not.toContain('@daisy');
   });
 });
+
+describe('wish-list groups', () => {
+  async function renderWish(items) {
+    const baseApi = vi.mocked(api).getMockImplementation();
+    vi.mocked(api).mockImplementation((path, options) => path.endsWith('/wishlist') ? Promise.resolve({ items }) : baseApi(path, options));
+    actions['fin-tab']({ dataset: { value: 'wish' } });
+    document.getElementById('page').innerHTML = await financesView();
+    actions['fin-tab']({ dataset: { value: 'settle' } });
+  }
+  it('shows Needs first and Wants second while keeping purchased items separate', async () => {
+    await renderWish([
+      { wishlistItemId: 1, itemName: 'Curtains', needOrWant: 'want', createdByUserId: 1 },
+      { wishlistItemId: 2, itemName: 'Toilet Paper', needOrWant: 'need', createdByUserId: 1 },
+      { wishlistItemId: 3, itemName: 'Soap', needOrWant: 'need', createdByUserId: 1, isBought: true },
+    ]);
+    const needs = document.querySelector('[aria-labelledby=wishlist-need]');
+    const wants = document.querySelector('[aria-labelledby=wishlist-want]');
+    expect(needs.textContent).toContain('Toilet Paper'); expect(needs.textContent).not.toContain('Curtains');
+    expect(wants.textContent).toContain('Curtains'); expect(wants.textContent).not.toContain('Toilet Paper');
+    expect(needs.compareDocumentPosition(wants) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(needs.textContent).not.toContain('Soap');
+    expect(document.getElementById('page').textContent).toContain('Already bought');
+  });
+  it('keeps both group headings visible with clear empty states', async () => {
+    await renderWish([]);
+    expect(document.getElementById('wishlist-need').textContent).toBe('Needs');
+    expect(document.getElementById('wishlist-want').textContent).toBe('Wants');
+    expect(document.getElementById('page').textContent).toContain('No needs yet.');
+    expect(document.getElementById('page').textContent).toContain('No wants yet.');
+  });
+});

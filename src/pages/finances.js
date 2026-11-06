@@ -202,8 +202,11 @@ function wishView() {
   const row = (w) => `<div class="item exp" data-action="wish" data-id="${w.wishlistItemId}"><div class="grow"><b class="truncate">${esc(w.itemName)}</b>
     <div class="hint">${esc(first(w.createdByUserId))} added it${w.estimatedPrice ? ' · about ' + $m(w.estimatedPrice) : ''}</div></div>
     ${badge(w.needOrWant === 'need' ? 'Need' : 'Want', w.needOrWant === 'need' ? 'warn' : '')}${w.isBought ? badge('Bought', 'good') : ''}</div>`;
-  return `<section class="card"><div class="row sp"><h2>Wish list</h2>${badge(`${open.length} to buy`, 'gray')}</div>
-    ${open.length ? open.map(row).join('') : empty('🛒', 'Nothing on the list', 'Add things the house needs or wants. Anyone can buy them and split the cost.', '<button class="btn p" data-action="add-wish">Add an item</button>')}</section>
+  const groups = [['need', 'Needs'], ['want', 'Wants']].map(([kind, title]) => {
+    const items = open.filter((item) => kind === 'need' ? item.needOrWant === 'need' : item.needOrWant !== 'need');
+    return `<section class="stack" aria-labelledby="wishlist-${kind}"><h3 id="wishlist-${kind}">${title}</h3>${items.map(row).join('') || `<p class="hint">No ${title.toLowerCase()} yet.</p>`}</section>`;
+  }).join('');
+  return `<section class="card stack"><div class="row sp"><h2>Wish list</h2>${badge(`${open.length} to buy`, 'gray')}</div>${groups}</section>
     ${done.length ? `<section class="card"><h2>Already bought</h2>${done.map(row).join('')}</section>` : ''}`;
 }
 const wishForm = (w = {}) => `
