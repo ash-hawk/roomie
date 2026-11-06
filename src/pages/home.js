@@ -31,7 +31,7 @@ function getLayout() {
 let layout = defaultLayout(), editing = false, editingKey = null;
 const widgetSize = (id) => layout.find((w) => w.id === id)?.size;
 function widgetTools(id) {
-  return `<div class="home-widget-tools" ${editing ? '' : 'hidden'}><button type="button" class="home-drag-handle" data-widget-drag="${id}" aria-label="Move ${widgetNames[id]}" aria-describedby="home-layout-help" title="Drag to move; use arrow keys when focused">⠿</button><b>${widgetNames[id]}</b><label><span class="sr-only">${widgetNames[id]} size</span><select class="input" data-input="home-widget-size" data-widget="${id}">${['compact', 'expanded'].map((size) => `<option value="${size}" ${widgetSize(id) === size ? 'selected' : ''}>${size === 'compact' ? 'Compact' : 'Expanded'}</option>`).join('')}</select></label></div>`;
+  return `<div class="home-widget-tools" ${editing ? '' : 'hidden'}><button type="button" class="home-drag-handle" data-widget-drag="${id}" aria-label="Move ${widgetNames[id]}" title="Move ${widgetNames[id]}">⠿</button><b>${widgetNames[id]}</b><label><span class="sr-only">${widgetNames[id]} size</span><select class="input" data-input="home-widget-size" data-widget="${id}">${['compact', 'expanded'].map((size) => `<option value="${size}" ${widgetSize(id) === size ? 'selected' : ''}>${size === 'compact' ? 'Compact' : 'Expanded'}</option>`).join('')}</select></label></div>`;
 }
 let monthStart = null, monthHousehold = null, D = null;
 
@@ -98,7 +98,7 @@ export async function homeView() {
     finances: `<section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section>`,
   };
   return `${phead('Shared household schedule', 'Here you can see an overview of what’s happening in your household', `<button class="btn s" data-action="home-edit-layout">${editing ? 'Done' : 'Edit dashboard'}</button>`)}
-    <div class="home-layout-status" id="home-layout-help" role="status">${editing ? 'Drag a section by its grip to move it. You can also focus the grip and use arrow keys.' : ''}</div><div class="page-content home-dashboard">${layout.map(({ id, size }) => `<div class="home-widget ${size}" data-widget="${id}">${widgetTools(id)}${widgets[id]}</div>`).join('')}</div>`;
+    <div class="home-layout-status sr-only" role="status"></div><div class="page-content home-dashboard">${layout.map(({ id, size }) => `<div class="home-widget ${size}" data-widget="${id}">${widgetTools(id)}${widgets[id]}</div>`).join('')}</div>`;
 
 }
 
@@ -205,7 +205,7 @@ function applyLayout(focusWidget, focusSelector) {
 actions['home-edit-layout'] = (button) => {
   editing = !editing;
   button.textContent = editing ? 'Done' : 'Edit dashboard';
-  document.querySelector('.home-layout-status').textContent = editing ? 'Drag a section by its grip to move it. You can also focus the grip and use arrow keys.' : '';
+  document.querySelector('.home-layout-status').textContent = '';
   applyLayout();
 };
 inputs['home-widget-size'] = (select) => {
