@@ -692,3 +692,5 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .home-board-conversation>summary{font-size:13px;color:var(--mute);cursor:pointer;width:fit-content}
 .home-board-conversation>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .home-board-conversation>form{margin-top:12px}
+
+.home-board-view{align-self:flex-start;width:auto}

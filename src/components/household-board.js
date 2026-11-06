@@ -10,7 +10,7 @@ export function householdBoard({ members, events, chores, notes, user, timezone,
   const choreName = (a) => chores.chores.find((c) => c.choreId === a?.choreId)?.choreName ?? 'Chore';
   const entry = (html, at, key, pinned = false) => ({ html, at: Date.parse(at) || 0, key, pinned });
   const button = (kind, id, action, text, primary = false) => `<button type="button" class="btn s ${primary ? 'p' : ''}" data-action="home-board-response" data-kind="${kind}" data-id="${id}" data-response="${action}">${text}</button>`;
-  const eventLink = (event) => `<a class="btn s" href="#/calendar" data-action="home-open" data-kind="event" data-id="${event.eventId}">View event</a>`;
+  const eventLink = (event) => `<a class="btn s home-board-view" href="#/calendar" data-action="home-open" data-kind="event" data-id="${event.eventId}">View event</a>`;
   const requestCard = (request, mine) => {
     const a = assignment(request.requesterAssignmentId), target = assignment(request.targetAssignmentId);
     if (!a || a.isCompleted) return '';
@@ -19,7 +19,7 @@ export function householdBoard({ members, events, chores, notes, user, timezone,
       <p class="hint">${esc(when(a.dueAt))}${target ? ` · Swap with ${esc(choreName(target))} (${esc(when(target.dueAt))})` : ''}</p>
       ${request.requestMessage ? `<p class="home-board-message">${esc(request.requestMessage)}</p>` : ''}
       ${mine ? `<span class="st unpaid">${cover ? 'Waiting for a volunteer' : `Waiting for ${esc(name(request.targetUserId))}`}</span>` : ''}
-      <div class="acts"><button type="button" class="btn s" data-action="home-chore-detail" data-id="${a.assignmentId}">View chore</button>${mine ? button('chore', request.swapId, 'withdraw', 'Cancel request') : cover ? '' : `${button('chore', request.swapId, 'accept', 'Accept swap', true)}${button('chore', request.swapId, 'decline', 'Decline swap')}`}</div><div class="err" role="alert"></div></article>`;
+      <div class="acts"><button type="button" class="btn s home-board-view" data-action="home-chore-detail" data-id="${a.assignmentId}">View chore</button>${mine ? button('chore', request.swapId, 'withdraw', 'Cancel request') : cover ? '' : `${button('chore', request.swapId, 'accept', 'Accept swap', true)}${button('chore', request.swapId, 'decline', 'Decline swap')}`}</div><div class="err" role="alert"></div></article>`;
   };
   const openEvents = events.filter((e) => Date.parse(e.endDate ?? e.eventDate) >= Date.now());
   const incoming = [
