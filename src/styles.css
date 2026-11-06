@@ -712,3 +712,16 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .schedule-filter-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:20;box-sizing:border-box;width:min(300px,100%);display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:var(--shadow)}
 .home-schedule-toolbar .schedule-filter-panel select.input{width:100%}
 .schedule-filter-menu:not([open])>.schedule-filter-panel{display:none}
+
+.chore-attention-board{gap:20px;min-width:0}
+.chore-attention-board>h2{font-size:20px}
+.chore-attention-board h3{font-size:14px}
+.chore-attention-board h4{font-size:14px;overflow-wrap:anywhere}
+.chore-attention-board .chore-requests-board{margin:0}
+.chore-attention-board .chore-board-item{gap:9px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.chore-attention-board .chore-occurrence{align-items:center}
+.chore-attention-board .chore-occurrence b{font-size:12px}
+.chore-attention-board .hint{font-size:12px;line-height:1.4}
+.chore-attention-board .chore-board-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:0}
+.chore-attention-board .btn{align-self:flex-start}
+.chore-dashboard-layout{margin-bottom:18px}

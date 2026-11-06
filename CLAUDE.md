@@ -132,3 +132,5 @@
 - Home, Events and Chores all render schedule controls through components/schedule-toolbar.js: month navigation is always the first row, with the left-aligned Calendar/List selector and page-specific filters together on the next row. This placement does not change between compact and wider cards. Events no longer wraps its filters in a separate outlined panel.
 
 - Secondary Events/Chores schedule controls live inside a closed Filtering options menu beside the Calendar/List selector. The menu preserves open state/focus during filter changes, closes on Escape or outside clicks, and keeps the Events poll from repainting while it is open.
+
+- Chores now has a compact Chore board beside the schedule on wider screens (stacked on smaller screens). It combines overdue summaries and cover/swap requests with empty states; each opens the existing chore/request detail popup. Overdue follows the assignee filter, while actionable household requests remain visible. The former Manage chores disclosure is opened through the All chores page action instead; workload remains available below.
