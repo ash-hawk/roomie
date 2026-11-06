@@ -15,7 +15,6 @@ import { homeView } from './pages/home.js';
 import { openPendingCalendarCreate } from './lib/calendar-create.js';
 import { connectHomeLayout } from './components/home-layout.js';
 import { soonView } from './pages/soon.js';
-import { toCents } from '../shared/money.ts';
 
 const NAV = [['home', 'home', 'Home'], ['calendar', 'calendar', 'Events'], ['finances', 'money', 'Finances'], ['chores', 'check', 'Chores'], ['household', 'users', 'Household']];
 // Real pages register here as each slice lands; everything else shows the "coming next" card.
@@ -36,10 +35,10 @@ async function loadMe() {
 
 async function loadNavCounts() {
   if (S.navCounts.hid === S.hid && Date.now() - S.navCounts.at < 30_000) return;
-  const [chores, balances] = await Promise.all([api(`/households/${S.hid}/chores`), api(`/households/${S.hid}/balances`)]);
+  const chores = await api(`/households/${S.hid}/chores`);
   S.navCounts = {
     overdue: chores.assignments.filter((a) => !a.isCompleted && a.status === 'overdue' && a.assignedUserId === S.user.userId).length,
-    owedCents: balances.mine.reduce((sum, b) => sum + Math.max(0, -toCents(b.signedAmount)), 0), at: Date.now(), hid: S.hid,
+    at: Date.now(), hid: S.hid,
   };
 }
 
@@ -51,8 +50,8 @@ function accentInk(hex) {
 
 function shell(page, body) {
   const h = household();
-  const count = (key) => key === 'chores' && S.navCounts.overdue ? String(S.navCounts.overdue) : key === 'finances' && S.navCounts.owedCents ? `$${Math.ceil(S.navCounts.owedCents / 100)}` : '';
-  const items = NAV.map(([k, i, l]) => `<a href="#/${k}" class="nav-i ${k === page ? 'on' : ''}" ${k === page ? 'aria-current="page"' : ''}>${ico(i, 19)}<span>${l}</span>${count(k) ? `<span class="nav-count" aria-label="${k === 'chores' ? `${count(k)} overdue` : `${count(k)} owed`}">${count(k)}</span>` : ''}</a>`).join('');
+  const count = (key) => key === 'chores' && S.navCounts.overdue ? String(S.navCounts.overdue) : '';
+  const items = NAV.map(([k, i, l]) => `<a href="#/${k}" class="nav-i ${k === page ? 'on' : ''}" ${k === page ? 'aria-current="page"' : ''}>${ico(i, 19)}<span>${l}</span>${count(k) ? `<span class="nav-count" aria-label="${count(k)} overdue">${count(k)}</span>` : ''}</a>`).join('');
   const accent = h.themeColor || '#4338ca'; document.documentElement.style.setProperty('--accent', accent); document.documentElement.style.setProperty('--on-accent', accentInk(accent));
   const account = S.user.profilePhoto ? `<img class="acct-photo" src="${esc(S.user.profilePhoto)}" alt="" referrerpolicy="no-referrer">` : esc(((S.user.firstName || '?')[0]).toUpperCase());
   return `<div class="shell"><div class="main">
