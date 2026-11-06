@@ -19,7 +19,7 @@ export function householdBoard({ members, events, chores, notes, user, timezone 
       <p class="hint">${esc(when(a.dueAt))}${target ? ` · Swap with ${esc(choreName(target))} (${esc(when(target.dueAt))})` : ''}</p>
       ${request.requestMessage ? `<p class="home-board-message">${esc(request.requestMessage)}</p>` : ''}
       ${mine ? `<span class="st unpaid">${cover ? 'Waiting for a volunteer' : `Waiting for ${esc(name(request.targetUserId))}`}</span>` : ''}
-      <div class="acts"><a class="btn s" href="#/chores">View in Chores</a>${mine ? button('chore', request.swapId, 'withdraw', 'Cancel request') : `${button('chore', request.swapId, 'accept', cover ? 'I can cover' : 'Accept swap', true)}${cover ? '' : button('chore', request.swapId, 'decline', 'Decline swap')}`}</div><div class="err" role="alert"></div></article>`;
+      <div class="acts"><button type="button" class="btn s" data-action="home-chore-detail" data-id="${a.assignmentId}">View chore</button>${mine ? button('chore', request.swapId, 'withdraw', 'Cancel request') : cover ? '' : `${button('chore', request.swapId, 'accept', 'Accept swap', true)}${button('chore', request.swapId, 'decline', 'Decline swap')}`}</div><div class="err" role="alert"></div></article>`;
   };
   const openEvents = events.filter((e) => Date.parse(e.endDate ?? e.eventDate) >= Date.now());
   const incoming = [

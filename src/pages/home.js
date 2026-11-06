@@ -6,6 +6,7 @@ import { avatar, closeModal, esc, mhead, money, openModal, personColor, phead, s
 import { addDays } from '../../shared/chore-dates.ts';
 import { monthDays, scheduleItems } from '../../shared/home-schedule.ts';
 import { householdBoard, announcementForm } from '../components/household-board.js';
+import { openChoreDetails } from './chores.js';
 import { toCents } from '../../shared/money.ts';
 
 const hid = () => household().householdId;
@@ -147,3 +148,5 @@ setInterval(async () => {
   if (document.activeElement?.closest?.('form,input,textarea,select,button') || document.querySelector('#home-board [aria-busy=true]')) return;
   try { await refreshHomeBoard(true); } catch { /* Keep the last snapshot while offline. */ }
 }, 15000);
+
+actions['home-chore-detail'] = (button) => openChoreDetails(D.householdId, Number(button.dataset.id));

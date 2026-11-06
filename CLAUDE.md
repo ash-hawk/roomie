@@ -104,3 +104,5 @@
 - Announcements and replies use the same bulletin records as the Events board, with a Make announcement button opening a modal for the message and optional event link, plus inline replies. Responses use existing server-validated endpoints and refresh the board and schedule. Chores shows a Chore requests board above both schedule and chart, using the same open requests; each chore with a request also offers View request. No new database schema or notifications copies.
 
 - Announcement authors and replies on both Home and Events show clickable photos/names. They open the existing roommate profile using freshly fetched current-household member data, including former-member privacy restrictions; no prior visit to Household is required.
+
+- View chore on Home opens the exact occurrence directly in the standard Chores detail modal, loaded fresh for the current household. Cover request responses on Chores reuse that same detail modal with the request reason and Decline / Cover it controls. Covering is submitted only after reviewing the details; the server’s existing per-viewer decline behavior stays unchanged.

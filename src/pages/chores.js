@@ -113,6 +113,21 @@ actions['done-chore'] = async (el) => {
 actions['undo-chore'] = async (el) => { await api(`/households/${hid()}/assignments/${el.dataset.id}/uncomplete`, { method: 'POST' }); closeModal(); toast('Marked not done'); refresh(); };
 actions['remind-chore'] = async (el) => { await api(`/households/${hid()}/assignments/${el.dataset.id}/remind`, { method: 'POST' }); closeModal(); toast('Reminder sent'); refresh(); };
 
+// Open the exact occurrence from Home using the same detail renderer as the Chores page.
+export async function openChoreDetails(householdId, assignmentId) {
+  const [{ members }, data] = await Promise.all([api(`/households/${householdId}/members`), api(`/households/${householdId}/chores`)]);
+  if (hid() !== householdId) return;
+  D = { members, ...data };
+  if (!asgOf(assignmentId)) throw new Error('This chore occurrence is no longer available.');
+  actions['chore-detail']({ dataset: { id: assignmentId } });
+}
+function coverRequestDetails(request) {
+  const mine = request.requesterUserId === S.user.userId;
+  const message = `<h4>Cover request</h4><p>${mine ? 'You asked someone to cover this occurrence.' : `${esc(fullName(who(request.requesterUserId)))} asked someone to cover this occurrence.`}</p><p class="home-board-message">${esc(request.requestMessage ?? '')}</p>`;
+  return mine ? `<section class="stack">${message}<span class="st unpaid">Waiting for a volunteer</span><div class="acts"><button class="btn" data-action="answer" data-answer="withdraw" data-id="${request.swapId}">Cancel request</button></div></section>`
+    : `<form class="stack" data-form="respond" data-id="${request.swapId}" data-type="skip">${message}<label class="fld"><span>Reply (optional)</span><textarea class="input" name="message" rows="2" maxlength="300"></textarea></label><div class="err" role="alert"></div><div class="acts"><button type="button" class="btn" data-action="answer" data-answer="decline" data-id="${request.swapId}">Decline</button><button class="btn p" type="submit">Cover it</button></div></form>`;
+}
+
 // ---- detail -----------------------------------------------------------------------------------
 actions['chore-detail'] = (el) => {
   const a = asgOf(Number(el.dataset.id)); if (!a) return; const c = choreOf(a.choreId);
@@ -123,7 +138,7 @@ actions['chore-detail'] = (el) => {
     ${c.description ? `<p>${esc(c.description)}</p>` : ''}
     <div class="item row">${avatar(who(a.assignedUserId))}<div class="grow"><b>${mine ? 'You' : esc(fullName(who(a.assignedUserId)))}</b><div class="hint">${whenFmt(a.dueAt)}${who(a.assignedUserId)?.leftDate ? ' · moved out' : ''}</div></div></div>
     ${c.repeats !== 'none' && c.rotation.length > 1 ? `<p class="hint">Takes turns: ${c.rotation.map((u) => esc(first(u))).join(', ')}</p>` : ''}
-    ${req ? `<p class="hint">There is an open ${req.type === 'swap' ? 'swap' : 'cover'} request on this chore.</p><button class="btn s" data-action="open-request" data-id="${req.swapId}">View request</button>` : ''}
+    ${req?.type === 'skip' ? coverRequestDetails(req) : req ? `<p class="hint">There is an open ${req.type === 'swap' ? 'swap' : 'cover'} request on this chore.</p><button class="btn s" data-action="open-request" data-id="${req.swapId}">View request</button>` : ''}
     <div class="acts" style="justify-content:flex-start;flex-wrap:wrap">
       ${mine && !a.isCompleted ? `<button class="btn p" data-action="done-chore" data-id="${a.assignmentId}">Mark done</button>` : ''}
       ${mine && a.isCompleted ? `<button class="btn" data-action="undo-chore" data-id="${a.assignmentId}">Undo</button>` : ''}
@@ -293,6 +308,10 @@ actions['open-request'] = (el) => {
   const r = D.swapRequests.find((x) => x.swapId === Number(el.dataset.id)); if (!r) return;
   const ra = asgOf(r.requesterAssignmentId), ta = r.targetAssignmentId ? asgOf(r.targetAssignmentId) : null, mineReq = r.requesterUserId === S.user.userId;
   const rc = choreOf(ra?.choreId), tc = choreOf(ta?.choreId);
+  if (r.type === 'skip') {
+    if (!ra) { toast('This chore occurrence is no longer available.'); return; }
+    actions['chore-detail']({ dataset: { id: ra.assignmentId } }); return;
+  }
   if (mineReq) {
     openModal(`${mhead('Your request')}<p>${r.type === 'swap' ? `You asked ${esc(first(r.targetUserId))} to swap <b>${esc(rc?.choreName)}</b> (${ra ? whenFmt(ra.dueAt) : ''}) for <b>${esc(tc?.choreName)}</b> (${ta ? whenFmt(ta.dueAt) : ''}).` : `You asked the house to cover <b>${esc(rc?.choreName)}</b> (${ra ? whenFmt(ra.dueAt) : ''}).`}</p><p class="hint">“${esc(r.requestMessage ?? '')}”</p>
       <div class="acts"><button class="btn" data-action="close-modal">Keep it</button><button class="btn d" data-action="answer" data-answer="withdraw" data-id="${r.swapId}">Withdraw</button></div>`);
@@ -303,7 +322,7 @@ actions['open-request'] = (el) => {
       <div class="item row t">${avatar(who(r.requesterUserId))}<div class="grow"><b>${esc(first(r.requesterUserId))}</b> ${r.type === 'swap' ? `wants to swap their <b>${esc(rc?.choreName)}</b> (${ra ? whenFmt(ra.dueAt) : ''}) for your <b>${esc(tc?.choreName)}</b> (${ta ? whenFmt(ta.dueAt) : ''}).` : `asked someone to cover <b>${esc(rc?.choreName)}</b> (${ra ? whenFmt(ra.dueAt) : ''}).`}<div class="hint">“${esc(r.requestMessage ?? '')}”</div></div></div>
       <label class="fld"><span>Reply (optional)</span><textarea class="input" name="message" rows="2" maxlength="300"></textarea></label>
       <div class="err" role="alert"></div>
-      <div class="acts"><button type="button" class="btn" data-action="answer" data-answer="decline" data-id="${r.swapId}">${r.type === 'swap' ? 'Decline' : 'Not me'}</button><button class="btn p" type="submit">${r.type === 'swap' ? 'Accept swap' : "I'll cover it"}</button></div></form>`);
+      <div class="acts"><button type="button" class="btn" data-action="answer" data-answer="decline" data-id="${r.swapId}">${r.type === 'swap' ? 'Decline' : 'Decline'}</button><button class="btn p" type="submit">${r.type === 'swap' ? 'Accept swap' : 'Cover it'}</button></div></form>`);
 };
 const sendAnswer = async (swapId, action, message, form) => {
   try { await api(`/households/${hid()}/swap-requests/${swapId}`, { method: 'PATCH', body: { action, message: message || undefined } }); } catch (e) { if (form) return showError(form, e.message); throw e; }
