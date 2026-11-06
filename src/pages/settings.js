@@ -53,7 +53,7 @@ inputs['profile-file'] = (el) => {
   const reader = new FileReader();
   reader.onload = () => {
     cropImage = new Image();
-    cropImage.onload = () => openModal(`${mhead('Crop profile photo')}<p class="hint">Center your face in the square and adjust the zoom.</p><div class="crop-frame"><img id="crop-preview" src="${esc(reader.result)}" alt="Photo crop preview"></div>
+    cropImage.onload = () => openModal(`${mhead('Crop profile photo')}<p class="hint">Center your face in the circle and adjust the zoom.</p><div class="crop-frame"><img id="crop-preview" src="${esc(reader.result)}" alt="Photo crop preview"></div>
       <label class="fld"><span>Zoom</span><input class="input crop-range" type="range" min="1" max="2.5" value="1" step="0.05" data-input="crop-zoom"></label>
       <div class="acts"><button class="btn" data-action="close-modal">Cancel</button><button class="btn p" data-action="apply-photo">Use photo</button></div>`);
     cropImage.src = reader.result;
