@@ -36,3 +36,13 @@ it('infers narrow, wide and empty spaces from the destination rather than a size
   expect(widgetDropSlot(bounds, widgets, 'finances', -1, 100, 3)).toBeNull();
   expect(widgetDropSlot({ left: 0, right: 320, width: 320 }, [], 'schedule', 100, 100, 1)).toEqual({ column: 1, span: 1, targetId: null });
 });
+
+
+it('keeps empty right-corner drops narrow rather than expanding left', async () => {
+  const { widgetDropSlot } = await import('../src/components/home-layout.js');
+  const bounds = { left: 0, right: 900, width: 900 };
+  expect(widgetDropSlot(bounds, [], 'finances', 850, 600, 3)).toEqual({ column: 3, span: 1, targetId: null });
+  expect(widgetDropSlot(bounds, [], 'finances', 450, 600, 3)).toEqual({ column: 2, span: 2, targetId: null });
+  expect(widgetDropSlot(bounds, [], 'finances', 50, 600, 3)).toEqual({ column: 1, span: 2, targetId: null });
+  expect(widgetDropSlot({ left: 0, right: 600, width: 600 }, [], 'finances', 550, 600, 2)).toEqual({ column: 2, span: 1, targetId: null });
+});
