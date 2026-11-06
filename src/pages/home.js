@@ -8,6 +8,7 @@ import { monthDays, scheduleItems } from '../../shared/home-schedule.ts';
 import { householdBoard, announcementForm } from '../components/household-board.js';
 import { openChoreDetails } from './chores.js';
 import { fitHomeWidgets, widgetDropSlot } from '../components/home-layout.js';
+import { queueCalendarCreate } from '../lib/calendar-create.js';
 import { toCents } from '../../shared/money.ts';
 
 const hid = () => household().householdId;
@@ -31,9 +32,6 @@ function getLayout() {
 }
 let layout = defaultLayout(), editing = false, editingKey = null;
 const widgetSize = (id) => layout.find((w) => w.id === id)?.size;
-function widgetTools(id) {
-  return `<div class="home-widget-tools" ${editing ? '' : 'hidden'}><button type="button" class="home-drag-handle" data-widget-drag="${id}" aria-label="Move ${widgetNames[id]}" title="Move ${widgetNames[id]}">⠿</button><b>${widgetNames[id]}</b></div>`;
-}
 let monthStart = null, monthHousehold = null, D = null;
 
 function row(item) {
@@ -100,7 +98,7 @@ export async function homeView() {
     finances: `<section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section>`,
   };
   return `${phead('Shared household schedule', 'Here you can see an overview of what’s happening in your household', `<button class="btn s" data-action="home-edit-layout">${editing ? 'Done' : 'Edit dashboard'}</button>`)}
-    <div class="home-layout-status sr-only" role="status"></div><div class="page-content home-dashboard">${layout.map(({ id, size }) => `<div class="home-widget ${size}" data-widget="${id}" data-column="${layout.find((w) => w.id === id).column ?? ''}">${widgetTools(id)}${widgets[id]}</div>`).join('')}</div>`;
+    <div class="home-layout-status sr-only" role="status"></div><div class="page-content home-dashboard">${layout.map(({ id, size }) => `<div class="home-widget ${size}" data-widget="${id}" data-column="${layout.find((w) => w.id === id).column ?? ''}" data-editing="${editing}">${widgets[id]}</div>`).join('')}</div>`;
 
 }
 
@@ -114,16 +112,23 @@ inputs['home-view'] = (el) => {
   content.className = view === 'list' ? 'stack' : '';
   const keepFocus = document.activeElement === el;
   content.innerHTML = view === 'calendar' ? calendarView() : listView();
+  fitHomeWidgets(document.querySelector('.home-dashboard'));
   if (keepFocus) content.querySelector('[data-input=home-view]')?.focus();
 };
 actions['home-month'] = (el) => {
   const d = new Date(`${monthStart}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + Number(el.dataset.n)); monthStart = `${d.toISOString().slice(0, 7)}-01`;
   const content = document.getElementById('home-schedule-content');
   content.innerHTML = content.dataset.view === 'calendar' ? calendarView() : listView();
+  fitHomeWidgets(document.querySelector('.home-dashboard'));
 };
 actions['home-day'] = (el) => {
   const items = D.items.filter((item) => item.ymd === el.dataset.day);
-  openModal(`${mhead(esc(dayLabel(el.dataset.day)))}<div class="stack">${items.length ? items.map(row).join('') : '<p class="mute">No events or chores on this day.</p>'}</div>`);
+  openModal(`${mhead(esc(dayLabel(el.dataset.day)))}<div class="stack">${items.length ? items.map(row).join('') : '<p class="mute">No events or chores on this day.</p>'}</div><div class="acts"><button class="btn p" data-action="home-create" data-kind="event" data-day="${esc(el.dataset.day)}">Add event</button><button class="btn" data-action="home-create" data-kind="chore" data-day="${esc(el.dataset.day)}">Add chore</button></div>`);
+};
+actions['home-create'] = (button) => {
+  if (!D || D.householdId !== hid() || !queueCalendarCreate(button.dataset.kind, button.dataset.day)) return;
+  closeModal();
+  location.hash = button.dataset.kind === 'event' ? '#/calendar' : '#/chores';
 };
 actions['home-open'] = (el) => {
   closeModal();
@@ -151,6 +156,7 @@ async function refreshHomeBoard(onlyChanged = false) {
   }
   const content = document.getElementById('home-schedule-content');
   if (content) content.innerHTML = content.dataset.view === 'calendar' ? calendarView() : listView();
+  fitHomeWidgets(document.querySelector('.home-dashboard'));
 }
 actions['home-board-response'] = async (button) => {
   const card = button.closest('article');
@@ -200,7 +206,7 @@ function applyLayout(focusWidget, focusSelector) {
     const widget = grid.querySelector(`.home-widget[data-widget="${id}"]`);
     widget.className = `home-widget ${size}`;
     widget.dataset.column = layout.find((w) => w.id === id).column ?? '';
-    widget.querySelector('.home-widget-tools').outerHTML = widgetTools(id);
+    widget.dataset.editing = String(editing);
     grid.appendChild(widget);
   }
   fitHomeWidgets(grid);
@@ -238,7 +244,7 @@ actions['home-widget-move'] = (button) => {
   widget.size = destination.size; widget.column = destination.column;
   layout.splice(target, 0, widget);
   if (changedSize) renderWidgetSize(widget.id);
-  saveLayout(); applyLayout(widget.id, '.home-drag-handle');
+  saveLayout(); applyLayout(widget.id, '[data-widget-drag]');
 };
 // Pointer events provide one live preview for mouse, pen, and touch.
 let widgetDrag = null;
@@ -265,6 +271,7 @@ function finishWidgetDrag(cancel = false) {
   else if (drag.active) saveLayout();
   drag.ghost?.remove(); drag.widget.classList.remove('home-widget-dragging');
   document.body.classList.remove('home-is-dragging');
+  drag.grip = drag.widget.querySelector('[data-widget-drag]') ?? drag.grip;
   if (drag.grip.hasPointerCapture?.(drag.pointerId)) drag.grip.releasePointerCapture(drag.pointerId);
   drag.grip.focus({ preventScroll: true });
   const status = document.querySelector('.home-layout-status');
@@ -291,6 +298,8 @@ function previewWidgetMove(x, y) {
     const size = slot.span > 1 ? 'expanded' : 'compact';
     if (size !== moving.size) {
       moving.size = size; renderWidgetSize(moving.id);
+      fitHomeWidgets(grid);
+      drag.grip = drag.widget.querySelector('[data-widget-drag]') ?? drag.grip;
       drag.ghost.innerHTML = drag.widget.innerHTML;
       drag.ghost.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
     }
@@ -356,6 +365,6 @@ document.addEventListener('keydown', (event) => {
   if (widgetDrag || !editing || !grip || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
   event.preventDefault();
   actions['home-widget-move']({ dataset: { widget: grip.dataset.widgetDrag, step: ['ArrowUp', 'ArrowLeft'].includes(event.key) ? '-1' : '1' } });
-  document.querySelector(`.home-widget[data-widget="${grip.dataset.widgetDrag}"] .home-drag-handle`)?.focus();
+  document.querySelector(`.home-widget[data-widget="${grip.dataset.widgetDrag}"] [data-widget-drag]`)?.focus();
   document.querySelector('.home-layout-status').textContent = `${widgetNames[grip.dataset.widgetDrag]} moved. Layout saved.`;
 });

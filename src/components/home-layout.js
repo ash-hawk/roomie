@@ -8,6 +8,17 @@ export function fitHomeWidgets(target = grid) {
   const columns = styles.gridTemplateColumns.split(' ').filter(Boolean).length;
   for (const widget of target.children) {
     if (!widget.classList.contains('home-widget')) continue;
+    const heading = widget.querySelector('h2');
+    if (heading) {
+      if (widget.dataset.editing === 'true') {
+        heading.dataset.widgetDrag = widget.dataset.widget;
+        heading.tabIndex = 0; heading.setAttribute('role', 'button');
+        heading.setAttribute('aria-label', `Move ${widget.dataset.widget === 'board' ? 'Household board' : widget.dataset.widget === 'schedule' ? 'Schedule' : 'Finances'}`);
+      } else {
+        delete heading.dataset.widgetDrag; heading.removeAttribute('tabindex');
+        heading.removeAttribute('role'); heading.removeAttribute('aria-label');
+      }
+    }
     const span = Math.min(columns, widget.classList.contains('expanded') ? 2 : 1);
     const preferred = Number(widget.dataset.column);
     widget.style.gridColumn = row > 0 && preferred > 0 ? `${Math.min(preferred, columns - span + 1)} / span ${span}` : '';
