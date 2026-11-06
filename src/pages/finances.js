@@ -59,7 +59,7 @@ function settleView() {
     <section class="card"><div class="row sp"><h2>Your balances</h2>${badge(mine ? 'Open' : 'All square', mine ? 'warn' : 'good')}</div>
       <p class="section-description">What you owe or should receive.</p>
       ${mine || `<p class="mute" style="padding:10px 0">You don't owe anyone, and no one owes you. Log an expense when you buy something for the house.</p>`}</section>
-    <details class="card household-balances"><summary><span class="household-balances-title">Who owes who</span>${badge(`${bal.pairs.length}`, 'gray')}<span class="hint">Show / hide</span></summary>
+    <details class="card household-balances"><summary><span class="household-balances-title">Who owes who</span>${badge(`${bal.pairs.length}`, 'gray')}</summary>
       <p class="section-description">Payments needed across the whole household.</p>
       ${pairs || `<p class="mute" style="padding:10px 0">Everyone in the house is square.</p>`}</details>
   </div>
