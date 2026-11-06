@@ -273,11 +273,11 @@ describe('Home household board', () => {
     expect(document.querySelector('[role=dialog]').textContent).toContain('Cover it');
     expect(document.querySelector('[role=dialog]').textContent).toContain('Decline');
     expect(document.querySelector('form[data-form=respond]').dataset.id).toBe('7');
-    actions['chore-tab']({ dataset: { value: 'chart' } });
+    inputs['chore-view']({ value: 'calendar' });
     document.getElementById('page').innerHTML = await choresView();
     expect(document.querySelectorAll('.chore-requests-board')).toHaveLength(1);
     expect(document.querySelector('.chore-requests-board').textContent).toContain('Laundry');
-    actions['chore-tab']({ dataset: { value: 'schedule' } });
+    inputs['chore-view']({ value: 'list' });
   });
   it('keeps Cover Requests empty when only swaps are open and still exposes those swaps', async () => {
     await renderBoard();
@@ -681,5 +681,44 @@ describe('Events schedule display', () => {
     document.getElementById('page').innerHTML = await calendarView();
     expect(document.getElementById('cal-main').textContent).toContain('November 2026');
     expect(document.querySelector('[data-input="cal-event-type"]').value).toBe('all');
+  });
+});
+
+describe('Chores schedule formats', () => {
+  it('uses Calendar/List for the same occurrences, retaining month, filters, overdue actions and rule management', async () => {
+    const { choresView } = await import('../src/pages/chores.js');
+    S.hid = 84; S.households = [{ ...S.households[0], householdId: 84 }];
+    const rule = { choreId: 1, choreName: 'Laundry', description: 'Wash and fold', effort: 'medium', repeats: 'weekly', rotation: [1, 2], schedule: 'Every Thursday', createdAt: '2026-11-01T12:00:00Z', canEdit: true };
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => path.endsWith('/chores') ? Promise.resolve({ chores: [rule, { ...rule, choreId: 2, choreName: 'Unscheduled rule' }], assignments: [
+      { assignmentId: 1, choreId: 1, assignedUserId: 1, dueAt: '2026-11-04T20:00:00Z', isCompleted: false, status: 'overdue' },
+      { assignmentId: 2, choreId: 1, assignedUserId: 2, dueAt: '2026-11-05T20:00:00Z', isCompleted: false, status: 'upcoming' },
+      { assignmentId: 3, choreId: 1, assignedUserId: 1, dueAt: '2026-12-01T20:00:00Z', isCompleted: false, status: 'upcoming' },
+      { assignmentId: 4, choreId: 1, assignedUserId: 1, dueAt: '2027-01-01T20:00:00Z', isCompleted: false, status: 'upcoming' },
+    ], swapRequests: [] }) : baseApi(path));
+    document.getElementById('page').innerHTML = await choresView();
+    const schedule = document.getElementById('chore-schedule');
+    const picker = () => schedule.querySelector('[data-input="chore-view"]');
+    expect([...picker().options].map((option) => option.textContent)).toEqual(['Calendar view', 'List view']);
+    expect(document.querySelector('[data-action="chore-tab"]')).toBeNull();
+    expect(schedule.querySelectorAll('[data-action="chore-detail"]')).toHaveLength(1);
+    expect(document.getElementById('chore-overdue').textContent).toContain('Overdue (1)');
+    expect(document.querySelector('#chore-overdue [data-action="chore-detail"]').dataset.id).toBe('1');
+    expect(document.querySelector('.chore-management').textContent).toContain('Unscheduled rule');
+    picker().value = 'calendar'; inputs['chore-view'](picker());
+    actions['chore-day'](schedule.querySelector('[data-day="2026-11-05"]'));
+    expect(document.querySelector('[role="dialog"] [data-action="chore-detail"]').dataset.id).toBe('2');
+    expect(document.querySelector('[role="dialog"] [data-action="add-chore"]').dataset.day).toBe('2026-11-05');
+    document.getElementById('modal')?.remove();
+    actions['chore-month'](schedule.querySelector('[data-n="1"]'));
+    picker().value = 'list'; inputs['chore-view'](picker());
+    expect(schedule.textContent).toContain('December 2026');
+    expect(schedule.querySelector('[data-action="chore-detail"]').dataset.id).toBe('3');
+    actions['chore-month'](schedule.querySelector('[data-n="1"]'));
+    expect(schedule.textContent).toContain('January 2027');
+    const filter = schedule.querySelector('[data-input="chore-filter"]'); filter.value = '2'; inputs['chore-filter'](filter);
+    expect(schedule.querySelector('[data-action="chore-detail"]')).toBeNull();
+    expect(mockedApi).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(localStorage.getItem('roomie.chores.display.1.84'))).toEqual({ view: 'list', filter: '2' });
   });
 });
