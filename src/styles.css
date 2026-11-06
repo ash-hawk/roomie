@@ -628,4 +628,3 @@ button.activity-item{cursor:pointer}button.activity-item:hover{background:var(--
 @media(max-width:520px){.ovl.activity-overlay{padding:72px 12px 12px}.activity-overlay .sheet{max-height:calc(100dvh - 84px)}}
 
 .activity-source-target:focus{outline:2px solid var(--accent);outline-offset:4px}
-
