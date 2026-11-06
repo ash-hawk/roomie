@@ -207,7 +207,7 @@ function wishView() {
     return `<section class="stack" aria-labelledby="wishlist-${kind}"><h3 id="wishlist-${kind}">${title}</h3>${items.map(row).join('') || `<p class="hint">No ${title.toLowerCase()} yet.</p>`}</section>`;
   }).join('');
   return `<section class="card stack"><div class="row sp"><h2>Wish list</h2>${badge(`${open.length} to buy`, 'gray')}</div>${groups}</section>
-    ${done.length ? `<section class="card"><h2>Already bought</h2>${done.map(row).join('')}</section>` : ''}`;
+    ${done.length ? `<section class="card"><h2>Purchase history</h2>${done.map(row).join('')}</section>` : ''}`;
 }
 const wishForm = (w = {}) => `
   <label class="fld"><span>Item</span><input class="input" name="itemName" required maxlength="120" value="${esc(w.itemName ?? '')}" placeholder="Air fryer"></label>

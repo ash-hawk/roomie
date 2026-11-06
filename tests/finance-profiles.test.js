@@ -78,7 +78,7 @@ describe('wish-list groups', () => {
     expect(wants.textContent).toContain('Curtains'); expect(wants.textContent).not.toContain('Toilet Paper');
     expect(needs.compareDocumentPosition(wants) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(needs.textContent).not.toContain('Soap');
-    expect(document.getElementById('page').textContent).toContain('Already bought');
+    expect(document.getElementById('page').textContent).toContain('Purchase history');
   });
   it('keeps both group headings visible with clear empty states', async () => {
     await renderWish([]);
