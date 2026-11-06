@@ -291,7 +291,6 @@ function previewWidgetMove(x, y) {
     return { id: el.dataset.widget, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, column, span: Math.min(columns, widgetSize(el.dataset.widget) === 'expanded' ? 2 : 1) };
   });
   const target = document.elementFromPoint(x, y)?.closest('.home-widget');
-  if (target === drag.widget) return;
   const slot = widgetDropSlot(bounds, snapshot, drag.id, x, y, columns);
   const moving = layout.find((w) => w.id === drag.id);
   if (slot) {

@@ -498,6 +498,23 @@ describe('Home live dragging', () => {
     point(grip, 'pointerdown'); point(document, 'pointermove', 800, 100); point(document, 'pointerup');
     expect(JSON.parse(localStorage.getItem('roomie.home.layout.1.1')).find((w) => w.id === 'schedule')).toMatchObject({ size: 'compact', column: 3 });
   });
+  it('allows a wide Finances tile to shrink into its own right corner while dragging', async () => {
+    localStorage.setItem('roomie.home.layout.1.1', JSON.stringify([{ id: 'board', size: 'expanded' }, { id: 'schedule', size: 'compact' }, { id: 'finances', size: 'expanded' }]));
+    await setup();
+    const grid = document.querySelector('.home-dashboard');
+    grid.style.gridTemplateColumns = '300px 300px 300px'; grid.style.gridAutoRows = '2px';
+    grid.getBoundingClientRect = () => ({ left: 0, right: 900, width: 900, top: 0, bottom: 900 });
+    const rects = { board: { left: 0, right: 600, top: 0, bottom: 300, width: 600, height: 300 }, schedule: { left: 600, right: 900, top: 0, bottom: 300, width: 300, height: 300 }, finances: { left: 300, right: 900, top: 320, bottom: 500, width: 600, height: 180 } };
+    [...grid.children].forEach((el) => { el.getBoundingClientRect = () => rects[el.dataset.widget]; });
+    const tile = grid.querySelector('[data-widget="finances"]');
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => tile });
+    point(tile.querySelector('[data-widget-drag]'), 'pointerdown', 310, 330);
+    point(document, 'pointermove', 850, 400);
+    expect(tile.classList.contains('compact')).toBe(true);
+    expect(tile.dataset.column).toBe('3');
+    point(document, 'pointerup', 850, 400);
+    expect(JSON.parse(localStorage.getItem('roomie.home.layout.1.1')).find((w) => w.id === 'finances')).toMatchObject({ size: 'compact', column: 3 });
+  });
   it('restores the original order on Escape or pointer cancellation and supports keyboard movement', async () => {
     let grip = await setup();
     Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => document.querySelector('.home-widget[data-widget="finances"]') });
@@ -720,5 +737,30 @@ describe('Chores schedule formats', () => {
     expect(schedule.querySelector('[data-action="chore-detail"]')).toBeNull();
     expect(mockedApi).toHaveBeenCalledTimes(2);
     expect(JSON.parse(localStorage.getItem('roomie.chores.display.1.84'))).toEqual({ view: 'list', filter: '2' });
+  });
+});
+
+
+describe('Wider household board conversations', () => {
+  it('keeps full posts visible with conversations collapsed, preserving the mini board presentation', async () => {
+    const baseApi = mockedApi.getMockImplementation();
+    const note = { messageId: 90, senderUserId: 2, messageText: 'Can we use the living room for dinner?', postedDate: '2026-11-05T16:00:00Z', replies: [{ messageId: 91, senderUserId: 1, messageText: 'Yes, that works', postedDate: '2026-11-05T17:00:00Z' }, { messageId: 92, senderUserId: 3, messageText: 'Sounds good', postedDate: '2026-11-05T17:10:00Z' }] };
+    mockedApi.mockImplementation((path) => path.endsWith('/board') ? Promise.resolve({ notes: [note, { ...note, messageId: 93, messageText: 'Another announcement', replies: [] }] }) : baseApi(path));
+    localStorage.setItem('roomie.home.layout.1.1', JSON.stringify([{ id: 'board', size: 'expanded' }, { id: 'schedule', size: 'compact' }, { id: 'finances', size: 'compact' }]));
+    document.getElementById('page').innerHTML = await homeView();
+    const post = document.querySelector('#home-board .sticky');
+    expect(post.querySelector('p').textContent).toBe(note.messageText);
+    const conversation = post.querySelector('.home-board-conversation');
+    expect(conversation.open).toBe(false);
+    expect(conversation.querySelector('summary').textContent).toBe('2 replies');
+    expect(post.querySelector('form').closest('details')).toBe(conversation);
+    conversation.open = true;
+    expect(conversation.querySelectorAll('.board-comment')).toHaveLength(2);
+    expect(conversation.querySelector('[name="messageText"]')).not.toBeNull();
+    expect(document.querySelector('[data-board-entry="replies-93"] summary').textContent).toBe('Reply');
+    localStorage.removeItem('roomie.home.layout.1.1');
+    document.getElementById('page').innerHTML = await homeView();
+    expect(document.querySelector('#home-board .home-board-summary')).not.toBeNull();
+    expect(document.querySelector('#home-board .home-board-conversation')).toBeNull();
   });
 });

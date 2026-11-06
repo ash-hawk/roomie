@@ -51,11 +51,11 @@ export function widgetDropSlot(bounds, widgets, sourceId, x, y, columns) {
     for (let i = widget.column; i < widget.column + widget.span; i++) occupied.add(i);
   }
   if (occupied.has(lane + 1)) return null;
-  let left = lane + 1, right = lane + 1;
-  while (left > 1 && !occupied.has(left - 1)) left--;
+  const column = lane + 1;
+  let right = column;
   while (right < columns && !occupied.has(right + 1)) right++;
-  const span = Math.min(2, right - left + 1);
-  const column = Math.min(Math.max(left, lane + 1), right - span + 1);
+  // Anchor to the pointed column; never grow left and pull a corner drop inward.
+  const span = Math.min(2, right - column + 1);
   const below = others.filter((w) => w.top > y && w.column <= column + span - 1 && w.column + w.span > column).sort((a, b) => a.top - b.top)[0];
   return { column, span, targetId: below?.id ?? null };
 }

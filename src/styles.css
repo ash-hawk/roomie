@@ -687,3 +687,8 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .event-schedule-toolbar .month-nav h2{font-size:18px}
 .event-schedule-filters{margin:14px 0;gap:8px;flex-wrap:wrap}
 .event-schedule-filters select.input{width:auto;max-width:100%;min-height:36px;padding:7px 30px 7px 10px;font-size:13px}
+
+.home-board-conversation{margin-top:6px;border-top:1px solid var(--line);padding-top:8px}
+.home-board-conversation>summary{font-size:13px;color:var(--mute);cursor:pointer;width:fit-content}
+.home-board-conversation>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.home-board-conversation>form{margin-top:12px}
