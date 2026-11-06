@@ -259,8 +259,11 @@ describe('Home household board', () => {
     const { choresView } = await import('../src/pages/chores.js');
     document.getElementById('page').innerHTML = await choresView();
     const board = document.querySelector('.chore-requests-board');
-    expect(board.textContent).toContain('Chore requests');
+    expect(board.textContent).toContain('Cover Requests');
     expect(board.textContent).toContain('Cover request');
+    expect(board.textContent).toContain('Wash, dry, and fold the laundry.');
+    expect(board.querySelector('.chore-occurrence').textContent).toContain('Jordan');
+    expect(board.querySelector('.chore-occurrence').textContent).toContain('Mon Nov 16');
     expect(board.textContent).toContain('Laundry');
     expect(board.querySelector('[data-action=open-request]').dataset.id).toBe('7');
     actions['open-request'](board.querySelector('[data-action=open-request]'));
@@ -274,6 +277,15 @@ describe('Home household board', () => {
     expect(document.querySelectorAll('.chore-requests-board')).toHaveLength(1);
     expect(document.querySelector('.chore-requests-board').textContent).toContain('Laundry');
     actions['chore-tab']({ dataset: { value: 'schedule' } });
+  });
+  it('keeps Cover Requests empty when only swaps are open and still exposes those swaps', async () => {
+    await renderBoard();
+    boardChores = { ...boardChores, swapRequests: [{ ...request, type: 'swap', targetUserId: 1 }] };
+    const { choresView } = await import('../src/pages/chores.js');
+    document.getElementById('page').innerHTML = await choresView();
+    expect(document.querySelector('.chore-requests-board h2').textContent).toBe('Cover Requests');
+    expect(document.querySelector('.chore-requests-board').textContent).toContain('No chores need to be covered.');
+    expect(document.querySelector('.chore-swap-board').textContent).toContain('Laundry');
   });
   it('shows reply photos and opens roommate profiles on Home and Events without visiting Household first', async () => {
     await renderBoard();
