@@ -27,7 +27,7 @@ export async function householdView() {
         <p class="mute invite-description">Share this code. Anyone who signs up can join with it.</p>
         <div class="rowline">
           <span class="code">${esc(h.joinCode)}</span>
-          <button class="btn" data-action="copy-code" data-code="${esc(h.joinCode)}">Copy</button>
+          <button class="btn" data-action="copy-code" data-code="${esc(h.joinCode)}">Copy Code</button>
         </div>
 
         <hr class="hr">
