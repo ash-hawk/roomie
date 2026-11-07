@@ -15,14 +15,32 @@ export async function householdView() {
   const h = household(), response = await api(`/households/${h.householdId}/members`);
   members = response.members;
   const current = members.filter((m) => !m.leftDate), former = members.filter((m) => m.leftDate);
+
   return `${phead('Household')}
-    <div class="stack"><section class="card invite-card"><h2>${esc(h.householdName)}</h2>
-      <p class="mute">${current.length} ${current.length === 1 ? 'member' : 'members'} · ${esc(h.timezone)}</p><hr class="hr">
-      <h3>Roommates</h3>${current.map((m) => memberRow(m, h)).join('')}
-      ${former.length ? `<details style="margin-top:16px"><summary>Former roommates (${former.length})</summary>${former.map((m) => memberRow(m, h)).join('')}</details>` : ''}
-      <hr class="hr"><h3>Invite roommates</h3><p class="mute invite-description">Share this code. Anyone who signs up can join with it.</p>
-      <div class="rowline"><span class="code">${esc(h.joinCode)}</span><button class="btn" data-action="copy-code" data-code="${esc(h.joinCode)}">Copy</button></div>
-    </section></div>`;
+    <div class="stack">
+      <section class="card invite-card">
+        <h2>${esc(h.householdName)}</h2>
+        <p class="mute">${current.length} ${current.length === 1 ? 'member' : 'members'} · ${esc(h.timezone)}</p>
+
+        <hr class="hr">
+        <h3>Invite roommates</h3>
+        <p class="mute invite-description">Share this code. Anyone who signs up can join with it.</p>
+        <div class="rowline">
+          <span class="code">${esc(h.joinCode)}</span>
+          <button class="btn" data-action="copy-code" data-code="${esc(h.joinCode)}">Copy</button>
+        </div>
+
+        <hr class="hr">
+        <h3>Roommates</h3>
+        ${current.map((m) => memberRow(m, h)).join('')}
+        ${former.length ? `
+          <details style="margin-top:16px">
+            <summary>Former roommates (${former.length})</summary>
+            ${former.map((m) => memberRow(m, h)).join('')}
+          </details>
+        ` : ''}
+      </section>
+    </div>`;
 }
 
 actions['copy-code'] = async (el) => { try { await navigator.clipboard.writeText(el.dataset.code); toast('Join code copied'); } catch { toast(`Your code is ${el.dataset.code}`); } };
