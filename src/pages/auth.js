@@ -1,6 +1,7 @@
 import { actions, forms } from '../lib/events.js';
 import { esc, mark, showError } from '../lib/dom.js';
 import { requestPasswordReset, resetPassword, signIn, signUp } from '../auth-client.js';
+import { meetsPasswordRequirements, PASSWORD_MIN_LENGTH, PASSWORD_REQUIREMENTS } from '../../shared/password-policy.ts';
 
 let mode = 'signin';
 let resetToken = '';
@@ -41,7 +42,8 @@ function recoveryForm() {
 
   return `<form class="card stack" data-form="auth-reset">
     <h2>Choose a new password</h2>
-    ${resetToken ? `<label class="fld"><span>New password</span><input class="input" name="password" type="password" autocomplete="new-password" required minlength="8" placeholder="At least 8 characters"></label>
+    ${resetToken ? `<label class="fld"><span>New password</span><input class="input" name="password" type="password" autocomplete="new-password" required minlength="${PASSWORD_MIN_LENGTH}" aria-describedby="password-requirements"></label>
+      <p id="password-requirements" class="mute">${PASSWORD_REQUIREMENTS}</p>
       <div class="err" role="alert"></div>
       <button class="btn p" type="submit">Reset password</button>` : '<p class="mute">This reset link is invalid or expired.</p>'}
     <button type="button" class="link-btn" data-action="auth-forgot">Request a new link</button>
@@ -62,7 +64,8 @@ export function authView() {
           <label class="mute" for="auth-password">Password</label>
           <button type="button" class="link-btn" data-action="auth-toggle-password" aria-controls="auth-password">Show password</button>
         </div>
-        <input id="auth-password" class="input" name="password" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" required minlength="8" placeholder="${up ? 'At least 8 characters' : 'Enter your password'}">
+        <input id="auth-password" class="input" name="password" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" required ${up ? `minlength="${PASSWORD_MIN_LENGTH}" aria-describedby="password-requirements"` : 'placeholder="Enter your password"'}>
+        ${up ? `<p id="password-requirements" class="mute">${PASSWORD_REQUIREMENTS}</p>` : ''}
       </div>
       ${up ? '' : '<div><button type="button" class="link-btn" data-action="auth-forgot">Forgot password?</button></div>'}
       ${mode === 'reset-done' ? '<p role="status">Password updated. Sign in with your new password.</p>' : ''}
@@ -94,6 +97,7 @@ forms['auth-forgot'] = async (form) => {
 forms['auth-reset'] = async (form) => {
   if (!resetToken) return;
   const password = String(new FormData(form).get('password'));
+  if (!meetsPasswordRequirements(password)) return showError(form, PASSWORD_REQUIREMENTS);
   await resetPassword(resetToken, password);
   if (form.isConnected) leaveReset('reset-done');
 };
@@ -108,6 +112,7 @@ actions['auth-toggle-password'] = (button) => {
 forms.auth = async (form) => {
   const f = new FormData(form);
   const email = String(f.get('email')).trim(), password = String(f.get('password'));
+  if (mode === 'signup' && !meetsPasswordRequirements(password)) return showError(form, PASSWORD_REQUIREMENTS);
   try {
     if (mode === 'signup') await signUp(email, password, String(f.get('name')).trim());
     else await signIn(email, password);
