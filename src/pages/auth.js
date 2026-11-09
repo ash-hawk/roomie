@@ -1,3 +1,4 @@
+
 import { actions, forms } from '../lib/events.js';
 import { esc, mark, showError } from '../lib/dom.js';
 import { signIn, signUp } from '../auth-client.js';
@@ -12,7 +13,13 @@ export function authView() {
       <h2>${up ? 'Create your account' : 'Sign in'}</h2>
       ${up ? `<label class="fld"><span>Your name</span><input class="input" name="name" autocomplete="name" required maxlength="80" placeholder="Alex Rivera"></label>` : ''}
       <label class="fld"><span>Email</span><input class="input" name="email" type="email" autocomplete="email" required placeholder="you@school.edu"></label>
-      <label class="fld"><span>Password</span><input class="input" name="password" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" required minlength="8" placeholder="At least 8 characters"></label>
+      <div class="fld">
+        <div class="rowline">
+          <label class="mute" for="auth-password">Password</label>
+          <button type="button" class="link-btn" data-action="auth-toggle-password" aria-controls="auth-password">Show password</button>
+        </div>
+        <input id="auth-password" class="input" name="password" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" required minlength="8" placeholder="${up ? 'At least 8 characters' : 'Enter your password'}">
+      </div>
       <div class="err" role="alert"></div>
       <button class="btn p" type="submit">${up ? 'Create account' : 'Sign in'}</button>
       <p class="mute" style="text-align:center;font-size:14px">${up ? 'Already have an account?' : 'New here?'} <button type="button" class="link-btn" data-action="auth-toggle">${up ? 'Sign in' : 'Create an account'}</button></p>
@@ -21,6 +28,13 @@ export function authView() {
 }
 
 actions['auth-toggle'] = () => { mode = mode === 'signin' ? 'signup' : 'signin'; window.dispatchEvent(new Event('roomie:render')); };
+
+actions['auth-toggle-password'] = (button) => {
+  const password = button.form.elements.namedItem('password');
+  const show = password.type === 'password';
+  password.type = show ? 'text' : 'password';
+  button.textContent = show ? 'Hide password' : 'Show password';
+};
 
 forms.auth = async (form) => {
   const f = new FormData(form);
@@ -33,3 +47,8 @@ forms.auth = async (form) => {
 };
 
 export const _esc = esc; // keep esc imported for future fields
+
+
+
+
+
