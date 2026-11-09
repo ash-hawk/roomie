@@ -1,35 +1,3 @@
-import './styles.css';
-import { api, getToken, signOut } from './auth-client.js';
-import { actions, forms, inputs } from './lib/events.js';
-import { $, ico, mark, closeModal, esc, showError, toast } from './lib/dom.js';
-import { S, household, resetState } from './lib/state.js';
-import { authView } from './pages/auth.js';
-import { onboardingView } from './pages/onboarding.js';
-import { settingsView } from './pages/settings.js';
-import { householdView } from './pages/household.js';
-import { financesView } from './pages/finances.js';
-import { choresView } from './pages/chores.js';
-import { calendarView } from './pages/calendar.js';
-import { bellHtml, loadAlerts, openActivityPanel, openPendingActivity, paintBell } from './pages/notifications.js';
-import { homeView } from './pages/home.js';
-import { openPendingCalendarCreate } from './lib/calendar-create.js';
-import { connectHomeLayout } from './components/home-layout.js';
-import { soonView } from './pages/soon.js';
-
-const NAV = [
-  ['home', 'home', 'Home'],
-  ['calendar', 'calendar', 'Events'],
-  ['chores', 'check', 'Chores'],
-  ['finances', 'money', 'Finances'],
-  ['household', 'users', 'Household']
-];
-// Real pages register here as each slice lands; everything else shows the "coming next" card.
-export const pages = { settings: settingsView, household: householdView, finances: financesView, chores: choresView, calendar: calendarView, home: homeView };
-
-const root = $('#root');
-const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/')[0]; return r === 'settings' || NAV.some(([k]) => k === r) ? r : 'home'; };
-const loading = `<div class="page-skeleton" aria-label="Loading page" aria-busy="true"><div class="sk sk-title"></div><div class="sk sk-sub"></div>
-  <div class="sk-grid"><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div></div></div>`;
 
 async function loadMe() {
   const me = await api('/me');
@@ -73,6 +41,7 @@ let seq = 0;
 export async function render() {
   const mine = ++seq;
   try {
+    if (isPasswordReset()) { root.innerHTML = authView(); return; }
     if (!(await getToken())) { resetState(); root.innerHTML = authView(); return; }
     if (!S.user) { root.innerHTML = loading; await loadMe(); }
     if (mine !== seq) return;
