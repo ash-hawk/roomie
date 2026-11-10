@@ -5,7 +5,7 @@ import { avatar, closeModal, confirmDialog, esc, mhead, openModal, phead, showEr
 
 const PAYMENT_APPS = [['venmo', 'Venmo'], ['zelle', 'Zelle'], ['apple_cash', 'Apple Cash']];
 let profileDirty = false;
-let cropImage = null;
+let photoSelection = 0;
 
 function profileForm() {
   const methods = Object.fromEntries((S.user.paymentMethods ?? []).map((m) => [m.app, m]));
@@ -44,32 +44,84 @@ const markProfileDirty = () => {
   const status = document.getElementById('profile-status'); if (status) status.textContent = 'Unsaved changes';
 };
 inputs['profile-dirty'] = markProfileDirty;
-inputs['crop-zoom'] = (el) => { const preview = document.getElementById('crop-preview'); if (preview) preview.style.transform = `scale(${el.value})`; };
+function openPhotoCrop(image, form) {
+  openModal(`${mhead('Crop profile photo')}
+    <p class="hint" id="crop-help">Drag the photo or use the arrow keys on the preview to reposition it. Use Zoom to resize it.</p>
+    <canvas class="crop-frame" width="256" height="256" tabindex="0" role="img" aria-label="Photo crop preview" aria-describedby="crop-help"></canvas>
+    <label class="fld"><span>Zoom</span><input class="input crop-range" type="range" min="1" max="2.5" value="1" step="0.05"></label>
+    <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="button" class="btn p" data-apply-crop>Use photo</button></div>`);
+  const modal = document.getElementById('modal');
+  const canvas = modal.querySelector('canvas');
+  const zoom = modal.querySelector('input[type=range]');
+  const context = canvas.getContext('2d', { alpha: false });
+  let x = image.naturalWidth / 2, y = image.naturalHeight / 2;
+  let size, drag;
+
+  function draw() {
+    size = Math.min(image.naturalWidth, image.naturalHeight) / Number(zoom.value);
+    const half = size / 2;
+    x = Math.max(half, Math.min(x, image.naturalWidth - half));
+    y = Math.max(half, Math.min(y, image.naturalHeight - half));
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, x - half, y - half, size, size, 0, 0, canvas.width, canvas.height);
+  }
+
+  canvas.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || drag) return;
+    canvas.setPointerCapture(event.pointerId);
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  });
+  canvas.addEventListener('pointermove', (event) => {
+    if (drag?.id !== event.pointerId) return;
+    const scale = size / canvas.getBoundingClientRect().width;
+    x -= (event.clientX - drag.x) * scale;
+    y -= (event.clientY - drag.y) * scale;
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+    draw();
+  });
+  canvas.addEventListener('lostpointercapture', () => { drag = null; });
+  canvas.addEventListener('keydown', (event) => {
+    const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+    if (!direction || !event.key.startsWith('Arrow')) return;
+    event.preventDefault();
+    x -= direction[0] * size / 32;
+    y -= direction[1] * size / 32;
+    draw();
+  });
+  zoom.addEventListener('input', draw);
+  modal.querySelector('[data-apply-crop]').addEventListener('click', () => {
+    if (!form.isConnected) { closeModal(); return; }
+    const data = canvas.toDataURL('image/jpeg', .82);
+    form.elements.namedItem('profilePhoto').value = data;
+    document.getElementById('profile-avatar').innerHTML = avatar({ ...S.user, profilePhoto: data }, 'lg');
+    form.querySelector('[data-action=remove-photo]').disabled = false;
+    markProfileDirty();
+    closeModal();
+  });
+  draw();
+}
+
 inputs['profile-file'] = (el) => {
   const file = el.files?.[0]; if (!file) return;
-  const error = document.querySelector('[data-error-for=profilePhoto]');
-  if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 10_000_000) { error.textContent = 'Choose a JPG, PNG, or WebP image under 10 MB.'; el.value = ''; return; }
+  const selection = ++photoSelection;
+  const form = el.closest('form');
+  const error = form.querySelector('[data-error-for=profilePhoto]');
+  el.value = '';
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 10_000_000) { error.textContent = 'Choose a JPG, PNG, or WebP image under 10 MB.'; return; }
   error.textContent = '';
-  const reader = new FileReader();
-  reader.onload = () => {
-    cropImage = new Image();
-    cropImage.onload = () => openModal(`${mhead('Crop profile photo')}<p class="hint">Center your face in the circle and adjust the zoom.</p><div class="crop-frame"><img id="crop-preview" src="${esc(reader.result)}" alt="Photo crop preview"></div>
-      <label class="fld"><span>Zoom</span><input class="input crop-range" type="range" min="1" max="2.5" value="1" step="0.05" data-input="crop-zoom"></label>
-      <div class="acts"><button class="btn" data-action="close-modal">Cancel</button><button class="btn p" data-action="apply-photo">Use photo</button></div>`);
-    cropImage.src = reader.result;
+  const image = new Image();
+  const url = URL.createObjectURL(file);
+  image.onload = () => {
+    URL.revokeObjectURL(url);
+    if (form.isConnected && selection === photoSelection) openPhotoCrop(image, form);
   };
-  reader.readAsDataURL(file);
-};
-actions['apply-photo'] = () => {
-  if (!cropImage) return;
-  const zoom = Number(document.querySelector('[data-input=crop-zoom]')?.value ?? 1), size = Math.min(cropImage.naturalWidth, cropImage.naturalHeight) / zoom;
-  const sx = (cropImage.naturalWidth - size) / 2, sy = (cropImage.naturalHeight - size) / 2;
-  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
-  canvas.getContext('2d').drawImage(cropImage, sx, sy, size, size, 0, 0, 256, 256);
-  const data = canvas.toDataURL('image/jpeg', .82), form = document.querySelector('form[data-form=profile]');
-  form.profilePhoto.value = data;
-  document.getElementById('profile-avatar').innerHTML = avatar({ ...S.user, profilePhoto: data }, 'lg');
-  form.querySelector('[data-action=remove-photo]').disabled = false; markProfileDirty(); cropImage = null; closeModal();
+  image.onerror = () => {
+    URL.revokeObjectURL(url);
+    if (form.isConnected && selection === photoSelection) error.textContent = 'Could not open this photo. Try another image.';
+  };
+  image.src = url;
 };
 actions['remove-photo'] = (el) => {
   const form = el.closest('form'); form.profilePhoto.value = '';
