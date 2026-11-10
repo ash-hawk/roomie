@@ -330,6 +330,7 @@ button.link-btn{background:none;border:0;padding:0;color:var(--accent);font-weig
 .field-error{min-height:1.2em;color:var(--bad);font-size:12.5px}.save-status{font-size:13px;color:var(--mute)}
 .crop-frame{display:block;width:260px;max-width:100%;height:auto;margin:0 auto;border-radius:50%;background:var(--line);touch-action:none;cursor:grab}
 .crop-frame:active{cursor:grabbing}
+.crop-controls{flex-wrap:wrap}
 .crop-range{padding:0!important}
 .payment-editor{margin:0;border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px}
 .payment-editor legend{padding:0 6px;font-size:14px;font-weight:650}
