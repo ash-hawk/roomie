@@ -49,13 +49,22 @@ function openPhotoCrop(image, form) {
     <p class="hint" id="crop-help">Drag the photo or use the arrow keys on the preview to reposition it. Use Zoom to resize it.</p>
     <canvas class="crop-frame" width="256" height="256" tabindex="0" role="img" aria-label="Photo crop preview" aria-describedby="crop-help"></canvas>
     <label class="fld"><span>Zoom</span><input class="input crop-range" type="range" min="1" max="2.5" value="1" step="0.05"></label>
+    <div><button type="button" class="btn" data-rotate-crop>Rotate 90°</button></div>
     <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="button" class="btn p" data-apply-crop>Use photo</button></div>`);
   const modal = document.getElementById('modal');
-  const canvas = modal.querySelector('canvas');
+  const canvas = modal.querySelector('.crop-frame');
   const zoom = modal.querySelector('input[type=range]');
   const context = canvas.getContext('2d', { alpha: false });
   let x = image.naturalWidth / 2, y = image.naturalHeight / 2;
-  let size, drag;
+  let size, drag, quarterTurns = 0;
+
+  function moveCrop(dx, dy) {
+    // Convert movement on the rotated preview back to the original image axes.
+    const [sourceX, sourceY] = [[dx, dy], [dy, -dx], [-dx, -dy], [-dy, dx]][quarterTurns];
+    x -= sourceX;
+    y -= sourceY;
+    draw();
+  }
 
   function draw() {
     size = Math.min(image.naturalWidth, image.naturalHeight) / Number(zoom.value);
@@ -64,7 +73,11 @@ function openPhotoCrop(image, form) {
     y = Math.max(half, Math.min(y, image.naturalHeight - half));
     context.fillStyle = '#fff';
     context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(image, x - half, y - half, size, size, 0, 0, canvas.width, canvas.height);
+    context.save();
+    context.translate(canvas.width / 2, canvas.height / 2);
+    context.rotate(quarterTurns * Math.PI / 2);
+    context.drawImage(image, x - half, y - half, size, size, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+    context.restore();
   }
 
   canvas.addEventListener('pointerdown', (event) => {
@@ -75,22 +88,22 @@ function openPhotoCrop(image, form) {
   canvas.addEventListener('pointermove', (event) => {
     if (drag?.id !== event.pointerId) return;
     const scale = size / canvas.getBoundingClientRect().width;
-    x -= (event.clientX - drag.x) * scale;
-    y -= (event.clientY - drag.y) * scale;
+    moveCrop((event.clientX - drag.x) * scale, (event.clientY - drag.y) * scale);
     drag.x = event.clientX;
     drag.y = event.clientY;
-    draw();
   });
   canvas.addEventListener('lostpointercapture', () => { drag = null; });
   canvas.addEventListener('keydown', (event) => {
     const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
     if (!direction || !event.key.startsWith('Arrow')) return;
     event.preventDefault();
-    x -= direction[0] * size / 32;
-    y -= direction[1] * size / 32;
-    draw();
+    moveCrop(direction[0] * size / 32, direction[1] * size / 32);
   });
   zoom.addEventListener('input', draw);
+  modal.querySelector('[data-rotate-crop]').addEventListener('click', () => {
+    quarterTurns = (quarterTurns + 1) % 4;
+    draw();
+  });
   modal.querySelector('[data-apply-crop]').addEventListener('click', () => {
     if (!form.isConnected) { closeModal(); return; }
     const data = canvas.toDataURL('image/jpeg', .82);
