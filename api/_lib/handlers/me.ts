@@ -21,6 +21,7 @@ export const GET = withUser(async (user) => {
     householdId: schema.household.householdId, householdName: schema.household.householdName,
     timezone: schema.household.timezone, themeColor: schema.household.themeColor,
     joinCode: schema.household.joinCode, address: schema.household.address, role: schema.householdMember.role,
+    onboardedAt: schema.householdMember.onboardedAt,
   }).from(schema.householdMember)
     .innerJoin(schema.household, eq(schema.household.householdId, schema.householdMember.householdId))
     .where(and(eq(schema.householdMember.userId, user.userId), isNull(schema.householdMember.leftDate)));

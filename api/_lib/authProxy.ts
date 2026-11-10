@@ -1,5 +1,4 @@
 import { apiPath } from './http.js';
-import { meetsPasswordRequirements, PASSWORD_REQUIREMENTS } from '../../shared/password-policy.js';
 
 // Same-domain proxy to Neon Auth. Why a function and not a plain vercel.json rewrite to Neon: Vercel's external
 // rewrite forwards the ORIGINAL Host header and Neon Auth rejects it (400 INVALID_HOSTNAME).
@@ -55,21 +54,8 @@ export async function proxyAuth(req: Request): Promise<Response> {
   for (const name of FORWARD_REQUEST) { const v = req.headers.get(name); if (v && name !== 'cookie') headers.set(name, v); }
   const cookies = neonAuthCookies(req.headers.get('cookie'));
   if (cookies) headers.set('cookie', cookies);
-  const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await req.arrayBuffer();
-  const endpoint = rest.replace(/\/$/, '');
-  if (req.method === 'POST' && (endpoint === '/sign-up/email' || endpoint === '/reset-password')) {
-    let data;
-    try {
-      data = JSON.parse(new TextDecoder().decode(body));
-    } catch {
-      return Response.json({ message: 'Expected a JSON request.' }, { status: 400 });
-    }
-    const password = endpoint === '/sign-up/email' ? data?.password : data?.newPassword;
-    if (!meetsPasswordRequirements(password)) {
-      return Response.json({ message: PASSWORD_REQUIREMENTS }, { status: 400 });
-    }
-  }
-  const upstream = await fetch(target, { method: req.method, headers, body, redirect: 'manual' });
+  const hasBody = !['GET', 'HEAD'].includes(req.method);
+  const upstream = await fetch(target, { method: req.method, headers, body: hasBody ? await req.arrayBuffer() : undefined, redirect: 'manual' });
 
   const out = new Headers();
   upstream.headers.forEach((v, k) => { if (k !== 'set-cookie' && !DROP_RESPONSE.has(k)) out.set(k, v); });

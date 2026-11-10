@@ -28,6 +28,7 @@
     "db:migrate:prod": "tsx --env-file=.env.production.local scripts/migrate.ts --production"
   },
   "dependencies": {
+    "@vercel/functions": "^3.11.0",
     "drizzle-orm": "^0.45.3",
     "jose": "^6.2.12",
     "pg": "^8.23.1"

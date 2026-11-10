@@ -1,40 +1,17 @@
-// Slice (e): the optional AI line on the Home page. OFF by default: it needs HOME_AI_ENABLED=1 AND an
-// ANTHROPIC_API_KEY on the server. The snapshot is built here from the database (never from the request),
-// scoped to ONE household the caller belongs to, and contains first names and short item text only: no
-// emails, phone numbers or ids. It is sent to Anthropic's API, which is why the flag exists.
+// The snapshot is built from the database (never from the request), scoped to one household the caller
+// belongs to, and contains first names and short item text only: no emails, phone numbers or ids.
 import type { CurrentUser } from './auth.js';
 import { db, schema as s } from './db.js';
 import { and, eq, isNull } from 'drizzle-orm';
+import { callText } from './ai.js';
 import { listBoard, listEvents } from './calendar.js';
 import { listChores } from './chores.js';
 import { getBalances } from './finance.js';
 import { listNotifications } from './notifications.js';
 import { householdTz } from './validate.js';
-import { buildAiPrompt, cleanAiText, type HomeSnapshot } from '../../shared/home.js';
+import { cleanAiText } from '../../shared/ai.js';
+import { buildAiPrompt, type HomeSnapshot } from '../../shared/home-ai.js';
 import { addDays } from '../../shared/chore-dates.js';
-
-export const aiEnabled = () => process.env.HOME_AI_ENABLED === '1' && !!process.env.ANTHROPIC_API_KEY;
-
-type CallModel = (system: string, user: string) => Promise<string | null>;
-export const anthropicCall: CallModel = async (system, user) => {
-  const res = await fetch(`${process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com'}/v1/messages`, { // the override is for local testing against a mock
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: process.env.HOME_AI_MODEL || 'claude-haiku-5-5', max_tokens: 120, system, messages: [{ role: 'user', content: user }] }),
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!res.ok) return null;
-  const j = (await res.json()) as { content?: { type: string; text?: string }[] };
-  return j.content?.find((c) => c.type === 'text')?.text ?? null;
-};
-
-// a few calls per person per hour is plenty (the page asks once per sign-in); in memory, best effort
-const calls = new Map<number, number[]>();
-const withinLimit = (userId: number) => {
-  const now = Date.now(), recent = (calls.get(userId) ?? []).filter((t) => now - t < 3600_000);
-  if (recent.length >= 6) { calls.set(userId, recent); return false; }
-  calls.set(userId, [...recent, now]); return true;
-};
 
 export async function homeSnapshot(householdId: number, viewerId: number): Promise<HomeSnapshot> {
   const tz = await householdTz(db, householdId);
@@ -69,14 +46,14 @@ export async function homeSnapshot(householdId: number, viewerId: number): Promi
 }
 
 /** `{ enabled: false }` unless the flag and key are both set. Never throws on a model or network failure. */
-export async function homeSummary(user: CurrentUser, householdId: number, callModel: CallModel = anthropicCall) {
-  if (!aiEnabled()) return { enabled: false as const };
-  if (!withinLimit(user.userId)) return { enabled: true as const, text: null, limited: true };
-  try {
-    const { system, user: prompt } = buildAiPrompt(await homeSnapshot(householdId, user.userId));
-    return { enabled: true as const, text: cleanAiText(await callModel(system, prompt)) };
-  } catch (e) {
-    console.error('home summary failed', e instanceof Error ? e.message : e);
-    return { enabled: true as const, text: null };
-  }
+export async function homeSummary(user: CurrentUser, householdId: number) {
+  const result = await callText({
+    feature: 'home',
+    userId: user.userId,
+    householdId,
+    prompt: async () => buildAiPrompt(await homeSnapshot(householdId, user.userId)),
+  });
+  if (result.status === 'disabled') return { enabled: false as const };
+  if (result.status === 'limited') return { enabled: true as const, text: null, limited: true };
+  return { enabled: true as const, text: result.status === 'ok' ? cleanAiText(result.value) : null };
 }
