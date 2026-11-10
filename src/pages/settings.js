@@ -49,10 +49,18 @@ function openPhotoCrop(image, form) {
     <p class="hint" id="crop-help">Drag the photo or use the arrow keys on the preview to reposition it. Use Zoom to resize it.</p>
     <canvas class="crop-frame" width="256" height="256" tabindex="0" role="img" aria-label="Photo crop preview" aria-describedby="crop-help"></canvas>
     <label class="fld"><span>Zoom</span><input class="input crop-range" type="range" min="1" max="2.5" value="1" step="0.05"></label>
-    <div><button type="button" class="btn" data-rotate-crop>Rotate 90°</button></div>
+    <div class="row sp crop-controls">
+      <button type="button" class="btn" data-rotate-crop>Rotate 90°</button>
+      <div class="row">
+        <span class="hint" id="crop-avatar-label">Avatar preview</span>
+        <canvas class="av" width="38" height="38" data-crop-avatar role="img" aria-labelledby="crop-avatar-label"></canvas>
+      </div>
+    </div>
     <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="button" class="btn p" data-apply-crop>Use photo</button></div>`);
   const modal = document.getElementById('modal');
   const canvas = modal.querySelector('.crop-frame');
+  const avatarCanvas = modal.querySelector('[data-crop-avatar]');
+  const avatarContext = avatarCanvas.getContext('2d');
   const zoom = modal.querySelector('input[type=range]');
   const context = canvas.getContext('2d', { alpha: false });
   let x = image.naturalWidth / 2, y = image.naturalHeight / 2;
@@ -78,6 +86,7 @@ function openPhotoCrop(image, form) {
     context.rotate(quarterTurns * Math.PI / 2);
     context.drawImage(image, x - half, y - half, size, size, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
     context.restore();
+    avatarContext.drawImage(canvas, 0, 0, avatarCanvas.width, avatarCanvas.height);
   }
 
   canvas.addEventListener('pointerdown', (event) => {
