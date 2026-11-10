@@ -145,6 +145,8 @@ export async function calendarView() {
   const head = phead('Events', 'Meetings, hosting and other plans for your house.', `<button class="btn p" data-action="add-event">${ico('plus', 16)} Add event</button>`);
   const handoff = takeHandoff();
   if (handoff?.type === 'event') setTimeout(() => actions['event-detail']({ dataset: { id: String(handoff.id) } }), 60);
+  const linkedId = Number(location.hash.replace(/^#\/?/, '').split('/')[1]);
+  if (Number.isSafeInteger(linkedId) && linkedId > 0) setTimeout(() => actions['event-detail']({ dataset: { id: String(linkedId) } }), 60);
   return `${head}<div class="page-content split cal"><section class="card" id="cal-main">${scheduleContent()}</section><section class="card board" data-board>${boardInner()}</section></div>`;
 }
 inputs['cal-view'] = (el) => {
@@ -197,6 +199,7 @@ function eventForm(e, day, linkToNote = false) {
     <div class="fld"><span id="tag-label">Ask for approval</span><p class="hint" id="tag-hint">This event will appear on the calendar as Pending approval. Select the roommates who need to approve it before it’s confirmed. Leave everyone unchecked if no approval is needed.</p>${others.length ? `<label class="chk"><input type="checkbox" data-input="event-select-all" ${others.every((m) => tagged.has(m.userId)) ? 'checked' : ''}> Select all roommates</label>` : ''}<div class="opt-list">${others.length ? others.map((m) => `<label class="chk"><input type="checkbox" name="tag" data-input="event-approver" value="${m.userId}" ${tagged.has(m.userId) ? 'checked' : ''}> ${avatar(m, 'sm')} ${esc(fullName(m))}</label>`).join('') : '<span class="hint">No other roommates yet.</span>'}</div>
       </div>
     <label class="fld"><span>Details (optional)</span><textarea class="input" name="description" rows="2" maxlength="500">${esc(e?.description ?? '')}</textarea></label>
+    <label class="toggle-row"><span class="grow"><b>Notify roommates</b><span class="hint">Email current roommates who verified an address and opted into this type of event.</span></span><input type="checkbox" name="notifyRoommates" ${e?.notifyRoommates === true ? 'checked' : ''}></label>
     <div class="err" role="alert"></div>
     <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">${e ? 'Save' : 'Add event'}</button></div>
   </form>`;
@@ -223,7 +226,7 @@ actions['edit-event'] = (el) => { const e = eventOf(Number(el.dataset.id)); if (
 forms['event-save'] = async (form) => {
   const f = new FormData(form), id = form.dataset.id;
   const body = { eventName: f.get('eventName'), date: f.get('date'), time: f.get('time'), endTime: f.get('endTime') || null, location: f.get('location'), category: f.get('category'),
-    otherLabel: f.get('otherLabel'), reminderMinutesBefore: f.get('reminder') === '' ? null : Number(f.get('reminder')), description: f.get('description'), taggedUserIds: f.getAll('tag').map(Number) };
+    otherLabel: f.get('otherLabel'), reminderMinutesBefore: f.get('reminder') === '' ? null : Number(f.get('reminder')), description: f.get('description'), taggedUserIds: f.getAll('tag').map(Number), notifyRoommates: f.has('notifyRoommates') };
   let saved;
   try { saved = await api(path(id ? `/events/${id}` : '/events'), { method: id ? 'PATCH' : 'POST', body }); } catch (err) { return showError(form, err.message); }
   if (form.dataset.linkToNote === '1') {

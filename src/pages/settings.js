@@ -5,7 +5,10 @@ import { avatar, closeModal, confirmDialog, esc, mhead, openModal, phead, showEr
 
 const PAYMENT_APPS = [['venmo', 'Venmo'], ['zelle', 'Zelle'], ['apple_cash', 'Apple Cash']];
 let profileDirty = false;
-let photoSelection = 0;
+let cropImage = null;
+let notificationSettings = null;
+let notificationSettingsHid = null;
+let notificationChannel = null;
 
 function profileForm() {
   const methods = Object.fromEntries((S.user.paymentMethods ?? []).map((m) => [m.app, m]));
@@ -24,12 +27,25 @@ function profileForm() {
     </form></section>`;
 }
 
-export function settingsView() {
+export async function settingsView() {
+  if (!notificationSettings || notificationSettingsHid !== S.hid) {
+    const [preferences, channel] = await Promise.all([api(`/households/${S.hid}/notification-settings`), api('/notification-channel')]);
+    notificationSettings = preferences.settings; notificationChannel = channel.channel; notificationSettingsHid = S.hid;
+  }
+  const emailChoices = [['event_hosting', 'New parties and hosting', 'Email me when a roommate creates a hosting event.'], ['event_other', 'Other new events', 'Email me about meetings and other events.'], ['approval_request', 'Approval requests', 'Email me when an event needs my response.']];
   return `
     ${phead('Profile', 'Manage the information your roommates can see.')}
 
     <div class="stack">
       ${profileForm()}
+
+      <section class="card"><h2>Email notifications</h2><p class="body-copy">Choose what Roomie may send for this household. Everything is off unless you turn it on.</p>
+        <form class="stack" data-form="notification-channel"><label class="fld"><span>Notification email</span><input class="input" type="email" name="destination" autocomplete="email" required maxlength="320" value="${esc(notificationChannel?.destination ?? S.user.email ?? '')}"></label>
+          <div class="hint" role="status">${notificationChannel?.verifiedAt ? 'Verified — this address can receive important event notifications.' : notificationChannel ? 'Not verified — request a new confirmation link if the address changed.' : 'Confirm an address separately from sign-in before Roomie sends event notifications.'}</div>
+          <div class="err" role="alert"></div><div class="acts"><button class="btn" type="submit">${notificationChannel?.verifiedAt ? 'Change or re-confirm email' : 'Send confirmation email'}</button></div></form>
+        <hr class="hr">
+        <form class="stack" data-form="email-settings">${emailChoices.map(([key, title, detail]) => `<label class="toggle-row"><span class="grow"><b>${title}</b><span class="hint">${detail}</span></span><input type="checkbox" name="${key}" ${notificationSettings[key] ? 'checked' : ''}></label>`).join('')}
+          <div class="err" role="alert"></div><div class="acts"><button class="btn p" type="submit">Save email settings</button></div></form></section>
 
       <div class="acts" style="justify-content:flex-start">
         <button class="btn d" data-action="signout">Sign out</button>
@@ -43,107 +59,49 @@ const markProfileDirty = () => {
   if (form) { form.dataset.saved = '0'; form.querySelector('[type=submit]').disabled = false; }
   const status = document.getElementById('profile-status'); if (status) status.textContent = 'Unsaved changes';
 };
+
+forms['notification-channel'] = async (form) => {
+  const button = form.querySelector('[type=submit]'); button.disabled = true;
+  try {
+    const saved = await api('/notification-channel', { method: 'POST', body: { destination: new FormData(form).get('destination') } });
+    notificationChannel = saved.channel; toast('Confirmation email sent'); window.dispatchEvent(new Event('roomie:render'));
+  } catch (error) { showError(form, error.message); button.disabled = false; }
+};
+
+forms['email-settings'] = async (form) => {
+  const data = new FormData(form);
+  try {
+    const saved = await api(`/households/${S.hid}/notification-settings`, { method: 'PUT', body: { event_hosting: data.has('event_hosting'), event_other: data.has('event_other'), approval_request: data.has('approval_request') } });
+    notificationSettings = saved.settings; toast('Email settings saved');
+  } catch (error) { showError(form, error.message); }
+};
 inputs['profile-dirty'] = markProfileDirty;
-function openPhotoCrop(image, form) {
-  openModal(`${mhead('Crop profile photo')}
-    <p class="hint" id="crop-help">Drag the photo or use the arrow keys on the preview to reposition it. Use Zoom to resize it.</p>
-    <canvas class="crop-frame" width="256" height="256" tabindex="0" role="img" aria-label="Photo crop preview" aria-describedby="crop-help"></canvas>
-    <label class="fld"><span>Zoom</span><input class="input crop-range" type="range" min="1" max="2.5" value="1" step="0.05"></label>
-    <div class="row sp crop-controls">
-      <button type="button" class="btn" data-rotate-crop>Rotate 90°</button>
-      <div class="row">
-        <span class="hint" id="crop-avatar-label">Avatar preview</span>
-        <canvas class="av" width="38" height="38" data-crop-avatar role="img" aria-labelledby="crop-avatar-label"></canvas>
-      </div>
-    </div>
-    <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="button" class="btn p" data-apply-crop>Use photo</button></div>`);
-  const modal = document.getElementById('modal');
-  const canvas = modal.querySelector('.crop-frame');
-  const avatarCanvas = modal.querySelector('[data-crop-avatar]');
-  const avatarContext = avatarCanvas.getContext('2d');
-  const zoom = modal.querySelector('input[type=range]');
-  const context = canvas.getContext('2d', { alpha: false });
-  let x = image.naturalWidth / 2, y = image.naturalHeight / 2;
-  let size, drag, quarterTurns = 0;
-
-  function moveCrop(dx, dy) {
-    // Convert movement on the rotated preview back to the original image axes.
-    const [sourceX, sourceY] = [[dx, dy], [dy, -dx], [-dx, -dy], [-dy, dx]][quarterTurns];
-    x -= sourceX;
-    y -= sourceY;
-    draw();
-  }
-
-  function draw() {
-    size = Math.min(image.naturalWidth, image.naturalHeight) / Number(zoom.value);
-    const half = size / 2;
-    x = Math.max(half, Math.min(x, image.naturalWidth - half));
-    y = Math.max(half, Math.min(y, image.naturalHeight - half));
-    context.fillStyle = '#fff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.save();
-    context.translate(canvas.width / 2, canvas.height / 2);
-    context.rotate(quarterTurns * Math.PI / 2);
-    context.drawImage(image, x - half, y - half, size, size, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
-    context.restore();
-    avatarContext.drawImage(canvas, 0, 0, avatarCanvas.width, avatarCanvas.height);
-  }
-
-  canvas.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || drag) return;
-    canvas.setPointerCapture(event.pointerId);
-    drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
-  });
-  canvas.addEventListener('pointermove', (event) => {
-    if (drag?.id !== event.pointerId) return;
-    const scale = size / canvas.getBoundingClientRect().width;
-    moveCrop((event.clientX - drag.x) * scale, (event.clientY - drag.y) * scale);
-    drag.x = event.clientX;
-    drag.y = event.clientY;
-  });
-  canvas.addEventListener('lostpointercapture', () => { drag = null; });
-  canvas.addEventListener('keydown', (event) => {
-    const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
-    if (!direction || !event.key.startsWith('Arrow')) return;
-    event.preventDefault();
-    moveCrop(direction[0] * size / 32, direction[1] * size / 32);
-  });
-  zoom.addEventListener('input', draw);
-  modal.querySelector('[data-rotate-crop]').addEventListener('click', () => {
-    quarterTurns = (quarterTurns + 1) % 4;
-    draw();
-  });
-  modal.querySelector('[data-apply-crop]').addEventListener('click', () => {
-    if (!form.isConnected) { closeModal(); return; }
-    const data = canvas.toDataURL('image/jpeg', .82);
-    form.elements.namedItem('profilePhoto').value = data;
-    document.getElementById('profile-avatar').innerHTML = avatar({ ...S.user, profilePhoto: data }, 'lg');
-    form.querySelector('[data-action=remove-photo]').disabled = false;
-    markProfileDirty();
-    closeModal();
-  });
-  draw();
-}
-
+inputs['crop-zoom'] = (el) => { const preview = document.getElementById('crop-preview'); if (preview) preview.style.transform = `scale(${el.value})`; };
 inputs['profile-file'] = (el) => {
   const file = el.files?.[0]; if (!file) return;
-  const selection = ++photoSelection;
-  const form = el.closest('form');
-  const error = form.querySelector('[data-error-for=profilePhoto]');
-  el.value = '';
-  if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 10_000_000) { error.textContent = 'Choose a JPG, PNG, or WebP image under 10 MB.'; return; }
+  const error = document.querySelector('[data-error-for=profilePhoto]');
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 10_000_000) { error.textContent = 'Choose a JPG, PNG, or WebP image under 10 MB.'; el.value = ''; return; }
   error.textContent = '';
-  const image = new Image();
-  const url = URL.createObjectURL(file);
-  image.onload = () => {
-    URL.revokeObjectURL(url);
-    if (form.isConnected && selection === photoSelection) openPhotoCrop(image, form);
+  const reader = new FileReader();
+  reader.onload = () => {
+    cropImage = new Image();
+    cropImage.onload = () => openModal(`${mhead('Crop profile photo')}<p class="hint">Center your face in the circle and adjust the zoom.</p><div class="crop-frame"><img id="crop-preview" src="${esc(reader.result)}" alt="Photo crop preview"></div>
+      <label class="fld"><span>Zoom</span><input class="input crop-range" type="range" min="1" max="2.5" value="1" step="0.05" data-input="crop-zoom"></label>
+      <div class="acts"><button class="btn" data-action="close-modal">Cancel</button><button class="btn p" data-action="apply-photo">Use photo</button></div>`);
+    cropImage.src = reader.result;
   };
-  image.onerror = () => {
-    URL.revokeObjectURL(url);
-    if (form.isConnected && selection === photoSelection) error.textContent = 'Could not open this photo. Try another image.';
-  };
-  image.src = url;
+  reader.readAsDataURL(file);
+};
+actions['apply-photo'] = () => {
+  if (!cropImage) return;
+  const zoom = Number(document.querySelector('[data-input=crop-zoom]')?.value ?? 1), size = Math.min(cropImage.naturalWidth, cropImage.naturalHeight) / zoom;
+  const sx = (cropImage.naturalWidth - size) / 2, sy = (cropImage.naturalHeight - size) / 2;
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
+  canvas.getContext('2d').drawImage(cropImage, sx, sy, size, size, 0, 0, 256, 256);
+  const data = canvas.toDataURL('image/jpeg', .82), form = document.querySelector('form[data-form=profile]');
+  form.profilePhoto.value = data;
+  document.getElementById('profile-avatar').innerHTML = avatar({ ...S.user, profilePhoto: data }, 'lg');
+  form.querySelector('[data-action=remove-photo]').disabled = false; markProfileDirty(); cropImage = null; closeModal();
 };
 actions['remove-photo'] = (el) => {
   const form = el.closest('form'); form.profilePhoto.value = '';

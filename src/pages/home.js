@@ -49,9 +49,18 @@ function monthNav(view) {
   return scheduleToolbar({ title, monthAction: 'home-month', viewInput: 'home-view', view });
 }
 
-const upcomingMonthItems = () => D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7) && item.ymd >= ymdIn(Date.now()));
+const homeRange = () => {
+  const start = new Date(`${ymdIn(Date.now())}T12:00:00Z`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 13);
+  return [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)];
+};
+const upcomingMonthItems = () => {
+  const [start, end] = homeRange();
+  return D.items.filter((item) => item.ymd >= start && item.ymd <= end);
+};
 function monthList(items) {
-  return items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('') : '<p class="home-empty">No events or chores from today onward in this month.</p>';
+  return items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('') : '<p class="home-empty">Nothing scheduled in the next two weeks.</p>';
 }
 function listView() {
   const items = upcomingMonthItems();
@@ -68,7 +77,7 @@ function calendarView() {
   const today = ymdIn(Date.now());
   return `${monthNav('calendar')}
     <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div>
-    <div class="mgrid home-month">${monthDays(monthStart).map((day) => {
+    <div class="mgrid home-month">${Array.from({ length: 14 }, (_, i) => { const date = new Date(`${today}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + i); return date.toISOString().slice(0, 10); }).map((day) => {
       const items = D.items.filter((item) => item.ymd === day);
       return `<button class="day2 ${day.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${day === today ? 'today' : ''}" data-action="home-day" data-day="${day}" aria-label="${esc(dayLabel(day))}, ${items.length} items" ${day === today ? 'aria-current="date"' : ''}>
         <span class="dn">${Number(day.slice(8))}</span>${compact ? `<span class="home-day-dots" aria-hidden="true">${items.slice(0, 3).map((item) => `<i style="background:${personColor(item.userId)}"></i>`).join('')}</span>` : `${items.slice(0, 3).map((item) => `<span class="home-calendar-item ${item.completed ? 'completed' : ''}" style="--ev:${personColor(item.userId)}"><span>${timeFmt(item.at)} · ${esc(item.label)}</span><b>${esc(item.name)}</b>${item.approval?.total ? `<span class="home-calendar-approval">${item.approval.label} · ${item.approval.approved}/${item.approval.total}</span>` : ''}</span>`).join('')}

@@ -5,6 +5,7 @@ import { db, schema as s, type Tx } from './db.js';
 import type { CurrentUser } from './auth.js';
 import { HttpError, id } from './http.js';
 import { assertActiveMembers, assertCreator } from './household.js';
+import { queueEventEmails, skipEventEmails } from './event-email.js';
 import { activeIds, firstName, householdTz, optStr, str } from './validate.js';
 
 const iso = (v: string) => new Date(v).toISOString();
@@ -22,6 +23,7 @@ const eventOut = (e: EventRow, tags: TagRow[], viewerId: number) => ({
   eventId: e.eventId, eventName: e.eventName, eventDate: iso(e.eventDate), endDate: e.endDate ? iso(e.endDate) : null, location: e.location,
   category: e.category, otherLabel: e.category === 'other' && e.color && !HEX.test(e.color) ? e.color : null,
   reminderMinutesBefore: e.reminderMinutesBefore, description: e.description,
+  notifyRoommates: e.notifyRoommates,
   createdByUserId: e.createdByUserId, canEdit: e.createdByUserId === viewerId,
   tags: tags.filter((t) => t.eventId === e.eventId).map((t) => ({ userId: t.userId, response: t.response, respondedDate: t.respondedDate ? iso(t.respondedDate) : null })),
 });
@@ -51,10 +53,12 @@ function eventFields(b: Record<string, unknown>) {
   }
   const tagged = b.taggedUserIds === undefined ? [] : Array.isArray(b.taggedUserIds) ? [...new Set(b.taggedUserIds.map((x) => id(x, 'roommate')))] : (() => { throw new HttpError(400, 'Tagged roommates must be a list'); })();
   if (tagged.length > 12) throw new HttpError(400, 'Too many tagged roommates');
+  if (b.notifyRoommates !== undefined && typeof b.notifyRoommates !== 'boolean') throw new HttpError(400, 'notifyRoommates must be true or false');
   return {
     eventName: str(b.eventName, 1, 120, 'Event name'), date: ymd(b.date, 'Date'), time: hhmm(b.time, 'Time'),
     endTime: b.endTime == null || b.endTime === '' ? null : hhmm(b.endTime, 'End time'),
     location: optStr(b.location, 120, 'Location'), description: optStr(b.description, 500, 'Description'), category, otherLabel, reminder, tagged,
+    notifyRoommates: b.notifyRoommates === true,
   };
 }
 
@@ -78,8 +82,9 @@ export async function createEvent(user: CurrentUser, householdId: number, b: Rec
     const end = f.endTime ? sql`((${f.date}::date + ${f.endTime}::time) AT TIME ZONE ${tz})` : null;
     if (end) { const ok = await tx.execute(sql`SELECT ${end} >= ${start} AS ok`); if (!(ok.rows[0] as { ok: boolean }).ok) throw new HttpError(400, 'The event cannot end before it starts'); }
     const [e] = await tx.insert(s.event).values({ householdId, createdByUserId: user.userId, eventName: f.eventName, eventDate: start, endDate: end, location: f.location,
-      category: f.category, color: f.otherLabel, reminderMinutesBefore: f.reminder, description: f.description }).returning();
+      category: f.category, color: f.otherLabel, reminderMinutesBefore: f.reminder, description: f.description, notifyRoommates: f.notifyRoommates }).returning();
     await tagRoommates(tx, householdId, e!, tagged, user, tz);
+    await queueEventEmails(tx, e!, tagged);
     const tags = await tx.select().from(s.eventTag).where(eq(s.eventTag.eventId, e!.eventId));
     return eventOut(e!, tags, user.userId);
   });
@@ -99,7 +104,7 @@ export async function updateEvent(user: CurrentUser, householdId: number, eventI
     const start = sql`((${f.date}::date + ${f.time}::time) AT TIME ZONE ${tz})`;
     const end = f.endTime ? sql`((${f.date}::date + ${f.endTime}::time) AT TIME ZONE ${tz})` : null;
     if (end) { const ok = await tx.execute(sql`SELECT ${end} >= ${start} AS ok`); if (!(ok.rows[0] as { ok: boolean }).ok) throw new HttpError(400, 'The event cannot end before it starts'); }
-    const [e] = await tx.update(s.event).set({ eventName: f.eventName, eventDate: start, endDate: end, location: f.location, category: f.category, color: f.otherLabel, reminderMinutesBefore: f.reminder, description: f.description })
+    const [e] = await tx.update(s.event).set({ eventName: f.eventName, eventDate: start, endDate: end, location: f.location, category: f.category, color: f.otherLabel, reminderMinutesBefore: f.reminder, description: f.description, notifyRoommates: f.notifyRoommates })
       .where(eq(s.event.eventId, eventId)).returning();
     const planChanged = old.eventName !== e!.eventName || iso(old.eventDate) !== iso(e!.eventDate) || (old.endDate ? iso(old.endDate) : null) !== (e!.endDate ? iso(e!.endDate) : null) || old.location !== e!.location || old.category !== e!.category || old.color !== e!.color || old.description !== e!.description;
     const active = await activeIds(tx, householdId);
@@ -116,6 +121,7 @@ export async function deleteEvent(user: CurrentUser, householdId: number, eventI
   await db.transaction(async (tx) => {
     const e = await loadEvent(tx, householdId, eventId, true);
     assertCreator(e.createdByUserId, user.userId);
+    await skipEventEmails(tx, eventId);
     await tx.delete(s.notification).where(and(eq(s.notification.householdId, householdId), eq(s.notification.sourceType, 'event'), eq(s.notification.sourceId, eventId)));
     await tx.delete(s.event).where(eq(s.event.eventId, eventId)); // tags go with it; board notes that linked it keep their text
   });
@@ -219,8 +225,8 @@ export async function deleteNote(user: CurrentUser, householdId: number, message
 // reminder_minutes_before is stored on the event; the daily cron is the only clock we have (Hobby plan), so an
 // event is reminded on the first run at or after (start - lead - 24h): a short lead can arrive up to a day early
 // but is never missed. No column tracks it: a 'system' notification pointing at the event, per person, is the
-// record, so re-running the job never sends twice. Only current roommates get one; the creator and anyone
-// tagged who has not declined.
+// record, so re-running the job never sends twice. Reminders wait until every tagged roommate has approved;
+// once confirmed, the creator and current tagged roommates each get one.
 export async function sendEventReminders(opts: { nowIso?: string } = {}) {
   const nowIso = opts.nowIso ?? new Date().toISOString();
   return db.transaction(async (tx) => {
