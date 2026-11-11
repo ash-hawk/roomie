@@ -1,3 +1,4 @@
+import { removeFutureMemberActivity } from '../member-cleanup.js';
 import { and, eq, isNull } from 'drizzle-orm';
 import { db, schema } from '../db.js';
 import { withHousehold } from '../context.js';
@@ -44,6 +45,7 @@ export const DELETE = withHousehold(async ({ user, householdId, role, req }) => 
     if (target.role === 'owner') throw new HttpError(400, 'Transfer ownership before removing an owner');
     const [row] = await tx.update(hm).set({ leftDate: new Date().toISOString() })
       .where(eq(hm.memberId, target.memberId)).returning({ userId: hm.userId });
+    await removeFutureMemberActivity(tx, householdId, targetUserId);
     return row;
   });
   if (!removed) throw new HttpError(404, 'Active roommate not found');

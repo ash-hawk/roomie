@@ -70,7 +70,7 @@ function settleView() {
   ${incoming || outgoing ? `<div class="grid2">
     ${incoming ? `<section class="card"><h2>Waiting on you</h2>${incoming}</section>` : ''}
     ${outgoing ? `<section class="card"><h2>You sent</h2>${outgoing}</section>` : ''}</div>` : ''}
-  <section class="card finance-history"><div class="row sp"><h2>Past purchases</h2>${badge(`${D.expenses.length}`, 'gray')}</div>
+  <section class="card finance-history"><div class="row sp"><h2>Past purchases</h2></div>
     <p class="section-description">Shared expense history and how each purchase was split.</p>
     ${D.expenses.length ? D.expenses.map(expenseRow).join('') : empty('🧾', 'No purchases yet', 'Use Log expense above and the split is figured out for you.')}</section>`;
 }

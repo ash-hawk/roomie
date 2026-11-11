@@ -34,6 +34,10 @@ const iso = (v: string) => new Date(v).toISOString();
 /** Create the missing occurrences of one recurring chore for the next few weeks. Safe to run any number of times. */
 export async function generateForChore(tx: Tx, chore: Chore, tz: string, opts: { horizonDays?: number; asOf?: { today: string; nowIso: string } } = {}): Promise<number> {
   if (chore.repeats === 'none' || !chore.dueTime) return 0;
+  // Serialize generation with household membership changes so a departing roommate cannot
+  // receive fresh occurrences after the removal transaction has cleaned up their schedule.
+  await tx.select({ householdId: s.household.householdId }).from(s.household)
+    .where(eq(s.household.householdId, chore.householdId)).for('share');
   const today = opts.asOf?.today ?? todayIn(tz);
   const nowMs = Date.parse(opts.asOf?.nowIso ?? new Date().toISOString());
   const dates = occurrenceDates({ repeats: chore.repeats as 'weekly' | 'monthly', startDate: chore.startDate, dayOfWeek: chore.dayOfWeek, dayOfMonth: chore.dayOfMonth }, today, addDays(today, opts.horizonDays ?? HORIZON_DAYS));

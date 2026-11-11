@@ -1,3 +1,4 @@
+import { applyAppearance } from './lib/appearance.js';
 import './styles.css';
 import { api, getToken, signOut } from './auth-client.js';
 import { actions, forms, inputs } from './lib/events.js';
@@ -48,17 +49,11 @@ async function loadNavCounts() {
   };
 }
 
-function accentInk(hex) {
-  const value = /^#[0-9a-f]{6}$/i.test(hex) ? hex : '#4338ca';
-  const rgb = [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16) / 255).map((c) => c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
-  return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2] > .45 ? '#171721' : '#ffffff';
-}
-
 function shell(page, body) {
   const h = household();
   const count = (key) => key === 'chores' && S.navCounts.overdue ? String(S.navCounts.overdue) : '';
   const items = NAV.map(([k, i, l]) => `<a href="#/${k}" class="nav-i ${k === page ? 'on' : ''}" ${k === page ? 'aria-current="page"' : ''}>${ico(i, 19)}<span>${l}</span>${count(k) ? `<span class="nav-count" aria-label="${count(k)} overdue">${count(k)}</span>` : ''}</a>`).join('');
-  const accent = h.themeColor || '#4338ca'; document.documentElement.style.setProperty('--accent', accent); document.documentElement.style.setProperty('--on-accent', accentInk(accent));
+  applyAppearance();
   const account = S.user.profilePhoto ? `<img class="acct-photo" src="${esc(S.user.profilePhoto)}" alt="" referrerpolicy="no-referrer">` : esc(((S.user.firstName || '?')[0]).toUpperCase());
   return `<div class="shell"><div class="main">
     <header class="top"><a href="/#/home"><div class="brand">${mark()}<div class="grow"><b>Roomie</b><small class="truncate">${esc(h.householdName)}</small></div></div></a>
@@ -74,9 +69,10 @@ export async function render() {
   const mine = ++seq;
   try {
     if (isPasswordReset()) { root.innerHTML = authView(); return; }
-    if (!(await getToken())) { resetState(); root.innerHTML = authView(); return; }
+    if (!(await getToken())) { resetState(); applyAppearance(); root.innerHTML = authView(); return; }
     if (!S.user) { root.innerHTML = loading; await loadMe(); }
     if (mine !== seq) return;
+    applyAppearance();
     if (needsOnboarding()) { root.removeAttribute('data-page'); root.innerHTML = await onboardingView(); return; }
     const legacyActivity = location.hash.replace(/^#\/?/, '').split('/')[0] === 'notifications';
     if (legacyActivity) history.replaceState(null, '', '#/home');
