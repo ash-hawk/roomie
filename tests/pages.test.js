@@ -111,39 +111,34 @@ describe("profile save", () => {
   });
 });
 describe("Home views", () => {
-  it("limits the list to one month and keeps month navigation in List view across year boundaries", async () => {
+  it("pages through two-week ranges and keeps the selected range across views and years", async () => {
     S.hid = 2; S.households = [{ householdId: 2, householdName: 'Another house', timezone: 'America/Denver' }];
+    vi.setSystemTime(new Date('2026-12-18T18:00:00Z'));
     const baseApi = mockedApi.getMockImplementation();
     mockedApi.mockImplementation((path) => path.endsWith('/events') ? Promise.resolve({ events: [
       ...events,
-      { ...events[0], eventId: 2, eventName: 'December plan', eventDate: '2026-12-01T20:00:00Z' },
+      { ...events[0], eventId: 2, eventName: 'December plan', eventDate: '2026-12-31T20:00:00Z' },
       { ...events[0], eventId: 3, eventName: 'January plan', eventDate: '2027-01-01T20:00:00Z' },
     ] }) : baseApi(path));
     document.getElementById('page').innerHTML = await homeView();
     const content = document.getElementById('home-schedule-content');
-    expect(content.textContent).toContain('November 2026');
-    expect(content.textContent).toContain('Dinner');
-    expect(content.textContent).not.toContain('December plan');
-    const next = () => actions['home-month'](content.querySelector('[data-n="1"]'));
-    next();
-    expect(content.textContent).toContain('December 2026');
+    const move = (direction) => actions['home-range'](content.querySelector(`[data-n="${direction}"]`));
+    const setView = (value) => {
+      const picker = content.querySelector('[data-input="home-view"]');
+      picker.value = value; inputs['home-view'](picker);
+    };
     expect(content.textContent).toContain('December plan');
-    expect(content.textContent).not.toContain('Dinner');
     expect(content.textContent).not.toContain('January plan');
-    expect(content.querySelector('.home-month')).toBeNull();
-    next();
-    expect(content.textContent).toContain('January 2027');
+    move(1);
     expect(content.textContent).toContain('January plan');
     expect(content.textContent).not.toContain('December plan');
-    const picker = document.querySelector('[data-input="home-view"]');
-    picker.value = 'calendar'; inputs['home-view'](picker);
-    expect(content.textContent).toContain('January 2027');
-    expect(content.querySelector('.home-month')).not.toBeNull();
-    picker.value = 'list'; inputs['home-view'](picker);
-    next();
-    expect(content.textContent).toContain('February 2027');
-    expect(content.textContent).toContain('No events or chores from today onward in this month.');
-    actions['home-month'](content.querySelector('[data-n="-1"]'));
+    setView('calendar');
+    expect(content.querySelector('[data-day="2027-01-01"]').textContent).toContain('January plan');
+    expect(content.querySelectorAll('[data-day]')).toHaveLength(14);
+    setView('list');
+    move(1);
+    expect(content.textContent).toContain('Nothing scheduled in this date range.');
+    move(-1);
     expect(content.textContent).toContain('January plan');
     expect(mockedApi).toHaveBeenCalledTimes(5);
   });
@@ -481,8 +476,8 @@ describe('Home widget customization', () => {
     await render();
     expect(document.querySelector('.home-widget').classList.contains('compact')).toBe(true);
     expect(document.querySelector('[data-input="home-view"]').value).toBe('calendar');
-    actions['home-month'](document.querySelector('[data-n="1"]'));
-    expect(document.querySelector('#home-schedule-content').textContent).toContain('December 2026');
+    actions['home-range'](document.querySelector('[data-n="1"]'));
+    expect(document.querySelector('#home-schedule-content [data-day]').dataset.day).toBe('2026-11-19');
     S.user = { ...S.user, userId: 2 };
     await render();
     expect(document.querySelector('.home-widget').classList.contains('expanded')).toBe(true);
@@ -629,6 +624,8 @@ describe('Home upcoming list dates', () => {
     content = document.getElementById('home-schedule-content');
     expect(content.querySelectorAll('.home-schedule-row')).toHaveLength(8);
     const view = content.querySelector('[data-input="home-view"]'); view.value = 'calendar'; inputs['home-view'](view);
+    expect(content.querySelector('[data-day="2026-11-04"]')).toBeNull();
+    actions['home-range'](content.querySelector('[data-n="-1"]'));
     expect(content.querySelector('[data-day="2026-11-04"]').textContent).toContain('Yesterday meeting');
   });
 });
