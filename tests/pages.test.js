@@ -8,6 +8,7 @@ import { calendarView } from "../src/pages/calendar.js";
 import { settingsView } from "../src/pages/settings.js";
 import { connectHomeLayout } from "../src/components/home-layout.js";
 import { homeView } from "../src/pages/home.js";
+import { householdView } from "../src/pages/household.js";
 const user = { userId: 1, firstName: "Alex", lastName: "Rivera", profilePhoto: null, phoneNumber: "", paymentMethods: [] };
 const members = [user, { userId: 2, firstName: "Jordan" }, { userId: 3, firstName: "Sam" }];
 const events = [{ eventId: 1, eventName: "Dinner", eventDate: "2026-11-05T20:00:00Z", endDate: null, createdByUserId: 1, category: "meeting", canEdit: true, tags: [{ userId: 2, response: "pending" }] }];
@@ -797,5 +798,50 @@ describe('Schedule filtering menus', () => {
       document.getElementById('page').dispatchEvent(new MouseEvent('click', { bubbles: true }));
       expect(menu.open).toBe(false);
     }
+  });
+});
+
+describe('Household role controls', () => {
+  it('shows household administration only to owners', async () => {
+    S.households[0] = {
+      householdId: 1, householdName: 'Test household', address: '123 Main St',
+      timezone: 'America/Denver', themeColor: '#4338ca', joinCode: 'ROOM1234', role: 'owner',
+    };
+    mockedApi.mockResolvedValue({ members: [
+      { ...user, role: 'owner', joinedDate: '2026-01-01T00:00:00Z' },
+      { userId: 2, firstName: 'Jordan', role: 'member', joinedDate: '2026-01-01T00:00:00Z' },
+    ] });
+    document.getElementById('page').innerHTML = await householdView();
+    expect(document.querySelector('[data-form="household-settings"]')).not.toBeNull();
+    expect(document.querySelector('[data-action="rotate-join-code"]')).not.toBeNull();
+    expect(document.querySelector('[data-action="delete-household"]')).not.toBeNull();
+    expect(document.querySelector('[data-action="remove-member"]')).not.toBeNull();
+
+    S.households[0].role = 'member';
+    document.getElementById('page').innerHTML = await householdView();
+    expect(document.querySelector('[data-form="household-settings"]')).toBeNull();
+    expect(document.querySelector('[data-action="rotate-join-code"]')).toBeNull();
+    expect(document.querySelector('[data-action="delete-household"]')).toBeNull();
+    expect(document.querySelector('[data-action="remove-member"]')).toBeNull();
+    expect(document.querySelector('.code')).toBeNull();
+  });
+
+  it('saves household settings through the owner-only API and updates local household state', async () => {
+    S.households[0] = {
+      householdId: 1, householdName: 'Test household', timezone: 'America/Denver',
+      themeColor: '#4338ca', joinCode: 'ROOM1234', role: 'owner',
+    };
+    document.getElementById('page').innerHTML = await householdView();
+    const form = document.querySelector('[data-form="household-settings"]');
+    form.elements.namedItem('householdName').value = 'New household';
+    mockedApi.mockResolvedValueOnce({ household: {
+      householdId: 1, householdName: 'New household', address: null,
+      timezone: 'America/Denver', themeColor: '#4338ca',
+    } });
+
+    await forms['household-settings'](form);
+
+    expect(mockedApi).toHaveBeenCalledWith('/households/1', expect.objectContaining({ method: 'PATCH' }));
+    expect(S.households[0].householdName).toBe('New household');
   });
 });

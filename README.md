@@ -17,6 +17,10 @@ Roomie gives each household one shared place to coordinate: a chore chart with o
 
 The product requirements are documented in [docs/requirements.csv](docs/requirements.csv).
 
+### Household roles
+
+Every active household member can participate in shared chores, expenses, events, and messages. Owners additionally manage household details and invite codes, remove regular members, transfer ownership, and delete the household. These administrative actions are enforced by the API; removed roommates retain their historical activity, while deleting a household permanently deletes its shared data.
+
 ## ERD
 
 ![Roomie ERD](docs/erd.png)
@@ -179,4 +183,3 @@ Use the completion control again to mark the chore incomplete.
 7. After merging, verify the affected workflows on the deployed application.
 
 Keep environment secrets in `.env.local` and never commit them. Record change-specific test results and blocked checks in the pull request.
-

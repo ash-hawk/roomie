@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { HttpError } from '../api/_lib/http.js';
-import { assertCreator } from '../api/_lib/household.js';
+import { assertCreator, assertOwner } from '../api/_lib/household.js';
 import { newJoinCode } from '../api/_lib/joincode.js';
 
 const files = (dir: string, out: string[] = []): string[] => {
@@ -23,7 +23,7 @@ describe('every API route is behind authentication', () => {
   });
   it('every handler file is registered in the route table (no orphan handlers)', () => {
     const table = readFileSync('api/_lib/routes.ts', 'utf8');
-    for (const f of handlerFiles) expect(table, `${f} is not registered in api/_lib/routes.ts`).toContain(`./handlers/${f.split('/').pop()!.replace(/\.ts$/, '')}.js`);
+    for (const f of handlerFiles) expect(table, `${f} is not registered in api/_lib/routes.ts`).toContain(`./handlers/${f.replaceAll('\\', '/').split('/').pop()!.replace(/\.ts$/, '')}.js`);
   });
   it('household-scoped handlers (/households/:id/...) all use withHousehold, never withUser', () => {
     const table = readFileSync('api/_lib/routes.ts', 'utf8');
@@ -85,6 +85,13 @@ describe('creator-only edits', () => {
     expect(() => assertCreator(5, 5)).not.toThrow();
     expect(() => assertCreator(5, 6)).toThrow(HttpError);
     expect(() => assertCreator(null, 6)).toThrow(HttpError);
+  });
+});
+
+describe('household owner permissions', () => {
+  it('allows owners and rejects regular members from owner-only actions', () => {
+    expect(() => assertOwner('owner')).not.toThrow();
+    expect(() => assertOwner('member')).toThrow(HttpError);
   });
 });
 
