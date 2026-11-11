@@ -3,7 +3,7 @@ import { api, getToken, signOut } from './auth-client.js';
 import { actions, forms, inputs } from './lib/events.js';
 import { $, ico, mark, closeModal, esc, showError, toast } from './lib/dom.js';
 import { S, household, needsOnboarding, resetState } from './lib/state.js';
-import { authView } from './pages/auth.js';
+import { authView, isPasswordReset } from './pages/auth.js';
 import { onboardingView } from './pages/onboarding.js';
 import { settingsView } from './pages/settings.js';
 import { householdView } from './pages/household.js';
@@ -73,6 +73,7 @@ let seq = 0;
 export async function render() {
   const mine = ++seq;
   try {
+    if (isPasswordReset()) { root.innerHTML = authView(); return; }
     if (!(await getToken())) { resetState(); root.innerHTML = authView(); return; }
     if (!S.user) { root.innerHTML = loading; await loadMe(); }
     if (mine !== seq) return;
