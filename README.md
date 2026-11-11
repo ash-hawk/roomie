@@ -13,7 +13,7 @@ A shared-house app for roommates: chores, costs, calendar, and a message board i
 
 College students who move in with new or unrelated roommates rarely sit down and agree on how the house will run. Expectations go unspoken, so everyone assumes someone else will take out the trash, buy the paper towels, or ask before hosting friends. The group text where these things get sorted out is quickly buried under memes and plans, so a request from Tuesday is lost by Thursday. Chores and money then turn into tension because nobody can see who did what or who owes whom.
 
-Roomie gives each household one shared place to coordinate: a chore chart with one-time or repeating chores that are assigned or rotated, with swap and skip requests when life gets in the way. It splits shared purchases to the exact cent, shows who owes whom, and lets recipients confirm repayment made through Venmo, Zelle, or Apple Cash. A shared calendar, household message board, wish list, and personal activity panel keep everyone on the same page.
+Roomie gives each household one shared place to coordinate: a chore chart with one-time or repeating chores that are assigned or rotated, with swap and skip requests when life gets in the way. It splits shared purchases to the exact cent, shows who owes whom, and lets recipients confirm repayment made through Venmo, Zelle, or Apple Cash. A shared calendar, household message board with a resolved-announcement archive, wish list, and personal activity panel keep everyone on the same page.
 
 The product requirements are documented in [docs/requirements.csv](docs/requirements.csv).
 
@@ -179,4 +179,3 @@ Use the completion control again to mark the chore incomplete.
 7. After merging, verify the affected workflows on the deployed application.
 
 Keep environment secrets in `.env.local` and never commit them. Record change-specific test results and blocked checks in the pull request.
-

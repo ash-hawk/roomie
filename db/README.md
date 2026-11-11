@@ -20,7 +20,7 @@ Each branch has its own Neon Auth instance (its own users and its own `NEON_AUTH
 - `authenticated` and `anonymous` (the Data API roles) have zero privileges on every table. The Neon Data API is OFF on both branches.
 
 ## Files
-- `schema.sql` is the source of truth (v3, 18 tables). `migrations/` holds numbered changes since. `archive/` is the old RLS prototype, never run. `branches.json` holds the branch and endpoint ids (no secrets).
+- `schema.sql` is the source of truth (v4, 18 tables). `migrations/` holds numbered changes since; migration `0003` adds resolved-announcement status to `bulletin_message`. `archive/` is the old RLS prototype, never run. `branches.json` holds the branch and endpoint ids (no secrets).
 
 ## Changing the schema
 1. Write the next numbered file in `migrations/` and get it reviewed.
