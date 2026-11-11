@@ -1,7 +1,13 @@
--- Roommate App schema (IS 401 Team 4-06) — v4
+-- Roommate App schema (IS 401 Team 4-06) — v5
 -- Target: PostgreSQL 15+ (Neon). Run once on an empty database.
 --
--- v4 adds onboarding completion, opt-in email settings/outbox, and AI usage limits.
+-- v5 changes from v3:
+--   * bulletin_message.is_resolved keeps resolved announcements out of the open board feed
+--   * household_member.onboarded_at tracks completion of onboarding
+--   * event.email_roommates controls opt-in event notifications
+--   * notification_setting and email_outbox support email preferences and delivery
+--   * ai_usage tracks rate-limited AI features
+--   * notification_channel and notification_channel_confirmation verify delivery addresses
 -- v3 changes from v2:
 --   * users.auth_provider_id links a row to the sign-in provider (Clerk, Auth.js, ...)
 --   * household.timezone: recurring chores, reminders and the calendar use it
@@ -275,6 +281,7 @@ CREATE TABLE bulletin_message (
     parent_message_id BIGINT REFERENCES bulletin_message(message_id) ON DELETE CASCADE,
     message_text      TEXT NOT NULL,
     is_pinned         BOOLEAN NOT NULL DEFAULT false,
+    is_resolved       BOOLEAN NOT NULL DEFAULT false,
     posted_date       TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()

@@ -242,6 +242,7 @@ describe('Home household board', () => {
       throw new Error('Unexpected path ' + path);
     });
     document.getElementById('page').innerHTML = await homeView();
+    actions['home-board-filter'](document.querySelector('#home-board [data-archive=false]'));
   }
   it('shows actionable requests and the same announcements, without granting unrelated swap controls', async () => {
     await renderBoard();
@@ -256,6 +257,65 @@ describe('Home household board', () => {
     boardChores.swapRequests = [{ ...request, type: 'swap', targetUserId: 3 }];
     document.getElementById('page').innerHTML = await homeView();
     expect(document.querySelector('#home-board [data-kind=chore]')).toBeNull();
+  });
+  it('filters resolved announcements into the Home archive', async () => {
+    await renderBoard();
+    notes.push({ messageId: 12, senderUserId: 3, messageText: 'Archived announcement', postedDate: '2026-11-05T16:00:00Z', isResolved: true, replies: [] });
+    document.getElementById('page').innerHTML = await homeView();
+    const board = document.getElementById('home-board');
+    expect(board.textContent).toContain('Same announcement as Events');
+    expect(board.textContent).not.toContain('Archived announcement');
+    actions['home-board-filter'](board.querySelector('[data-archive=true]'));
+    expect(board.textContent).toContain('Archived announcement');
+    expect(board.textContent).not.toContain('Same announcement as Events');
+    expect(board.textContent).not.toContain('Laundry');
+  });
+  it('resolves an announcement and moves it to the Home archive', async () => {
+    await renderBoard();
+    mockedApi.mockImplementation(async (path, options = {}) => {
+      if (options.method === 'PATCH') {
+        notes.find((note) => note.messageId === Number(path.split('/').pop())).isResolved = options.body.isResolved;
+        return {};
+      }
+      if (path.endsWith('/members')) return { members };
+      if (path.endsWith('/events')) return { events: boardEvents };
+      if (path.endsWith('/chores')) return boardChores;
+      if (path.endsWith('/balances')) return { mine: [] };
+      if (path.endsWith('/board')) return { notes };
+      throw new Error('Unexpected path ' + path);
+    });
+    const button = document.querySelector('#home-board [data-action=home-board-resolve]');
+    await actions['home-board-resolve'](button);
+    expect(mockedApi).toHaveBeenCalledWith('/households/1/board/8', { method: 'PATCH', body: { isResolved: true } });
+    expect(document.getElementById('home-board').textContent).not.toContain('Same announcement as Events');
+    actions['home-board-filter'](document.querySelector('#home-board [data-archive=true]'));
+    expect(document.getElementById('home-board').textContent).toContain('Same announcement as Events');
+  });
+  it('shows a migration hint when resolving fails on the server', async () => {
+    await renderBoard();
+    mockedApi.mockImplementation(async (path, options = {}) => {
+      if (options.method === 'PATCH') throw Object.assign(new Error('Something went wrong'), { status: 500 });
+      if (path.endsWith('/members')) return { members };
+      if (path.endsWith('/events')) return { events: boardEvents };
+      if (path.endsWith('/chores')) return boardChores;
+      if (path.endsWith('/balances')) return { mine: [] };
+      if (path.endsWith('/board')) return { notes };
+      throw new Error('Unexpected path ' + path);
+    });
+    await actions['home-board-resolve'](document.querySelector('#home-board [data-action=home-board-resolve]'));
+    expect(document.querySelector('#home-board .err').textContent).toContain('migration 0003');
+    expect(document.querySelector('#home-board [data-action=home-board-resolve]').disabled).toBe(false);
+  });
+  it('filters resolved announcements into the Calendar board archive', async () => {
+    await renderBoard();
+    notes[0].isResolved = true;
+    document.getElementById('page').innerHTML = await calendarView();
+    const board = document.querySelector('[data-board]');
+    actions['calendar-board-filter'](board.querySelector('[data-archive=false]'));
+    expect(board.textContent).not.toContain('Same announcement as Events');
+    actions['calendar-board-filter'](board.querySelector('[data-archive=true]'));
+    expect(board.textContent).toContain('Same announcement as Events');
+    expect(board.querySelector('[data-action=note-resolve]').textContent).toBe('Reopen');
   });
   it('shows the same cover request on both Chores views with a working response control', async () => {
     await renderBoard();
@@ -297,6 +357,7 @@ describe('Home household board', () => {
     mockedApi.mockImplementation((path, options) => path.endsWith('/members') ? Promise.resolve({ members: members.map((m) => m.userId === 3 ? { ...m, profilePhoto: 'https://images.example/sam.jpg', email: 'sam@example.test' } : m) }) : baseApi(path, options));
     for (const page of [homeView, calendarView]) {
       document.getElementById('page').innerHTML = await page();
+      if (page === calendarView) actions['calendar-board-filter'](document.querySelector('[data-board] [data-archive=false]'));
       const reply = document.querySelector('.reply');
       expect(reply.textContent).toContain('Sam');
       expect(reply.querySelector('img').getAttribute('src')).toBe('https://images.example/sam.jpg');

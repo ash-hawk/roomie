@@ -39,4 +39,3 @@ describe('onboarding template fallback', () => {
     expect(result.wishlist.map((item) => item.itemName)).toEqual(['Dish soap', 'paper towels']);
   });
 });
-

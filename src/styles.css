@@ -606,6 +606,7 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 
 /* Household board keeps requests visible above the shared schedule. */
 .home-board-feed{padding:2px}
+.home-board-filters{gap:6px;flex-wrap:wrap}
 .home-board-request{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--soft)}
 .home-board-request .acts{justify-content:flex-start;flex-wrap:wrap}.home-board-request .st{align-self:flex-start;white-space:normal}
 .home-board-message{white-space:pre-wrap;overflow-wrap:anywhere}.home-board .row{flex-wrap:wrap}

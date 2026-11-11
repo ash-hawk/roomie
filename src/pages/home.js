@@ -33,7 +33,7 @@ function getLayout() {
 }
 let layout = defaultLayout(), editing = false, editingKey = null;
 const widgetSize = (id) => layout.find((w) => w.id === id)?.size;
-let monthStart = null, monthHousehold = null, D = null;
+let monthStart = null, monthHousehold = null, D = null, homeBoardArchive = false;
 
 function row(item) {
   const member = D.members.find((m) => m.userId === item.userId);
@@ -95,7 +95,7 @@ export async function homeView() {
     api(`/households/${hid()}/members`), api(`/households/${hid()}/events`), api(`/households/${hid()}/chores`), api(`/households/${hid()}/balances`), api(`/households/${hid()}/board`),
   ]);
   D = { householdId: hid(), members, events, chores, notes, user: S.user, timezone: tz(), items: scheduleItems(events, chores, tz()) };
-  if (monthHousehold !== hid()) { monthStart = null; monthHousehold = hid(); }
+  if (monthHousehold !== hid()) { monthStart = null; monthHousehold = hid(); homeBoardArchive = false; }
   monthStart ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   if (editingKey !== layoutKey()) { editing = false; editingKey = layoutKey(); }
   layout = getLayout();
@@ -156,7 +156,7 @@ async function refreshHomeBoard(onlyChanged = false) {
   const expandedEntries = [...document.querySelectorAll('#home-board details[open]')].map((el) => el.dataset.boardEntry);
   const drafts = [...document.querySelectorAll('#home-board form')].map((form) => ({ kind: form.dataset.form, id: form.dataset.id, message: form.elements.namedItem('messageText')?.value ?? '', eventId: form.elements.namedItem('eventId')?.value ?? '' }));
   D = { ...D, events, chores, notes, items: scheduleItems(events, chores, tz()) };
-  document.getElementById('home-board').innerHTML = householdBoard({ ...D, compact: widgetSize('board') === 'compact' });
+  document.getElementById('home-board').innerHTML = householdBoard({ ...D, compact: widgetSize('board') === 'compact', archive: homeBoardArchive });
   document.querySelectorAll('#home-board details').forEach((el) => { el.open = expandedEntries.includes(el.dataset.boardEntry); });
   for (const form of document.querySelectorAll('#home-board form')) {
     const draft = drafts.find((d) => d.kind === form.dataset.form && d.id === form.dataset.id);
@@ -182,6 +182,31 @@ actions['home-board-response'] = async (button) => {
   finally { card.removeAttribute('aria-busy'); buttons.forEach((el) => { el.disabled = false; }); }
   toast(answer === 'withdraw' ? 'Request cancelled' : 'Response saved');
   try { await refreshHomeBoard(); } catch { card.innerHTML = '<p class="hint" role="status">Response saved. Refresh Home to see the latest requests.</p>'; }
+};
+actions['home-board-filter'] = (button) => {
+  homeBoardArchive = button.dataset.archive === 'true';
+  renderWidgetSize('board');
+};
+actions['home-board-resolve'] = async (button) => {
+  const article = button.closest('article');
+  const buttons = [...article.querySelectorAll('button')];
+  article.setAttribute('aria-busy', 'true');
+  buttons.forEach((el) => { el.disabled = true; });
+  showError(article, '');
+  try {
+    await api(`/households/${D.householdId}/board/${button.dataset.id}`, { method: 'PATCH', body: { isResolved: button.dataset.resolved === 'true' } });
+  } catch (error) {
+    showError(article, error.status === 500
+      ? 'Could not update this announcement. The board database may need migration 0003 applied.'
+      : error.message);
+    article.removeAttribute('aria-busy');
+    buttons.forEach((el) => { el.disabled = false; });
+    return;
+  }
+  article.removeAttribute('aria-busy');
+  buttons.forEach((el) => { el.disabled = false; });
+  toast(button.dataset.resolved === 'true' ? 'Announcement moved to the resolved archive' : 'Announcement reopened');
+  try { await refreshHomeBoard(); } catch { toast('Saved. Refresh Home to see the updated board.'); }
 };
 actions['home-make-announcement'] = () => openModal(`${mhead('Make announcement')}${announcementForm(D.events)}`);
 const postHomeNote = async (form, reply) => {
@@ -237,7 +262,7 @@ function renderWidgetSize(id) {
     const board = document.getElementById('home-board');
     const drafts = [...board.querySelectorAll('form')].map((form) => ({ id: form.dataset.id, value: form.elements.namedItem('messageText')?.value }));
     const opened = [...board.querySelectorAll('details[open]')].map((el) => el.dataset.boardEntry);
-    board.innerHTML = householdBoard({ ...D, compact: widgetSize(id) === 'compact' });
+    board.innerHTML = householdBoard({ ...D, compact: widgetSize(id) === 'compact', archive: homeBoardArchive });
     board.querySelectorAll('details').forEach((el) => { el.open = opened.includes(el.dataset.boardEntry); });
     for (const form of board.querySelectorAll('form')) {
       const draft = drafts.find((d) => d.id === form.dataset.id);

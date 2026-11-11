@@ -2,7 +2,7 @@ import { ago, esc, fullName } from '../lib/dom.js';
 import { boardIdentity } from './board-profile.js';
 import { approvalState } from '../../shared/event-approval.ts';
 
-export function householdBoard({ members, events, chores, notes, user, timezone, compact = false }) {
+export function householdBoard({ members, events, chores, notes, user, timezone, compact = false, archive = false }) {
   const who = (id) => members.find((m) => m.userId === id);
   const name = (id) => id === user.userId ? 'You' : fullName(who(id));
   const when = (at) => new Date(at).toLocaleString('en-US', { timeZone: timezone, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -32,11 +32,12 @@ export function householdBoard({ members, events, chores, notes, user, timezone,
   ].filter(Boolean);
   const note = (n) => {
     const event = events.find((e) => e.eventId === n.eventId);
-    return `<article class="sticky ${n.isPinned ? 'pinned' : ''}"><span class="home-kind">Announcement</span><div class="row">${boardIdentity(who(n.senderUserId), name(n.senderUserId))}<span class="hint">${ago(n.postedDate, timezone)}</span>${n.isPinned ? '<span class="pin-mark">Pinned</span>' : ''}</div><p>${esc(n.messageText)}</p>
-      ${event ? eventLink(event) : ''}${compact ? '' : `<details class="home-board-conversation" data-board-entry="replies-${n.messageId}"><summary>${n.replies?.length ? `${n.replies.length} ${n.replies.length === 1 ? 'reply' : 'replies'}` : 'Reply'}</summary>`}${(n.replies ?? []).map((r) => `<div class="reply board-comment">${boardIdentity(who(r.senderUserId), null)}<div class="grow"><div class="row">${boardIdentity(who(r.senderUserId), name(r.senderUserId), false)}<span class="hint">${ago(r.postedDate, timezone)}</span></div><p>${esc(r.messageText)}</p></div></div>`).join('')}
+    return `<article class="sticky ${n.isPinned ? 'pinned' : ''}"><span class="home-kind">Announcement</span><div class="row">${boardIdentity(who(n.senderUserId), name(n.senderUserId))}<span class="hint">${ago(n.postedDate, timezone)}</span>${n.isPinned ? '<span class="pin-mark">Pinned</span>' : ''}${n.isResolved ? '<span class="st paid">Resolved</span>' : ''}</div><p>${esc(n.messageText)}</p>
+      ${event ? eventLink(event) : ''}${n.canResolve !== false ? `<div class="acts"><button type="button" class="btn s" data-action="home-board-resolve" data-id="${n.messageId}" data-resolved="${!n.isResolved}">${n.isResolved ? 'Reopen' : 'Mark as Resolved'}</button></div><div class="err" role="alert"></div>` : ''}${compact ? '' : `<details class="home-board-conversation" data-board-entry="replies-${n.messageId}"><summary>${n.replies?.length ? `${n.replies.length} ${n.replies.length === 1 ? 'reply' : 'replies'}` : 'Reply'}</summary>`}${(n.replies ?? []).map((r) => `<div class="reply board-comment">${boardIdentity(who(r.senderUserId), null)}<div class="grow"><div class="row">${boardIdentity(who(r.senderUserId), name(r.senderUserId), false)}<span class="hint">${ago(r.postedDate, timezone)}</span></div><p>${esc(r.messageText)}</p></div></div>`).join('')}
       <form class="stack" data-form="home-note-reply" data-id="${n.messageId}"><div class="row replyf"><input class="input" name="messageText" maxlength="500" placeholder="Reply" aria-label="Reply to ${esc(fullName(who(n.senderUserId)))}" required><button class="btn s" type="submit">Reply</button></div><div class="err" role="alert"></div></form>${compact ? '' : '</details>'}</article>`;
   };
-  const feed = [...incoming, ...outgoing, ...notes.map((n) => entry(note(n), n.postedDate, `note-${n.messageId}`, Boolean(n.isPinned)))]
+  const visibleNotes = notes.filter((n) => Boolean(n.isResolved) === archive);
+  const feed = [...(archive ? [] : [...incoming, ...outgoing]), ...visibleNotes.map((n) => entry(note(n), n.postedDate, `note-${n.messageId}`, Boolean(n.isPinned)))]
     .filter((item) => item.html)
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.at - a.at || a.key.localeCompare(b.key));
   const compactEntry = (item) => {
@@ -45,11 +46,13 @@ export function householdBoard({ members, events, chores, notes, user, timezone,
     const request = kind === 'chore' ? (chores.swapRequests ?? []).find((r) => r.swapId === Number(id)) : null;
     const announcement = kind === 'note' ? notes.find((n) => n.messageId === Number(id)) : null;
     const title = event ? event.eventName : request ? choreName(assignment(request.requesterAssignmentId)) : announcement?.messageText ?? '';
-    const type = event ? 'Event approval' : request ? (request.type === 'skip' ? 'Cover request' : 'Swap request') : `Announcement · ${name(announcement?.senderUserId)}`;
+    const type = event ? 'Event approval' : request ? (request.type === 'skip' ? 'Cover request' : 'Swap request') : `${announcement?.isResolved ? 'Resolved announcement' : 'Announcement'} · ${name(announcement?.senderUserId)}`;
     return `<details class="home-board-summary" data-board-entry="${item.key}"><summary><span class="home-kind">${esc(type)}</span><b>${esc(title)}</b><span class="hint">${event ? esc(when(event.eventDate)) : request ? esc(when(assignment(request.requesterAssignmentId)?.dueAt)) : esc(ago(announcement?.postedDate, timezone))}</span></summary>${item.html}</details>`;
   };
+  const resolvedCount = notes.filter((n) => n.isResolved).length;
   return `<div class="row sp home-board-heading"><h2>Household board</h2><button type="button" class="btn p home-make-announcement" data-action="home-make-announcement">Make announcement</button></div>
-    <div class="stack home-board-feed" aria-label="Household announcements and requests">${feed.map((item) => compact ? compactEntry(item) : item.html).join('') || '<p class="hint">No announcements or open requests right now.</p>'}</div>`;
+    <div class="row home-board-filters" role="group" aria-label="Household board filter"><button type="button" class="btn s ${archive ? '' : 'p'}" data-action="home-board-filter" data-archive="false" aria-pressed="${!archive}">Open</button><button type="button" class="btn s ${archive ? 'p' : ''}" data-action="home-board-filter" data-archive="true" aria-pressed="${archive}">Resolved archive${resolvedCount ? ` (${resolvedCount})` : ''}</button></div>
+    <div class="stack home-board-feed" aria-label="${archive ? 'Resolved household announcements' : 'Household announcements and requests'}">${feed.map((item) => compact ? compactEntry(item) : item.html).join('') || `<p class="hint">${archive ? 'No resolved announcements in the archive.' : 'No announcements or open requests right now.'}</p>`}</div>`;
 
 }
 

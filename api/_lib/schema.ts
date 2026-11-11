@@ -370,6 +370,7 @@ export const bulletinMessage = pgTable("bulletin_message", {
 	parentMessageId: bigint("parent_message_id", { mode: "number" }),
 	messageText: text("message_text").notNull(),
 	isPinned: boolean("is_pinned").default(false).notNull(),
+	isResolved: boolean("is_resolved").default(false).notNull(),
 	postedDate: timestamp("posted_date", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),

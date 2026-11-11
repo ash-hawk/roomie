@@ -158,13 +158,25 @@ export async function respondToEvent(user: CurrentUser, householdId: number, eve
 
 // ---- the sticky-note board ---------------------------------------------------------------------
 type MsgRow = typeof s.bulletinMessage.$inferSelect;
-const noteOut = (m: MsgRow, viewerId: number) => ({
+type BoardMsg = Pick<MsgRow, 'messageId' | 'householdId' | 'senderUserId' | 'eventId' | 'parentMessageId' | 'messageText' | 'isPinned' | 'postedDate'> & { isResolved: boolean };
+const boardMsgSelection = {
+  messageId: s.bulletinMessage.messageId,
+  householdId: s.bulletinMessage.householdId,
+  senderUserId: s.bulletinMessage.senderUserId,
+  eventId: s.bulletinMessage.eventId,
+  parentMessageId: s.bulletinMessage.parentMessageId,
+  messageText: s.bulletinMessage.messageText,
+  isPinned: s.bulletinMessage.isPinned,
+  isResolved: sql<boolean>`COALESCE((to_jsonb(${s.bulletinMessage})->>'is_resolved')::boolean, false)`,
+  postedDate: s.bulletinMessage.postedDate,
+};
+const noteOut = (m: BoardMsg, viewerId: number) => ({
   messageId: m.messageId, senderUserId: m.senderUserId, eventId: m.eventId, parentMessageId: m.parentMessageId, messageText: m.messageText,
-  isPinned: m.isPinned, postedDate: iso(m.postedDate), canEdit: m.senderUserId === viewerId,
+  isPinned: m.isPinned, isResolved: m.isResolved, postedDate: iso(m.postedDate), canEdit: m.senderUserId === viewerId, canResolve: m.parentMessageId === null,
 });
 
 export async function listBoard(householdId: number, viewerId: number) {
-  const rows = await db.select().from(s.bulletinMessage).where(eq(s.bulletinMessage.householdId, householdId)).orderBy(desc(s.bulletinMessage.isPinned), desc(s.bulletinMessage.postedDate));
+  const rows = await db.select(boardMsgSelection).from(s.bulletinMessage).where(eq(s.bulletinMessage.householdId, householdId)).orderBy(desc(s.bulletinMessage.isPinned), desc(s.bulletinMessage.postedDate));
   const notes = rows.filter((m) => m.parentMessageId === null).map((m) => ({
     ...noteOut(m, viewerId),
     replies: rows.filter((r) => r.parentMessageId === m.messageId).sort((a, b) => Date.parse(iso(a.postedDate)) - Date.parse(iso(b.postedDate))).map((r) => noteOut(r, viewerId)),
@@ -175,16 +187,16 @@ export async function listBoard(householdId: number, viewerId: number) {
 export async function postNote(user: CurrentUser, householdId: number, b: Record<string, unknown>) {
   const text = str(b.messageText, 1, 500, 'Note');
   return db.transaction(async (tx) => {
-    let eventId: number | null = null, parent: MsgRow | null = null;
+    let eventId: number | null = null, parent: BoardMsg | null = null;
     if (b.eventId != null) { eventId = id(b.eventId, 'event'); await loadEvent(tx, householdId, eventId); }
     if (b.parentMessageId != null) {
-      const [p] = await tx.select().from(s.bulletinMessage).where(and(eq(s.bulletinMessage.messageId, id(b.parentMessageId, 'note')), eq(s.bulletinMessage.householdId, householdId)));
+      const [p] = await tx.select(boardMsgSelection).from(s.bulletinMessage).where(and(eq(s.bulletinMessage.messageId, id(b.parentMessageId, 'note')), eq(s.bulletinMessage.householdId, householdId)));
       if (!p) throw new HttpError(404, 'Note not found');
       if (p.parentMessageId !== null) throw new HttpError(400, 'Reply to the note itself, not to a reply');
       if (eventId !== null) throw new HttpError(400, 'Only a new note can be linked to an event');
       parent = p;
     }
-    const [m] = await tx.insert(s.bulletinMessage).values({ householdId, senderUserId: user.userId, eventId, parentMessageId: parent?.messageId ?? null, messageText: text }).returning();
+    const [m] = await tx.insert(s.bulletinMessage).values({ householdId, senderUserId: user.userId, eventId, parentMessageId: parent?.messageId ?? null, messageText: text }).returning(boardMsgSelection);
     if (parent?.senderUserId && parent.senderUserId !== user.userId && (await activeIds(tx, householdId)).includes(parent.senderUserId)) {
       const me = await firstName(tx, user.userId);
       await tx.insert(s.notification).values({ userId: parent.senderUserId, householdId, actorUserId: user.userId, section: 'calendar_board', sourceType: 'bulletin_message', sourceId: m!.messageId, message: `${me} replied to your note.` });
@@ -194,20 +206,40 @@ export async function postNote(user: CurrentUser, householdId: number, b: Record
 }
 
 async function ownNote(tx: Tx, householdId: number, messageId: number, userId: number) {
-  const [m] = await tx.select().from(s.bulletinMessage).where(and(eq(s.bulletinMessage.messageId, messageId), eq(s.bulletinMessage.householdId, householdId))).for('update');
+  const [m] = await tx.select(boardMsgSelection).from(s.bulletinMessage).where(and(eq(s.bulletinMessage.messageId, messageId), eq(s.bulletinMessage.householdId, householdId))).for('update');
   if (!m) throw new HttpError(404, 'Note not found');
   if (m.senderUserId !== userId) throw new HttpError(403, 'Only the person who wrote this can change it');
   return m;
 }
-/** Sender only: edit the text, or pin / unpin a top-level note. */
+/** Household members may resolve a top-level note; only its sender may edit or pin it. */
 export async function updateNote(user: CurrentUser, householdId: number, messageId: number, b: Record<string, unknown>) {
   return db.transaction(async (tx) => {
-    const m = await ownNote(tx, householdId, messageId, user.userId);
+    const [m] = await tx.select(boardMsgSelection).from(s.bulletinMessage).where(and(eq(s.bulletinMessage.messageId, messageId), eq(s.bulletinMessage.householdId, householdId))).for('update');
+    if (!m) throw new HttpError(404, 'Note not found');
     const set: Partial<typeof s.bulletinMessage.$inferInsert> = {};
-    if (b.messageText !== undefined) set.messageText = str(b.messageText, 1, 500, 'Note');
-    if (b.isPinned !== undefined) { if (typeof b.isPinned !== 'boolean') throw new HttpError(400, 'isPinned must be true or false'); if (m.parentMessageId !== null) throw new HttpError(400, 'Only a note can be pinned'); set.isPinned = b.isPinned; }
-    if (!Object.keys(set).length) return noteOut(m, user.userId);
-    const [u] = await tx.update(s.bulletinMessage).set(set).where(eq(s.bulletinMessage.messageId, messageId)).returning();
+    if (b.messageText !== undefined || b.isPinned !== undefined) {
+      if (m.senderUserId !== user.userId) throw new HttpError(403, 'Only the person who wrote this can change it');
+      if (b.messageText !== undefined) set.messageText = str(b.messageText, 1, 500, 'Note');
+      if (b.isPinned !== undefined) { if (typeof b.isPinned !== 'boolean') throw new HttpError(400, 'isPinned must be true or false'); if (m.parentMessageId !== null) throw new HttpError(400, 'Only a note can be pinned'); set.isPinned = b.isPinned; }
+    }
+    if (b.isResolved !== undefined) {
+      if (typeof b.isResolved !== 'boolean') throw new HttpError(400, 'isResolved must be true or false');
+      if (m.parentMessageId !== null) throw new HttpError(400, 'Only a note can be resolved');
+      set.isResolved = b.isResolved;
+    }
+    if (!Object.keys(set).length) {
+      if (m.senderUserId !== user.userId) throw new HttpError(403, 'Only the person who wrote this can change it');
+      return noteOut(m, user.userId);
+    }
+    let u: BoardMsg | undefined;
+    try {
+      [u] = await tx.update(s.bulletinMessage).set(set).where(eq(s.bulletinMessage.messageId, messageId)).returning(boardMsgSelection);
+    } catch (error) {
+      if (b.isResolved !== undefined && typeof error === 'object' && error !== null && 'code' in error && error.code === '42703') {
+        throw new HttpError(503, 'Announcement resolution is unavailable until database migration 0003 is applied');
+      }
+      throw error;
+    }
     return noteOut(u!, user.userId);
   });
 }

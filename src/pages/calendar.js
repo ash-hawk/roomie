@@ -27,6 +27,7 @@ function loadPrefs() {
 }
 let D = null;             // { members, events, notes }
 let seen = '';            // what the last poll saw, to repaint only on change
+let boardArchive = false, boardArchiveHousehold = null;
 
 const hid = () => household().householdId;
 const tz = () => household().timezone;
@@ -54,6 +55,7 @@ const savePrefs = () => { try { localStorage.setItem(prefsKey(), JSON.stringify(
 // ---- data -------------------------------------------------------------------------------------
 async function load() {
   const [{ members }, { events }, { notes }] = await Promise.all([api(path('/members')), api(path('/events')), api(path('/board'))]);
+  if (boardArchiveHousehold !== hid()) { boardArchive = false; boardArchiveHousehold = hid(); }
   D = { members, events, notes };
   seen = JSON.stringify([events, notes]);
 }
@@ -247,25 +249,29 @@ forms['event-save'] = async (form) => {
 // ---- the board ----------------------------------------------------------------------------------
 function noteHtml(n) {
   const ev = n.eventId ? eventOf(n.eventId) : null;
-  return `<article data-board-message-ids="${[n.messageId, ...n.replies.map((r) => r.messageId)].join(' ')}" class="sticky ${n.isPinned ? 'pinned' : ''}">
+  return `<article data-board-message-ids="${[n.messageId, ...n.replies.map((r) => r.messageId)].join(' ')}" class="sticky ${n.isPinned ? 'pinned' : ''} ${n.isResolved ? 'resolved' : ''}">
     <div class="row t" style="gap:8px">${boardIdentity(who(n.senderUserId), first(n.senderUserId))}<div class="grow"> <span class="hint">${ago(n.postedDate)}</span></div>
-
+      ${n.isResolved ? '<span class="st paid">Resolved</span>' : ''}
       ${n.canEdit ? `<button class="x" data-action="note-pin" data-id="${n.messageId}" data-pinned="${n.isPinned ? '' : '1'}" aria-label="${n.isPinned ? 'Unpin' : 'Pin'}" title="${n.isPinned ? 'Unpin' : 'Pin'}">📌</button><button class="x" data-action="note-delete" data-id="${n.messageId}" aria-label="Delete note">✕</button>` : (n.isPinned ? '<span title="Pinned">📌</span>' : '')}</div>
     ${n.isPinned ? '<div class="pin-mark"><span aria-hidden="true">📌</span> Pinned</div>' : ''}
     <p>${esc(n.messageText)}</p>
     ${ev ? `<button class="chip" data-action="event-detail" data-id="${ev.eventId}">${ico('calendar', 13)} ${esc(ev.eventName)}</button>` : ''}
+    ${n.canResolve !== false ? `<button type="button" class="btn s" data-action="note-resolve" data-id="${n.messageId}" data-resolved="${!n.isResolved}">${n.isResolved ? 'Reopen' : 'Mark as Resolved'}</button><div class="err" role="alert"></div>` : ''}
     ${n.replies.map((r) => `<div class="reply row t" style="gap:8px">${boardIdentity(who(r.senderUserId), null)}<div class="grow">${boardIdentity(who(r.senderUserId), first(r.senderUserId), false)} <span class="hint">${ago(r.postedDate)}</span><div>${esc(r.messageText)}</div></div>
       ${r.canEdit ? `<button class="x" data-action="note-delete" data-id="${r.messageId}" aria-label="Delete reply">✕</button>` : ''}</div>`).join('')}
     <form class="row replyf" data-form="note-reply" data-id="${n.messageId}"><input class="input" name="messageText" maxlength="500" placeholder="Reply" aria-label="Reply" required><button class="btn s" type="submit">Send</button></form></article>`;
 }
 function boardInner() {
   const upcoming = D.events.filter((e) => Date.parse(e.eventDate) > Date.now() - 86400000);
+  const resolvedCount = D.notes.filter((n) => n.isResolved).length;
+  const visibleNotes = D.notes.filter((n) => Boolean(n.isResolved) === boardArchive);
   return `<div class="row board-heading"><h2>Board</h2></div>
+    <div class="row home-board-filters" role="group" aria-label="Household board filter"><button type="button" class="btn s ${boardArchive ? '' : 'p'}" data-action="calendar-board-filter" data-archive="false" aria-pressed="${!boardArchive}">Open</button><button type="button" class="btn s ${boardArchive ? 'p' : ''}" data-action="calendar-board-filter" data-archive="true" aria-pressed="${boardArchive}">Resolved archive${resolvedCount ? ` (${resolvedCount})` : ''}</button></div>
     <form class="stack" data-form="note-new"><textarea class="input" name="messageText" rows="2" maxlength="500" placeholder="Share a plan or check with everyone before hosting" aria-label="New note" required></textarea>
       <div class="row" style="gap:8px;flex-wrap:wrap"><select class="input" data-input="board-link-mode" aria-label="Event link option" style="flex:1;min-width:0"><option value="none">No linked event</option><option value="link">Link event</option><option value="add">Add and link event</option></select>
       <select class="input" name="eventId" aria-label="Choose an event" style="flex:1;min-width:0" hidden><option value="">Choose an event</option>${upcoming.map((e) => `<option value="${e.eventId}">${esc(e.eventName)}</option>`).join('')}</select>
       <button class="btn s" type="submit">Post</button></div><div class="err" role="alert"></div></form>
-    <div class="notes">${D.notes.length ? D.notes.map(noteHtml).join('') : '<p class="board-empty">No notes yet — share a plan or check with everyone before hosting.</p>'}</div>`;
+    <div class="notes">${visibleNotes.length ? visibleNotes.map(noteHtml).join('') : `<p class="board-empty">${boardArchive ? 'No resolved announcements in the archive.' : 'No open notes yet — share a plan or check with everyone before hosting.'}</p>`}</div>`;
 }
 inputs['board-link-mode'] = (el) => {
   const picker = el.form?.querySelector('[name="eventId"]'); if (!picker) return;
@@ -286,6 +292,26 @@ forms['note-reply'] = async (form) => {
   await reloadBoard();
 };
 actions['note-pin'] = async (el) => { await api(path(`/board/${el.dataset.id}`), { method: 'PATCH', body: { isPinned: el.dataset.pinned === '1' } }); await reloadBoard(); };
+actions['calendar-board-filter'] = (el) => { boardArchive = el.dataset.archive === 'true'; paintBoard(); };
+actions['note-resolve'] = async (el) => {
+  const article = el.closest('article');
+  const buttons = [...article.querySelectorAll('button')];
+  article.setAttribute('aria-busy', 'true');
+  buttons.forEach((button) => { button.disabled = true; });
+  article.querySelector('.err').textContent = '';
+  try {
+    await api(path(`/board/${el.dataset.id}`), { method: 'PATCH', body: { isResolved: el.dataset.resolved === 'true' } });
+  } catch (error) {
+    article.querySelector('.err').textContent = error.status === 500
+      ? 'Could not update this announcement. The board database may need migration 0003 applied.'
+      : error.message;
+    article.removeAttribute('aria-busy');
+    buttons.forEach((button) => { button.disabled = false; });
+    return;
+  }
+  toast(el.dataset.resolved === 'true' ? 'Announcement moved to the resolved archive' : 'Announcement reopened');
+  await reloadBoard();
+};
 actions['note-delete'] = async (el) => { if (!await confirmDialog('Delete this note?', 'Replies to this note will also be removed.')) return;
   await api(path(`/board/${el.dataset.id}`), { method: 'DELETE' }); await reloadBoard(); };
 
