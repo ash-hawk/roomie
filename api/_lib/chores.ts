@@ -251,6 +251,18 @@ export async function completeAssignment(user: CurrentUser, householdId: number,
       const me = await firstName(tx, user.userId);
       await tx.insert(s.notification).values({ userId: a.createdBy, householdId, actorUserId: user.userId, section: 'chores', sourceType: 'chore_assignment', sourceId: assignmentId, message: `${me} finished ${a.choreName}.` });
     }
+    // Keep the first completion by this user for this assignment, including after undo.
+    await tx.execute(sql`
+      INSERT INTO app_event (household_id, user_id, action_type, entity_id, occurred_at)
+      SELECT ${householdId}, ${user.userId}, 'chore_completed', ${assignmentId}, ${now}::timestamptz
+      FROM household h
+      JOIN users u ON u.user_id = ${user.userId}
+      WHERE h.household_id = ${householdId}
+        AND h.join_code <> 'MAPLE412'
+        AND lower(u.email) NOT LIKE 'roomie-test-%@example.com'
+        AND lower(u.email) NOT LIKE 'maple.%@example.com'
+      ON CONFLICT (household_id, user_id, action_type, entity_id) DO NOTHING
+    `);
     return { assignmentId, isCompleted: true, completedAt: now };
   });
 }
