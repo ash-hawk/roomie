@@ -2,7 +2,7 @@ import './styles.css';
 import { api, getToken, signOut } from './auth-client.js';
 import { actions, forms, inputs } from './lib/events.js';
 import { $, ico, mark, closeModal, esc, showError, toast } from './lib/dom.js';
-import { S, household, resetState } from './lib/state.js';
+import { S, household, needsOnboarding, resetState } from './lib/state.js';
 import { authView } from './pages/auth.js';
 import { onboardingView } from './pages/onboarding.js';
 import { settingsView } from './pages/settings.js';
@@ -76,7 +76,7 @@ export async function render() {
     if (!(await getToken())) { resetState(); root.innerHTML = authView(); return; }
     if (!S.user) { root.innerHTML = loading; await loadMe(); }
     if (mine !== seq) return;
-    if (!S.households.length) { root.innerHTML = onboardingView(); return; }
+    if (needsOnboarding()) { root.removeAttribute('data-page'); root.innerHTML = await onboardingView(); return; }
     const legacyActivity = location.hash.replace(/^#\/?/, '').split('/')[0] === 'notifications';
     if (legacyActivity) history.replaceState(null, '', '#/home');
     const page = route();

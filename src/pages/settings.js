@@ -6,6 +6,9 @@ import { avatar, closeModal, confirmDialog, esc, mhead, openModal, phead, showEr
 const PAYMENT_APPS = [['venmo', 'Venmo'], ['zelle', 'Zelle'], ['apple_cash', 'Apple Cash']];
 let profileDirty = false;
 let cropImage = null;
+let notificationSettings = null;
+let notificationSettingsHid = null;
+let notificationChannel = null;
 
 function profileForm() {
   const methods = Object.fromEntries((S.user.paymentMethods ?? []).map((m) => [m.app, m]));
@@ -24,12 +27,25 @@ function profileForm() {
     </form></section>`;
 }
 
-export function settingsView() {
+export async function settingsView() {
+  if (!notificationSettings || notificationSettingsHid !== S.hid) {
+    const [preferences, channel] = await Promise.all([api(`/households/${S.hid}/notification-settings`), api('/notification-channel')]);
+    notificationSettings = preferences.settings; notificationChannel = channel.channel; notificationSettingsHid = S.hid;
+  }
+  const emailChoices = [['event_hosting', 'New parties and hosting', 'Email me when a roommate creates a hosting event.'], ['event_other', 'Other new events', 'Email me about meetings and other events.'], ['approval_request', 'Approval requests', 'Email me when an event needs my response.']];
   return `
     ${phead('Profile', 'Manage the information your roommates can see.')}
 
     <div class="stack">
       ${profileForm()}
+
+      <section class="card"><h2>Email notifications</h2><p class="body-copy">Choose what Roomie may send for this household. Everything is off unless you turn it on.</p>
+        <form class="stack" data-form="notification-channel"><label class="fld"><span>Notification email</span><input class="input" type="email" name="destination" autocomplete="email" required maxlength="320" value="${esc(notificationChannel?.destination ?? S.user.email ?? '')}"></label>
+          <div class="hint" role="status">${notificationChannel?.verifiedAt ? 'Verified — this address can receive important event notifications.' : notificationChannel ? 'Not verified — request a new confirmation link if the address changed.' : 'Confirm an address separately from sign-in before Roomie sends event notifications.'}</div>
+          <div class="err" role="alert"></div><div class="acts"><button class="btn" type="submit">${notificationChannel?.verifiedAt ? 'Change or re-confirm email' : 'Send confirmation email'}</button></div></form>
+        <hr class="hr">
+        <form class="stack" data-form="email-settings">${emailChoices.map(([key, title, detail]) => `<label class="toggle-row"><span class="grow"><b>${title}</b><span class="hint">${detail}</span></span><input type="checkbox" name="${key}" ${notificationSettings[key] ? 'checked' : ''}></label>`).join('')}
+          <div class="err" role="alert"></div><div class="acts"><button class="btn p" type="submit">Save email settings</button></div></form></section>
 
       <div class="acts" style="justify-content:flex-start">
         <button class="btn d" data-action="signout">Sign out</button>
@@ -42,6 +58,22 @@ const markProfileDirty = () => {
   const form = document.querySelector('form[data-form=profile]');
   if (form) { form.dataset.saved = '0'; form.querySelector('[type=submit]').disabled = false; }
   const status = document.getElementById('profile-status'); if (status) status.textContent = 'Unsaved changes';
+};
+
+forms['notification-channel'] = async (form) => {
+  const button = form.querySelector('[type=submit]'); button.disabled = true;
+  try {
+    const saved = await api('/notification-channel', { method: 'POST', body: { destination: new FormData(form).get('destination') } });
+    notificationChannel = saved.channel; toast('Confirmation email sent'); window.dispatchEvent(new Event('roomie:render'));
+  } catch (error) { showError(form, error.message); button.disabled = false; }
+};
+
+forms['email-settings'] = async (form) => {
+  const data = new FormData(form);
+  try {
+    const saved = await api(`/households/${S.hid}/notification-settings`, { method: 'PUT', body: { event_hosting: data.has('event_hosting'), event_other: data.has('event_other'), approval_request: data.has('approval_request') } });
+    notificationSettings = saved.settings; toast('Email settings saved');
+  } catch (error) { showError(form, error.message); }
 };
 inputs['profile-dirty'] = markProfileDirty;
 inputs['crop-zoom'] = (el) => { const preview = document.getElementById('crop-preview'); if (preview) preview.style.transform = `scale(${el.value})`; };

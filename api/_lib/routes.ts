@@ -30,6 +30,12 @@ import * as eventOne from './handlers/event-one.js';
 import * as eventRespond from './handlers/event-respond.js';
 import * as board from './handlers/board.js';
 import * as boardOne from './handlers/board-one.js';
+import * as onboardingSuggest from './handlers/onboarding-suggest.js';
+import * as onboardingComplete from './handlers/onboarding-complete.js';
+import * as notificationSettings from './handlers/notification-settings.js';
+import * as emailUnsubscribe from './handlers/email-unsubscribe.js';
+import * as emailConfirm from './handlers/email-confirm.js';
+import * as notificationChannel from './handlers/notification-channel.js';
 
 type Handler = (req: Request) => Promise<Response>;
 type Entry = { method: string; parts: string[]; handler: Handler };
@@ -66,9 +72,15 @@ add('/households/:id/events/:eventId', eventOne);
 add('/households/:id/events/:eventId/respond', eventRespond);
 add('/households/:id/board', board);
 add('/households/:id/board/:messageId', boardOne);
+add('/households/:id/onboarding/suggest', onboardingSuggest);
+add('/households/:id/onboarding/complete', onboardingComplete);
+add('/households/:id/notification-settings', notificationSettings);
 add('/notifications', notifications);
 add('/notifications/read-all', notificationsReadAll);
 add('/notifications/:id', notificationRead);
+add('/email/unsubscribe', emailUnsubscribe);
+add('/email/confirm', emailConfirm);
+add('/notification-channel', notificationChannel);
 
 // static segments beat :params when two routes could match
 table.sort((a, b) => a.parts.filter((p) => p.startsWith(':')).length - b.parts.filter((p) => p.startsWith(':')).length);

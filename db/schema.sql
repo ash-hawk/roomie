@@ -1,9 +1,13 @@
--- Roommate App schema (IS 401 Team 4-06) — v4
+-- Roommate App schema (IS 401 Team 4-06) — v5
 -- Target: PostgreSQL 15+ (Neon). Run once on an empty database.
 --
--- v4 changes from v3:
+-- v5 changes from v3:
 --   * bulletin_message.is_resolved keeps resolved announcements out of the open board feed
---
+--   * household_member.onboarded_at tracks completion of onboarding
+--   * event.email_roommates controls opt-in event notifications
+--   * notification_setting and email_outbox support email preferences and delivery
+--   * ai_usage tracks rate-limited AI features
+--   * notification_channel and notification_channel_confirmation verify delivery addresses
 -- v3 changes from v2:
 --   * users.auth_provider_id links a row to the sign-in provider (Clerk, Auth.js, ...)
 --   * household.timezone: recurring chores, reminders and the calendar use it
@@ -63,6 +67,7 @@ CREATE TABLE household_member (
     role            TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'member')),
     joined_date     TIMESTAMPTZ NOT NULL DEFAULT now(),
     left_date       TIMESTAMPTZ,
+    onboarded_at    TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (household_id, user_id),
@@ -169,6 +174,7 @@ CREATE TABLE event (
     color                   TEXT,          -- custom display label when category is other (legacy column name)
     reminder_minutes_before INTEGER CHECK (reminder_minutes_before >= 0),
     description             TEXT,
+    email_roommates         BOOLEAN NOT NULL DEFAULT true,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK (end_date IS NULL OR end_date >= event_date)
@@ -322,6 +328,47 @@ CREATE TABLE app_feedback (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Missing settings mean off. Email delivery is added separately behind a server flag.
+CREATE TABLE notification_setting (
+    user_id      BIGINT NOT NULL,
+    household_id BIGINT NOT NULL,
+    channel      TEXT NOT NULL CHECK (channel IN ('email')),
+    kind         TEXT NOT NULL CHECK (kind IN ('event_hosting', 'event_other', 'approval_request')),
+    enabled      BOOLEAN NOT NULL DEFAULT false,
+    PRIMARY KEY (user_id, household_id, channel, kind),
+    FOREIGN KEY (household_id, user_id)
+        REFERENCES household_member(household_id, user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE email_outbox (
+    email_id     BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id      BIGINT NOT NULL,
+    household_id BIGINT NOT NULL,
+    kind         TEXT NOT NULL CHECK (kind IN ('event_hosting', 'event_other', 'approval_request')),
+    source_type  TEXT NOT NULL,
+    source_id    BIGINT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'skipped')),
+    attempts     INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    last_error   TEXT,
+    provider_id  TEXT,
+    sent_at      TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    FOREIGN KEY (household_id, user_id)
+        REFERENCES household_member(household_id, user_id) ON DELETE CASCADE,
+    UNIQUE (user_id, kind, source_type, source_id),
+    CHECK ((status = 'sent') = (sent_at IS NOT NULL))
+);
+
+CREATE TABLE ai_usage (
+    user_id      BIGINT NOT NULL,
+    household_id BIGINT NOT NULL,
+    feature      TEXT NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    FOREIGN KEY (household_id, user_id)
+        REFERENCES household_member(household_id, user_id) ON DELETE CASCADE
+);
+
 -- =========================================================
 -- Attach the updated_at trigger to every table above
 -- =========================================================
@@ -363,5 +410,7 @@ CREATE INDEX idx_bulletin_event          ON bulletin_message (event_id);
 CREATE INDEX idx_bulletin_parent         ON bulletin_message (parent_message_id);
 CREATE INDEX idx_notification_user       ON notification (user_id, is_read, created_at DESC);
 CREATE INDEX idx_notification_source     ON notification (source_type, source_id);
+CREATE INDEX idx_email_outbox_retry      ON email_outbox (status, created_at) WHERE status IN ('pending', 'failed');
+CREATE INDEX idx_ai_usage_hourly         ON ai_usage (user_id, household_id, feature, created_at DESC);
 
 COMMIT;

@@ -28,6 +28,8 @@ beforeEach(() => {
     if (path.endsWith("/chores")) return chores;
     if (path.endsWith("/board")) return { notes: [] };
     if (path.endsWith("/balances")) return { mine: [] };
+    if (path.endsWith("/notification-settings")) return { settings: { event_hosting: false, event_other: false, approval_request: false } };
+    if (path === "/notification-channel") return { channel: null };
     throw new Error("Unexpected test route " + path);
   });
 });
@@ -76,7 +78,7 @@ describe("event form", () => {
 });
 describe("profile save", () => {
   it("refreshes canonical values and allows saving again without another edit", async () => {
-    document.getElementById("page").innerHTML = settingsView();
+    document.getElementById("page").innerHTML = await settingsView();
     const form = document.querySelector("form");
     expect(form.querySelector("[type=submit]").disabled).toBe(false);
     form.elements.namedItem("firstName").value = "  Jordan  ";
@@ -93,10 +95,10 @@ describe("profile save", () => {
     expect(refreshed.querySelector("[type=submit]").disabled).toBe(false);
     expect(document.getElementById("profile-status").textContent).toContain("Profile saved");
     await forms.profile(refreshed);
-    expect(mockedApi).toHaveBeenCalledTimes(2);
+    expect(mockedApi.mock.calls.filter(([path]) => path === '/me')).toHaveLength(2);
   });
   it("keeps edits and the save button usable after a failed request", async () => {
-    document.getElementById("page").innerHTML = settingsView();
+    document.getElementById("page").innerHTML = await settingsView();
     const form = document.querySelector("form");
     form.elements.namedItem("phoneNumber").value = "123";
     inputs["profile-dirty"]();

@@ -6,4 +6,5 @@ export const S = {
   navCounts: { overdue: 0, at: 0, hid: null },
 };
 export const household = () => S.households.find((h) => h.householdId === S.hid) ?? null;
+export const needsOnboarding = () => !S.households.length || !household()?.onboardedAt;
 export const resetState = () => { S.user = null; S.households = []; S.hid = null; S.alerts = { unread: 0, swapPending: 0 }; S.navCounts = { overdue: 0, at: 0, hid: null }; };
