@@ -105,9 +105,15 @@ ALTER TABLE email_outbox
 
 -- 0001 already revoked default privileges. Repeat explicit revokes here so this migration
 -- stays locked down even if it is reviewed or replayed independently from that history.
-REVOKE ALL ON notification_channel, notification_channel_confirmation
-    FROM authenticated, anonymous;
-REVOKE ALL ON SEQUENCE notification_channel_confirmation_confirmation_id_seq
-    FROM authenticated, anonymous;
-REVOKE ALL ON FUNCTION reset_notification_channel_verification()
-    FROM authenticated, anonymous;
+DO $$
+DECLARE role_name TEXT;
+BEGIN
+    FOREACH role_name IN ARRAY ARRAY['authenticated', 'anonymous'] LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+            EXECUTE format('REVOKE ALL ON notification_channel, notification_channel_confirmation FROM %I', role_name);
+            EXECUTE format('REVOKE ALL ON SEQUENCE notification_channel_confirmation_confirmation_id_seq FROM %I', role_name);
+            EXECUTE format('REVOKE ALL ON FUNCTION reset_notification_channel_verification() FROM %I', role_name);
+        END IF;
+    END LOOP;
+END;
+$$;
