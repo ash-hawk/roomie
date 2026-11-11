@@ -6,8 +6,11 @@
 import { HttpError, json, segments } from './http.js';
 import * as me from './handlers/me.js';
 import * as households from './handlers/households.js';
+import * as householdAdmin from './handlers/household-admin.js';
+import * as joinCode from './handlers/join-code.js';
 import * as join from './handlers/join.js';
 import * as members from './handlers/members.js';
+import * as memberAdmin from './handlers/member-admin.js';
 import * as chores from './handlers/chores.js';
 import * as choreOne from './handlers/chore-one.js';
 import * as assignmentAction from './handlers/assignment-action.js';
@@ -52,7 +55,10 @@ function add(path: string, mod: object) {
 add('/me', me);
 add('/households', households);
 add('/households/join', join);
+add('/households/:id', householdAdmin);
+add('/households/:id/join-code', joinCode);
 add('/households/:id/members', members);
+add('/households/:id/members/:userId', memberAdmin);
 add('/households/:id/chores', chores);
 add('/households/:id/chores/:choreId', choreOne);
 add('/households/:id/assignments/:assignmentId/:action', assignmentAction);

@@ -19,6 +19,11 @@ export async function requireActiveMember(ex: Executor, userId: number, househol
   return rows[0];
 }
 
+/** Household-wide settings and membership changes are restricted to active owners. */
+export function assertOwner(role: string) {
+  if (role !== 'owner') throw new HttpError(403, 'Only a household owner can do that');
+}
+
 /**
  * New chores, shares, tags and notifications may only target current roommates.
  * Roommates who moved out keep their history but are never targeted again.

@@ -27,6 +27,9 @@ export const POST = withUser(async (user, req) => {
   }
   const hm = schema.householdMember;
   await db.transaction(async (tx) => {
+    const [currentHousehold] = await tx.select({ joinCode: schema.household.joinCode })
+      .from(schema.household).where(eq(schema.household.householdId, h.householdId)).for('update');
+    if (!currentHousehold || currentHousehold.joinCode !== code) throw new HttpError(404, 'That join code does not match a household');
     const [row] = await tx.select().from(hm).where(and(eq(hm.householdId, h.householdId), eq(hm.userId, user.userId))).for('update');
     if (!row) await tx.insert(hm).values({ householdId: h.householdId, userId: user.userId, role: 'member' });
     else if (row.leftDate) await tx.update(hm).set({ leftDate: null }).where(eq(hm.memberId, row.memberId));
