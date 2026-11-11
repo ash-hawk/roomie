@@ -5,7 +5,7 @@ import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
 import { avatar, closeModal, esc, mhead, money, openModal, personColor, phead, showError, toast } from '../lib/dom.js';
 import { addDays } from '../../shared/chore-dates.ts';
-import { monthDays, scheduleItems } from '../../shared/home-schedule.ts';
+import { scheduleItems } from '../../shared/home-schedule.ts';
 import { householdBoard, announcementForm } from '../components/household-board.js';
 import { openChoreDetails } from './chores.js';
 import { fitHomeWidgets, widgetDropSlot } from '../components/home-layout.js';
@@ -33,7 +33,7 @@ function getLayout() {
 }
 let layout = defaultLayout(), editing = false, editingKey = null;
 const widgetSize = (id) => layout.find((w) => w.id === id)?.size;
-let monthStart = null, monthHousehold = null, D = null, homeBoardArchive = false;
+let rangeOffset = 0, rangeHousehold = null, D = null, homeBoardArchive = false;
 
 function row(item) {
   const member = D.members.find((m) => m.userId === item.userId);
@@ -44,50 +44,53 @@ function row(item) {
     <div class="hint">${timeFmt(item.at)} · ${item.kind === 'event' ? 'Added by ' : ''}${esc(name)}${item.location ? ` · ${esc(item.location)}` : ''}</div></div>${avatar(member, 'sm')}</a>`;
 }
 
-function monthNav(view) {
-  const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-  return scheduleToolbar({ title, monthAction: 'home-month', viewInput: 'home-view', view });
+const RANGE_DAYS = 14;
+function homeRange() {
+  const start = addDays(ymdIn(Date.now()), rangeOffset);
+  return [start, addDays(start, RANGE_DAYS - 1)];
 }
-
-const homeRange = () => {
-  const start = new Date(`${ymdIn(Date.now())}T12:00:00Z`);
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 13);
-  return [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)];
-};
-const upcomingMonthItems = () => {
+function rangeTitle() {
+  const [start, end] = homeRange();
+  const format = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
+  return format.formatRange(new Date(`${start}T12:00:00Z`), new Date(`${end}T12:00:00Z`));
+}
+function rangeNav(view) {
+  return scheduleToolbar({ title: rangeTitle(), monthAction: 'home-range', viewInput: 'home-view', view, navigationUnit: 'two weeks' });
+}
+function rangeItems() {
   const [start, end] = homeRange();
   return D.items.filter((item) => item.ymd >= start && item.ymd <= end);
-};
+}
 function monthList(items) {
-  return items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('') : '<p class="home-empty">Nothing scheduled in the next two weeks.</p>';
+  return items.length ? [...new Set(items.map((item) => item.ymd))].map((day) => `<section class="stack home-day"><h3>${esc(dayLabel(day))}</h3>${items.filter((item) => item.ymd === day).map(row).join('')}</section>`).join('') : '<p class="home-empty">Nothing scheduled in this date range.</p>';
 }
 function listView() {
-  const items = upcomingMonthItems();
+  const items = rangeItems();
   const compact = widgetSize('schedule') === 'compact';
-  return `${monthNav('list')}${monthList(compact ? items.slice(0, 5) : items)}${compact && items.length > 5 ? `<button class="btn s" data-action="home-month-list">View all ${items.length} items</button>` : ''}`;
+  return `${rangeNav('list')}${monthList(compact ? items.slice(0, 5) : items)}${compact && items.length > 5 ? `<button class="btn s" data-action="home-month-list">View all ${items.length} items</button>` : ''}`;
 }
 actions['home-month-list'] = () => {
-  const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-  openModal(`${mhead(esc(title))}<div class="stack">${monthList(upcomingMonthItems())}</div>`);
+  openModal(`${mhead(esc(rangeTitle()))}<div class="stack">${monthList(rangeItems())}</div>`);
 };
 
 function calendarView() {
   const compact = widgetSize('schedule') === 'compact';
   const today = ymdIn(Date.now());
-  return `${monthNav('calendar')}
+  const [start] = homeRange();
+  const weekday = new Date(`${start}T12:00:00Z`).getUTCDay();
+  return `${rangeNav('calendar')}
     <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div>
-    <div class="mgrid home-month">${Array.from({ length: 14 }, (_, i) => { const date = new Date(`${today}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + i); return date.toISOString().slice(0, 10); }).map((day) => {
+    <div class="mgrid home-month">${'<span aria-hidden="true"></span>'.repeat(weekday)}${Array.from({ length: RANGE_DAYS }, (_, i) => addDays(start, i)).map((day) => {
       const items = D.items.filter((item) => item.ymd === day);
-      return `<button class="day2 ${day.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${day === today ? 'today' : ''}" data-action="home-day" data-day="${day}" aria-label="${esc(dayLabel(day))}, ${items.length} items" ${day === today ? 'aria-current="date"' : ''}>
+      return `<button class="day2 ${day === today ? 'today' : ''}" data-action="home-day" data-day="${day}" aria-label="${esc(dayLabel(day))}, ${items.length} items" ${day === today ? 'aria-current="date"' : ''}>
         <span class="dn">${Number(day.slice(8))}</span>${compact ? `<span class="home-day-dots" aria-hidden="true">${items.slice(0, 3).map((item) => `<i style="background:${personColor(item.userId)}"></i>`).join('')}</span>` : `${items.slice(0, 3).map((item) => `<span class="home-calendar-item ${item.completed ? 'completed' : ''}" style="--ev:${personColor(item.userId)}"><span>${timeFmt(item.at)} · ${esc(item.label)}</span><b>${esc(item.name)}</b>${item.approval?.total ? `<span class="home-calendar-approval">${item.approval.label} · ${item.approval.approved}/${item.approval.total}</span>` : ''}</span>`).join('')}
         ${items.length > 3 ? `<span class="home-more">+${items.length - 3} more</span>` : ''}<span class="home-mobile-count" aria-hidden="true">${items.length || ''}</span>` }</button>`;
     }).join('')}</div>${compact ? compactUpcoming() : ''}`;
 }
 
 function compactUpcoming() {
-  const monthItems = D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7) && !item.completed && Date.parse(item.at) >= Date.now());
-  return `<div class="home-compact-upcoming"><h3>Coming up</h3>${monthItems.slice(0, 3).map((item) => `<div><span class="hint">${esc(dayLabel(item.ymd))}</span>${row(item)}</div>`).join('') || '<p class="hint">Nothing else coming up this month.</p>'}</div>`;
+  const monthItems = rangeItems().filter((item) => !item.completed && Date.parse(item.at) >= Date.now());
+  return `<div class="home-compact-upcoming"><h3>Coming up</h3>${monthItems.slice(0, 3).map((item) => `<div><span class="hint">${esc(dayLabel(item.ymd))}</span>${row(item)}</div>`).join('') || '<p class="hint">Nothing else coming up in this date range.</p>'}</div>`;
 }
 
 export async function homeView() {
@@ -95,8 +98,7 @@ export async function homeView() {
     api(`/households/${hid()}/members`), api(`/households/${hid()}/events`), api(`/households/${hid()}/chores`), api(`/households/${hid()}/balances`), api(`/households/${hid()}/board`),
   ]);
   D = { householdId: hid(), members, events, chores, notes, user: S.user, timezone: tz(), items: scheduleItems(events, chores, tz()) };
-  if (monthHousehold !== hid()) { monthStart = null; monthHousehold = hid(); homeBoardArchive = false; }
-  monthStart ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
+  if (rangeHousehold !== hid()) { rangeOffset = 0; rangeHousehold = hid(); homeBoardArchive = false; }
   if (editingKey !== layoutKey()) { editing = false; editingKey = layoutKey(); }
   layout = getLayout();
   const view = getView();
@@ -125,8 +127,8 @@ inputs['home-view'] = (el) => {
   fitHomeWidgets(document.querySelector('.home-dashboard'));
   if (keepFocus) content.querySelector('[data-input=home-view]')?.focus();
 };
-actions['home-month'] = (el) => {
-  const d = new Date(`${monthStart}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + Number(el.dataset.n)); monthStart = `${d.toISOString().slice(0, 7)}-01`;
+actions['home-range'] = (el) => {
+  rangeOffset += RANGE_DAYS * Number(el.dataset.n);
   const content = document.getElementById('home-schedule-content');
   content.innerHTML = content.dataset.view === 'calendar' ? calendarView() : listView();
   fitHomeWidgets(document.querySelector('.home-dashboard'));
