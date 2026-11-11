@@ -111,34 +111,39 @@ describe("profile save", () => {
   });
 });
 describe("Home views", () => {
-  it("pages through two-week ranges and keeps the selected range across views and years", async () => {
+  it("limits the list to one month and keeps month navigation in List view across year boundaries", async () => {
     S.hid = 2; S.households = [{ householdId: 2, householdName: 'Another house', timezone: 'America/Denver' }];
-    vi.setSystemTime(new Date('2026-12-18T18:00:00Z'));
     const baseApi = mockedApi.getMockImplementation();
     mockedApi.mockImplementation((path) => path.endsWith('/events') ? Promise.resolve({ events: [
       ...events,
-      { ...events[0], eventId: 2, eventName: 'December plan', eventDate: '2026-12-31T20:00:00Z' },
+      { ...events[0], eventId: 2, eventName: 'December plan', eventDate: '2026-12-01T20:00:00Z' },
       { ...events[0], eventId: 3, eventName: 'January plan', eventDate: '2027-01-01T20:00:00Z' },
     ] }) : baseApi(path));
     document.getElementById('page').innerHTML = await homeView();
     const content = document.getElementById('home-schedule-content');
-    const move = (direction) => actions['home-range'](content.querySelector(`[data-n="${direction}"]`));
-    const setView = (value) => {
-      const picker = content.querySelector('[data-input="home-view"]');
-      picker.value = value; inputs['home-view'](picker);
-    };
+    expect(content.textContent).toContain('November 2026');
+    expect(content.textContent).toContain('Dinner');
+    expect(content.textContent).not.toContain('December plan');
+    const next = () => actions['home-month'](content.querySelector('[data-n="1"]'));
+    next();
+    expect(content.textContent).toContain('December 2026');
     expect(content.textContent).toContain('December plan');
+    expect(content.textContent).not.toContain('Dinner');
     expect(content.textContent).not.toContain('January plan');
-    move(1);
+    expect(content.querySelector('.home-month')).toBeNull();
+    next();
+    expect(content.textContent).toContain('January 2027');
     expect(content.textContent).toContain('January plan');
     expect(content.textContent).not.toContain('December plan');
-    setView('calendar');
-    expect(content.querySelector('[data-day="2027-01-01"]').textContent).toContain('January plan');
-    expect(content.querySelectorAll('[data-day]')).toHaveLength(14);
-    setView('list');
-    move(1);
-    expect(content.textContent).toContain('Nothing scheduled in this date range.');
-    move(-1);
+    const picker = document.querySelector('[data-input="home-view"]');
+    picker.value = 'calendar'; inputs['home-view'](picker);
+    expect(content.textContent).toContain('January 2027');
+    expect(content.querySelector('.home-month')).not.toBeNull();
+    picker.value = 'list'; inputs['home-view'](picker);
+    next();
+    expect(content.textContent).toContain('February 2027');
+    expect(content.textContent).toContain('No events or chores from today onward in this month.');
+    actions['home-month'](content.querySelector('[data-n="-1"]'));
     expect(content.textContent).toContain('January plan');
     expect(mockedApi).toHaveBeenCalledTimes(5);
   });
@@ -445,9 +450,10 @@ describe('Home household board', () => {
     notes = [...notes, { messageId: 10, senderUserId: 1, messageText: 'Pizza tonight', postedDate: '2026-11-05T18:00:00Z', replies: [] }];
     await forms['home-note-new'](form);
     expect(mockedApi).toHaveBeenCalledWith('/households/1/board', { method: 'POST', body: { messageText: 'Pizza tonight' } });
-    expect(document.getElementById('home-board').textContent).toContain('Pizza tonight');
     expect(document.querySelector('[role=dialog]')).toBeNull();
-    const reply = document.querySelector('[data-form=home-note-reply][data-id="8"]');
+    actions['home-board-all']();
+    expect(document.getElementById('home-board-all').textContent).toContain('Pizza tonight');
+    const reply = document.querySelector('#home-board-all [data-form=home-note-reply][data-id="8"]');
     reply.elements.namedItem('messageText').value = 'Sounds good';
     await forms['home-note-reply'](reply);
     expect(mockedApi).toHaveBeenCalledWith('/households/1/board', { method: 'POST', body: { messageText: 'Sounds good', parentMessageId: 8 } });
@@ -467,17 +473,17 @@ describe('Home widget customization', () => {
     const day = document.querySelector('[data-day="2026-11-05"]');
     expect(day.querySelectorAll('.home-day-dots i')).toHaveLength(2);
     expect(day.querySelector('.home-calendar-item')).toBeNull();
-    expect(document.querySelector('.home-compact-upcoming').textContent).toContain('Dinner');
+    expect(document.querySelector('.home-compact-upcoming').textContent).toContain('Dishes');
     actions['home-day'](day);
     expect(document.querySelector('[role="dialog"]').textContent).toContain('Dishes');
     document.getElementById('modal')?.remove();
     actions['home-widget-move']({ dataset: { widget: 'finances', step: '-1' } });
     expect(JSON.parse(localStorage.getItem(layoutKey)).map((w) => w.id)).toEqual(['board', 'finances', 'schedule']);
     await render();
-    expect(document.querySelector('.home-widget').classList.contains('compact')).toBe(true);
+    expect(document.querySelector('.home-widget').classList.contains('expanded')).toBe(true);
     expect(document.querySelector('[data-input="home-view"]').value).toBe('calendar');
-    actions['home-range'](document.querySelector('[data-n="1"]'));
-    expect(document.querySelector('#home-schedule-content [data-day]').dataset.day).toBe('2026-11-19');
+    actions['home-month'](document.querySelector('[data-n="1"]'));
+    expect(document.querySelector('#home-schedule-content').textContent).toContain('December 2026');
     S.user = { ...S.user, userId: 2 };
     await render();
     expect(document.querySelector('.home-widget').classList.contains('expanded')).toBe(true);
@@ -526,7 +532,7 @@ describe('Home live dragging', () => {
     expect(document.querySelector('[data-action="home-widget-move"]')).toBeNull();
     point(grip, 'pointerdown');
     point(document, 'pointermove', 100, 110);
-    expect(order()).toEqual(['board', 'finances', 'schedule']);
+    expect(order()).toEqual(['finances', 'board', 'schedule']);
     expect(localStorage.getItem('roomie.home.layout.1.1')).toBeNull();
     expect(document.querySelector('.home-widget-ghost').getAttribute('aria-hidden')).toBe('true');
     expect(document.getElementById('home-board')).toBe(board);
@@ -535,44 +541,28 @@ describe('Home live dragging', () => {
     expect(document.querySelector('.home-widget-ghost')).toBeNull();
     expect(document.querySelector('.home-widget-dragging')).toBeNull();
   });
-  it('automatically changes presentation to fit the drop space and rolls the size back on cancellation', async () => {
+  it('previews an entire preset during drag and restores it on cancellation', async () => {
     let grip = await setup();
-    const grid = document.querySelector('.home-dashboard');
-    grid.style.gridTemplateColumns = '300px 300px 300px'; grid.style.gridAutoRows = '2px';
-    grid.getBoundingClientRect = () => ({ left: 0, right: 900, width: 900, top: 0, bottom: 1000 });
-    const rects = { schedule: { left: 0, right: 600, top: 0, bottom: 900, width: 600, height: 900 }, board: { left: 600, right: 900, top: 0, bottom: 300, width: 300, height: 300 }, finances: { left: 600, right: 900, top: 320, bottom: 500, width: 300, height: 180 } };
-    [...grid.children].forEach((el) => { el.getBoundingClientRect = () => rects[el.dataset.widget]; });
-    const target = grid.querySelector('[data-widget="board"]');
-    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => target });
-    expect(document.querySelector('[data-input="home-widget-size"]')).toBeNull();
-    point(grip, 'pointerdown'); point(document, 'pointermove', 800, 100);
-    const widget = grid.querySelector('[data-widget="schedule"]');
-    expect(widget.classList.contains('compact')).toBe(true);
-    expect(widget.dataset.column).toBe('3');
-    expect(document.querySelector('.home-widget-ghost').classList.contains('compact')).toBe(true);
-    point(document, 'pointercancel');
-    expect(widget.classList.contains('expanded')).toBe(true);
-    expect(widget.dataset.column).toBe('');
-    grip = document.querySelector('[data-widget-drag="schedule"]');
-    point(grip, 'pointerdown'); point(document, 'pointermove', 800, 100); point(document, 'pointerup');
-    expect(JSON.parse(localStorage.getItem('roomie.home.layout.1.1')).find((w) => w.id === 'schedule')).toMatchObject({ size: 'compact', column: 3 });
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => document.querySelector('[data-layout-preset="equal"]') });
+    point(grip,'pointerdown');point(document,'pointermove',100,110);
+    expect(document.querySelector('.home-dashboard').dataset.preset).toBe('equal');
+    expect(document.querySelectorAll('.home-dashboard>.compact')).toHaveLength(3);
+    expect(localStorage.getItem('roomie.home.layout.1.1.preset')).toBeNull();
+    point(document,'pointercancel');
+    expect(document.querySelector('.home-dashboard').dataset.preset).toBe('focus-left');
+    grip=document.querySelector('[data-widget-drag="schedule"]');
+    point(grip,'pointerdown');point(document,'pointermove',100,110);point(document,'pointerup');
+    expect(localStorage.getItem('roomie.home.layout.1.1.preset')).toBe('equal');
   });
-  it('allows a wide Finances tile to shrink into its own right corner while dragging', async () => {
-    localStorage.setItem('roomie.home.layout.1.1', JSON.stringify([{ id: 'board', size: 'expanded' }, { id: 'schedule', size: 'compact' }, { id: 'finances', size: 'expanded' }]));
+  it('moves a panel into the large right slot while resizing the other panels as one layout', async () => {
     await setup();
-    const grid = document.querySelector('.home-dashboard');
-    grid.style.gridTemplateColumns = '300px 300px 300px'; grid.style.gridAutoRows = '2px';
-    grid.getBoundingClientRect = () => ({ left: 0, right: 900, width: 900, top: 0, bottom: 900 });
-    const rects = { board: { left: 0, right: 600, top: 0, bottom: 300, width: 600, height: 300 }, schedule: { left: 600, right: 900, top: 0, bottom: 300, width: 300, height: 300 }, finances: { left: 300, right: 900, top: 320, bottom: 500, width: 600, height: 180 } };
-    [...grid.children].forEach((el) => { el.getBoundingClientRect = () => rects[el.dataset.widget]; });
-    const tile = grid.querySelector('[data-widget="finances"]');
-    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => tile });
-    point(tile.querySelector('[data-widget-drag]'), 'pointerdown', 310, 330);
-    point(document, 'pointermove', 850, 400);
-    expect(tile.classList.contains('compact')).toBe(true);
-    expect(tile.dataset.column).toBe('3');
-    point(document, 'pointerup', 850, 400);
-    expect(JSON.parse(localStorage.getItem('roomie.home.layout.1.1')).find((w) => w.id === 'finances')).toMatchObject({ size: 'compact', column: 3 });
+    const tile=document.querySelector('.home-widget[data-widget="finances"]');
+    Object.defineProperty(document, 'elementFromPoint', { configurable:true,value:()=>document.querySelector('[data-layout-preset="focus-right"]') });
+    point(tile.querySelector('[data-widget-drag]'),'pointerdown');point(document,'pointermove',100,110);point(document,'pointerup');
+    expect(document.querySelector('.home-dashboard').dataset.preset).toBe('focus-right');
+    const saved=JSON.parse(localStorage.getItem('roomie.home.layout.1.1'));
+    expect(saved[0]).toEqual({id:'finances',size:'expanded'});
+    expect(saved.slice(1).every((w)=>w.size==='compact' && !('column' in w))).toBe(true);
   });
   it('restores the original order on Escape or pointer cancellation and supports keyboard movement', async () => {
     let grip = await setup();
@@ -622,10 +612,8 @@ describe('Home upcoming list dates', () => {
     localStorage.removeItem('roomie.home.layout.1.51');
     document.getElementById('page').innerHTML = await homeView();
     content = document.getElementById('home-schedule-content');
-    expect(content.querySelectorAll('.home-schedule-row')).toHaveLength(8);
+    expect(content.querySelectorAll('.home-schedule-row')).toHaveLength(5);
     const view = content.querySelector('[data-input="home-view"]'); view.value = 'calendar'; inputs['home-view'](view);
-    expect(content.querySelector('[data-day="2026-11-04"]')).toBeNull();
-    actions['home-range'](content.querySelector('[data-n="-1"]'));
     expect(content.querySelector('[data-day="2026-11-04"]').textContent).toContain('Yesterday meeting');
   });
 });
@@ -901,5 +889,53 @@ describe('Household role controls', () => {
 
     expect(mockedApi).toHaveBeenCalledWith('/households/1', expect.objectContaining({ method: 'PATCH' }));
     expect(S.households[0].householdName).toBe('New household');
+  });
+});
+
+
+describe('Complete Home month grids', () => {
+  it('renders all six weeks of a long month instead of a rolling fourteen-day strip', async () => {
+    S.hid=201;S.households=[{...S.households[0],householdId:201}];
+    localStorage.setItem('roomie.home.view.1.201','calendar');
+    document.getElementById('page').innerHTML=await homeView();
+    for(let i=0;i<3;i++)actions['home-month'](document.querySelector('[data-n="-1"]'));
+    const days=[...document.querySelectorAll('.home-month [data-day]')].map((el)=>el.dataset.day);
+    expect(document.querySelector('#home-schedule-content').textContent).toContain('August 2026');
+    expect(days).toHaveLength(42);expect(days[0]).toBe('2026-07-26');expect(days).toContain('2026-08-31');expect(days.at(-1)).toBe('2026-09-05');
+  });
+});
+
+describe('Bounded dashboard previews', () => {
+  it('shows three Home updates with all remaining posts and reply drafts accessible in View all', async () => {
+    S.hid=202;S.households=[{...S.households[0],householdId:202}];
+    const baseApi=mockedApi.getMockImplementation();
+    const notes=Array.from({length:7},(_,i)=>({messageId:200+i,senderUserId:2,messageText:`Household update ${i}`,postedDate:`2026-11-0${7-i}T12:00:00Z`,replies:[]}));
+    mockedApi.mockImplementation((path)=>path.endsWith('/board')?Promise.resolve({notes}):path.endsWith('/events')?Promise.resolve({events:[]}):baseApi(path));
+    document.getElementById('page').innerHTML=await homeView();
+    expect(document.querySelector('.home-board-feed').children).toHaveLength(3);
+    actions['home-board-all']();
+    expect(document.querySelector('#home-board-all .home-board-feed').children).toHaveLength(7);
+    const form=document.querySelector('#home-board-all form');form.elements.namedItem('messageText').value='Keep my reply';
+    actions['home-layout-preset']({dataset:{layoutPreset:'equal'}});
+    expect(document.querySelector('#home-board-all form').elements.namedItem('messageText').value).toBe('Keep my reply');
+    expect(document.querySelector('#home-board .home-board-feed').children).toHaveLength(3);
+  });
+  it('keeps the Chores workload under its schedule and exposes every overdue/request behind bounded previews', async () => {
+    const {choresView}=await import('../src/pages/chores.js');
+    S.hid=203;S.households=[{...S.households[0],householdId:203}];
+    const baseApi=mockedApi.getMockImplementation();
+    const rule={choreId:1,choreName:'Laundry',effort:'medium',repeats:'weekly',rotation:[2],schedule:'Every Monday',createdAt:'2026-11-01T12:00:00Z',canEdit:true};
+    const assignments=Array.from({length:5},(_,i)=>({assignmentId:300+i,choreId:1,assignedUserId:2,dueAt:'2026-11-04T20:00:00Z',isCompleted:false,status:'overdue'}));
+    const swapRequests=assignments.map((a,i)=>({swapId:400+i,type:'skip',requesterUserId:2,requesterAssignmentId:a.assignmentId,requestMessage:'Can someone cover?'}));
+    mockedApi.mockImplementation((path)=>path.endsWith('/chores')?Promise.resolve({chores:[rule],assignments,swapRequests}):baseApi(path));
+    document.getElementById('page').innerHTML=await choresView();
+    expect(document.querySelector('.chore-schedule-column #chore-schedule')).not.toBeNull();
+    expect(document.querySelectorAll('.chore-schedule-column>section')).toHaveLength(2);
+    expect(document.querySelector('#chore-overdue').closest('aside')).not.toBeNull();
+    expect(document.querySelectorAll('#chore-overdue .chore-board-item')).toHaveLength(1);
+    expect(document.querySelectorAll('.chore-requests-board .chore-board-item')).toHaveLength(2);
+    actions['all-overdue']();expect(document.querySelectorAll('[role=dialog] .chore-board-item')).toHaveLength(5);
+    document.getElementById('modal')?.remove();
+    actions['all-chore-requests']();expect(document.querySelectorAll('[role=dialog] .chore-board-item')).toHaveLength(5);
   });
 });

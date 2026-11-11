@@ -642,8 +642,7 @@ button.activity-item{cursor:pointer}button.activity-item:hover{background:var(--
 .activity-source-target:focus{outline:2px solid var(--accent);outline-offset:4px}
 
 /* Home widgets share one responsive grid; DOM order is also the reading order. */
-.home-dashboard{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
-.home-widget{min-width:0}.home-widget.expanded{grid-column:span 2}.home-widget.compact{grid-column:span 1}
+.home-widget{min-width:0}
 .home-widget>.card{margin:0;min-width:0;padding:18px}
 .home-layout-status:empty{display:none}.home-layout-status{font-size:13px;color:var(--mute);margin-bottom:12px}
 .home-widget-tools{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:10px;margin-bottom:8px;border:1px dashed var(--line);border-radius:10px;background:var(--card)}
@@ -673,8 +672,7 @@ button.activity-item{cursor:pointer}button.activity-item:hover{background:var(--
 .home-widget.compact .home-finances h2{font-size:18px}.home-widget.compact .home-balance{flex-direction:column;gap:14px}
 .home-widget.compact .home-balance span{justify-content:space-between;align-items:center;font-size:13px}.home-widget.compact .home-balance b{font-size:22px}
 .home-widget.compact .home-finances>.btn{align-self:flex-start}
-@media(max-width:1000px){.home-dashboard{grid-template-columns:repeat(2,minmax(0,1fr))}.home-widget.expanded{grid-column:1/-1}}
-@media(max-width:640px){.home-dashboard{grid-template-columns:minmax(0,1fr);gap:14px}.home-widget.compact,.home-widget.expanded{grid-column:1/-1}.home-widget>.card{padding:14px}}
+@media(max-width:640px){.home-widget>.card{padding:14px}}
 
 /* Live dashboard dragging: the original stays in the grid as a drop preview. */
 button.home-drag-handle{border:0;background:transparent;font:inherit;font-size:24px;line-height:1;padding:5px 8px;color:var(--mute);cursor:grab;touch-action:none;border-radius:6px}
@@ -685,10 +683,6 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .home-widget-ghost{position:fixed!important;top:0;left:0;z-index:1000;max-height:360px;overflow:hidden;pointer-events:none!important;opacity:.92;box-shadow:0 16px 45px rgba(0,0,0,.2);border-radius:12px;will-change:transform}
 .home-widget-ghost .home-widget-tools{margin-bottom:8px}
 
-/* Independently measured rows let Finances sit directly below a short board. */
-.home-dashboard{grid-auto-flow:row dense;grid-auto-rows:2px;column-gap:18px;row-gap:0}
-.home-widget{align-self:start}
-@media(max-width:640px){.home-dashboard{grid-auto-flow:row;grid-auto-rows:auto;row-gap:14px}}
 
 /* Editing uses the card's own heading, with no separate grip bar. */
 .home-widget[data-editing="true"]>.card{outline:1px dashed var(--accent);outline-offset:3px}
@@ -737,3 +731,23 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .chore-attention-board .chore-board-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:0}
 .chore-attention-board .btn{align-self:flex-start}
 .chore-dashboard-layout{margin-bottom:18px}
+
+/* Complete presets replace measured masonry rows and independently pinned columns. */
+.home-dashboard[data-preset]{display:grid;grid-auto-flow:row;grid-auto-rows:auto;gap:18px;align-items:stretch}
+.home-dashboard[data-preset="focus-left"]{grid-template-columns:minmax(0,2fr) minmax(280px,1fr);grid-template-areas:"primary secondary" "primary tertiary";grid-template-rows:minmax(0,1fr) auto}
+.home-dashboard[data-preset="focus-right"]{grid-template-columns:minmax(280px,1fr) minmax(0,2fr);grid-template-areas:"secondary primary" "tertiary primary";grid-template-rows:minmax(0,1fr) auto}
+.home-dashboard[data-preset="equal"]{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"primary secondary tertiary";grid-template-rows:auto}
+.home-dashboard[data-preset]>.home-widget{display:flex;min-width:0;align-self:stretch;grid-column:auto}
+.home-dashboard[data-preset]>.home-widget:nth-child(1){grid-area:primary}
+.home-dashboard[data-preset]>.home-widget:nth-child(2){grid-area:secondary}
+.home-dashboard[data-preset]>.home-widget:nth-child(3){grid-area:tertiary}
+.home-dashboard[data-preset]>.home-widget>.card{flex:1;box-sizing:border-box;height:100%;min-width:0}
+.home-layout-choices{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.home-layout-choices [aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:2px}
+.home-layout-choices.drag-active{position:sticky;top:8px;z-index:50;padding:10px;background:var(--card);border-radius:10px;box-shadow:var(--shadow)}
+.home-dashboard .home-widget.expanded .home-month .day2{min-height:88px}
+.home-dashboard .home-widget.expanded .home-calendar-item{font-size:11px;padding:2px 4px}
+.home-dashboard .home-widget .home-board-feed>.sticky>p,.home-dashboard .home-board-message{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.home-board-view-all{align-self:flex-start}
+.chore-schedule-column{min-width:0}
+@media(max-width:900px){.home-dashboard[data-preset]{grid-template-columns:minmax(0,1fr);grid-template-areas:none;grid-template-rows:auto}.home-dashboard[data-preset]>.home-widget:nth-child(n){grid-area:auto}.home-dashboard[data-preset]>.home-widget>.card{height:auto}}

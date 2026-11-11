@@ -2,7 +2,7 @@ import { ago, esc, fullName } from '../lib/dom.js';
 import { boardIdentity } from './board-profile.js';
 import { approvalState } from '../../shared/event-approval.ts';
 
-export function householdBoard({ members, events, chores, notes, user, timezone, compact = false, archive = false }) {
+export function householdBoard({ members, events, chores, notes, user, timezone, compact = false, archive = false, limit = Infinity }) {
   const who = (id) => members.find((m) => m.userId === id);
   const name = (id) => id === user.userId ? 'You' : fullName(who(id));
   const when = (at) => new Date(at).toLocaleString('en-US', { timeZone: timezone, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -52,7 +52,7 @@ export function householdBoard({ members, events, chores, notes, user, timezone,
   const resolvedCount = notes.filter((n) => n.isResolved).length;
   return `<div class="row sp home-board-heading"><h2>Household board</h2><button type="button" class="btn p home-make-announcement" data-action="home-make-announcement">Make announcement</button></div>
     <div class="row home-board-filters" role="group" aria-label="Household board filter"><button type="button" class="btn s ${archive ? '' : 'p'}" data-action="home-board-filter" data-archive="false" aria-pressed="${!archive}">Open</button><button type="button" class="btn s ${archive ? 'p' : ''}" data-action="home-board-filter" data-archive="true" aria-pressed="${archive}">Resolved archive${resolvedCount ? ` (${resolvedCount})` : ''}</button></div>
-    <div class="stack home-board-feed" aria-label="${archive ? 'Resolved household announcements' : 'Household announcements and requests'}">${feed.map((item) => compact ? compactEntry(item) : item.html).join('') || `<p class="hint">${archive ? 'No resolved announcements in the archive.' : 'No announcements or open requests right now.'}</p>`}</div>`;
+    <div class="stack home-board-feed" aria-label="${archive ? 'Resolved household announcements' : 'Household announcements and requests'}">${feed.slice(0, limit).map((item) => compact ? compactEntry(item) : item.html).join('') || `<p class="hint">${archive ? 'No resolved announcements in the archive.' : 'No announcements or open requests right now.'}</p>`}</div>${Number.isFinite(limit) && feed.length ? `<button class="btn s home-board-view-all" data-action="home-board-all">View all (${feed.length})</button>` : ''}`;
 
 }
 
