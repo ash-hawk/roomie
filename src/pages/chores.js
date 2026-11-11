@@ -41,20 +41,22 @@ export async function choresView() {
   loadChoreDisplay();
   choreMonth ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   return `${phead('Chores', 'A clear view of what needs doing, and whose turn it is.', `<button class="btn s" data-action="all-chores">All chores</button><button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
-    <div class="page-content split cal chores-content chore-dashboard-layout"><section class="card" id="chore-schedule">${scheduleView()}</section><aside class="card stack chore-attention-board" aria-label="Chore board"><h2>Chore board</h2><div id="chore-overdue">${overdueView()}</div>${choreRequestsBoard()}</aside></div>${workloadView()}`;
+    <div class="page-content split cal chores-content chore-dashboard-layout"><div class="stack chore-schedule-column"><section class="card" id="chore-schedule">${scheduleView()}</section>${workloadView()}</div><aside class="card stack chore-attention-board" aria-label="Chore board"><h2>Chore board</h2><div id="chore-overdue">${overdueView()}</div>${choreRequestsBoard()}</aside></div>`;
 
 }
 function choreIdentity(assignment) {
   return `<div class="row chore-occurrence" style="gap:8px">${avatar(who(assignment.assignedUserId), 'sm')}<div><b>${esc(fullName(who(assignment.assignedUserId)))}</b><div class="hint">${whenFmt(assignment.dueAt)}</div></div></div>`;
 }
-function choreRequestsBoard() {
-  const requests = D.swapRequests.filter((r) => r.requesterUserId === S.user.userId || r.targetUserId === S.user.userId || r.type === 'skip').filter((r) => { const a = asgOf(r.requesterAssignmentId); return a && !a.isCompleted && choreOf(a.choreId); });
+function attentionRequests() { return D.swapRequests.filter((r) => r.requesterUserId === S.user.userId || r.targetUserId === S.user.userId || r.type === 'skip').filter((r) => { const a = asgOf(r.requesterAssignmentId); return a && !a.isCompleted && choreOf(a.choreId); }); }
+function choreRequestsBoard(limit = overdueItems().length ? 2 : 3) {
+  const requests = attentionRequests();
   const cards = (list) => list.map((request) => {
     const assignment = asgOf(request.requesterAssignmentId);
     return `<article class="chore-board-item stack"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}${request.requestMessage ? `<p class="hint chore-board-preview">${esc(request.requestMessage)}</p>` : ''}<button class="btn s" data-action="open-request" data-id="${request.swapId}">View chore</button></article>`;
   }).join('');
   const covers = requests.filter((r) => r.type === 'skip'), swaps = requests.filter((r) => r.type === 'swap');
-  return `<section class="stack chore-requests-board"><h3>Cover Requests${covers.length ? ` (${covers.length})` : ''}</h3>${cards(covers) || '<p class="hint">No chores need to be covered.</p>'}</section>${swaps.length ? `<section class="stack chore-swap-board"><h3>Swap requests (${swaps.length})</h3>${cards(swaps)}</section>` : ''}`;
+  const shownSwaps = swaps.slice(0, Math.max(0, limit - covers.length));
+  return `<section class="stack chore-requests-board"><h3>Cover Requests${covers.length ? ` (${covers.length})` : ''}</h3>${cards(covers.slice(0, limit)) || '<p class="hint">No chores need to be covered.</p>'}</section>${shownSwaps.length ? `<section class="stack chore-swap-board"><h3>Swap requests (${swaps.length})</h3>${cards(shownSwaps)}</section>` : ''}${requests.length > limit ? `<button class="btn s" data-action="all-chore-requests">View all requests (${requests.length})</button>` : ''}`;
 }
 actions['all-chores'] = () => openModal(`${mhead('All chores')}<div id="chore-rules">${chartView()}</div>`);
 const chorePrefsKey = () => `roomie.chores.display.${S.user.userId}.${hid()}`;
@@ -102,10 +104,13 @@ function workloadView() {
   const max = Math.max(1, ...counts.map(([, count]) => count));
   return `<section class="card"><div class="row sp"><h2>Household workload</h2><span class="hint workload-label">Open chores</span></div>${counts.map(([member, count]) => `<div class="row" style="padding:7px 0">${avatar(member, 'sm')}<span class="truncate" style="width:74px">${esc(first(member.userId))}</span><div class="bar grow" style="--w:${Math.round(count / max * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${count}</b></div>`).join('')}</section>`;
 }
-function overdueView() {
-  const overdue = visibleAssignments().filter((a) => !a.isCompleted && ymdIn(a.dueAt) < ymdIn(Date.now()));
-  return `<section class="stack"><h3>Overdue${overdue.length ? ` (${overdue.length})` : ''}</h3>${overdue.map((assignment) => `<article class="chore-board-item stack"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}<button class="btn s" data-action="chore-detail" data-id="${assignment.assignmentId}">View chore</button></article>`).join('') || '<p class="hint">No overdue chores.</p>'}</section>`;
+function overdueItems() { return visibleAssignments().filter((a) => !a.isCompleted && ymdIn(a.dueAt) < ymdIn(Date.now())); }
+function overdueView(limit = attentionRequests().length ? 1 : 3) {
+  const overdue = overdueItems();
+  return `<section class="stack"><h3>Overdue${overdue.length ? ` (${overdue.length})` : ''}</h3>${overdue.slice(0, limit).map((assignment) => `<article class="chore-board-item stack"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}<button class="btn s" data-action="chore-detail" data-id="${assignment.assignmentId}">View chore</button></article>`).join('') || '<p class="hint">No overdue chores.</p>'}${overdue.length > limit ? `<button class="btn s" data-action="all-overdue">View all overdue (${overdue.length})</button>` : ''}</section>`;
 }
+actions['all-overdue'] = () => openModal(`${mhead('Overdue chores')}<div class="chore-attention-board">${overdueView(Infinity)}</div>`);
+actions['all-chore-requests'] = () => openModal(`${mhead('Chore requests')}<div class="stack chore-attention-board">${choreRequestsBoard(Infinity)}</div>`);
 function scheduleView() {
   const title = new Date(`${choreMonth}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
   const people = active();

@@ -1,48 +1,23 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from 'vitest';
-import { connectHomeLayout, fitHomeWidgets } from '../src/components/home-layout.js';
-afterEach(() => { document.body.innerHTML = ''; connectHomeLayout(); vi.unstubAllGlobals(); });
-it('sizes separate widget tracks and remeasures expanded content without forcing equal card heights', () => {
-  document.body.innerHTML = '<div class="home-dashboard" style="grid-auto-rows:2px;column-gap:18px"><div class="home-widget"></div><div class="home-widget"></div><div class="home-widget"></div></div>';
-  const grid = document.querySelector('.home-dashboard');
-  const heights = [1000, 200, 100];
-  [...grid.children].forEach((widget, i) => { widget.getBoundingClientRect = () => ({ height: heights[i] }); });
-  let changed;
-  const disconnect = vi.fn();
-  vi.stubGlobal('ResizeObserver', class { constructor(callback) { changed = callback; } observe() {} disconnect() { disconnect(); } });
+import { afterEach, expect, it } from 'vitest';
+import { HOME_PRESETS, normalizeHomeLayout, connectHomeLayout } from '../src/components/home-layout.js';
+afterEach(() => { document.body.innerHTML = ''; });
+it('normalizes every legacy order into complete presets without independent column pins', () => {
+  const orders = [['schedule','board','finances'],['schedule','finances','board'],['board','schedule','finances'],['board','finances','schedule'],['finances','board','schedule'],['finances','schedule','board']];
+  for (const order of orders) for (const preset of HOME_PRESETS) {
+    const layout = normalizeHomeLayout(order.map((id) => ({ id, size:'expanded', column:3 })), preset);
+    expect(layout.map((w) => w.id)).toEqual(order);
+    expect(layout.filter((w) => w.size === 'expanded')).toHaveLength(preset === 'equal' ? 0 : 1);
+    expect(layout.every((w) => !('column' in w))).toBe(true);
+  }
+});
+it('clears old measured spans and enables heading movement only while editing', () => {
+  document.body.innerHTML = '<div class="home-dashboard" data-preset="focus-left"><div class="home-widget" data-widget="schedule" data-editing="true" style="grid-column:3;grid-row-end:span 509"><h2>November</h2></div><div class="home-widget" data-widget="board"><h2>Household board</h2></div><div class="home-widget" data-widget="finances"><h2>Finances</h2></div></div>';
   connectHomeLayout();
-  expect([...grid.children].map((w) => w.style.gridRowEnd)).toEqual(['span 509', 'span 109', 'span 59']);
-  heights[1] = 320; changed();
-  expect(grid.children[1].style.gridRowEnd).toBe('span 169');
-  expect(grid.children[2].style.gridRowEnd).toBe('span 59');
-  grid.style.gridAutoRows = 'auto'; fitHomeWidgets(grid);
-  expect([...grid.children].every((w) => w.style.gridRowEnd === '')).toBe(true);
-  document.body.innerHTML = ''; connectHomeLayout();
-  expect(disconnect).toHaveBeenCalledOnce();
-});
-
-it('infers narrow, wide and empty spaces from the destination rather than a size toggle', async () => {
-  const { widgetDropSlot } = await import('../src/components/home-layout.js');
-  const bounds = { left: 0, right: 900, width: 900 };
-  const widgets = [
-    { id: 'schedule', left: 0, right: 600, top: 0, bottom: 900, column: 1, span: 2 },
-    { id: 'board', left: 600, right: 900, top: 0, bottom: 300, column: 3, span: 1 },
-    { id: 'finances', left: 600, right: 900, top: 310, bottom: 510, column: 3, span: 1 },
-  ];
-  expect(widgetDropSlot(bounds, widgets, 'finances', 200, 100, 3)).toEqual({ column: 1, span: 2, targetId: 'schedule' });
-  expect(widgetDropSlot(bounds, widgets, 'schedule', 800, 100, 3)).toEqual({ column: 3, span: 1, targetId: 'board' });
-  expect(widgetDropSlot(bounds, widgets, 'finances', 800, 700, 3)).toEqual({ column: 3, span: 1, targetId: null });
-  expect(widgetDropSlot(bounds, widgets, 'finances', 200, 1000, 3)).toEqual({ column: 1, span: 2, targetId: null });
-  expect(widgetDropSlot(bounds, widgets, 'finances', -1, 100, 3)).toBeNull();
-  expect(widgetDropSlot({ left: 0, right: 320, width: 320 }, [], 'schedule', 100, 100, 1)).toEqual({ column: 1, span: 1, targetId: null });
-});
-
-
-it('keeps empty right-corner drops narrow rather than expanding left', async () => {
-  const { widgetDropSlot } = await import('../src/components/home-layout.js');
-  const bounds = { left: 0, right: 900, width: 900 };
-  expect(widgetDropSlot(bounds, [], 'finances', 850, 600, 3)).toEqual({ column: 3, span: 1, targetId: null });
-  expect(widgetDropSlot(bounds, [], 'finances', 450, 600, 3)).toEqual({ column: 2, span: 2, targetId: null });
-  expect(widgetDropSlot(bounds, [], 'finances', 50, 600, 3)).toEqual({ column: 1, span: 2, targetId: null });
-  expect(widgetDropSlot({ left: 0, right: 600, width: 600 }, [], 'finances', 550, 600, 2)).toEqual({ column: 2, span: 1, targetId: null });
+  const widgets=[...document.querySelectorAll('.home-widget')];
+  expect(widgets.map((w) => w.dataset.slot)).toEqual(['primary','secondary','tertiary']);
+  expect(widgets.every((w) => !w.style.gridColumn && !w.style.gridRowEnd)).toBe(true);
+  expect(widgets[0].querySelector('h2').tabIndex).toBe(0);
+  widgets[0].dataset.editing='false';connectHomeLayout();
+  expect(document.querySelector('[data-widget-drag]')).toBeNull();
 });
