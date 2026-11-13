@@ -5,8 +5,8 @@ import { validCalendarDay } from '../lib/calendar-create.js';
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { avatar, badge, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, phead, personColor, showError, toast } from '../lib/dom.js';
-import { monthDays } from '../../shared/home-schedule.ts';
+import { avatar, badge, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, phead, itemColor, showError, toast } from '../lib/dom.js';
+import { monthCalendar } from '../components/month-calendar.js';
 import { dayName } from '../../shared/chore-dates.ts';
 
 let choreView = 'list', choreMonth = null, choreScope = null;
@@ -52,7 +52,7 @@ function choreRequestsBoard(limit = overdueItems().length ? 2 : 3) {
   const requests = attentionRequests();
   const cards = (list) => list.map((request) => {
     const assignment = asgOf(request.requesterAssignmentId);
-    return `<article class="chore-board-item stack"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}${request.requestMessage ? `<p class="hint chore-board-preview">${esc(request.requestMessage)}</p>` : ''}<button class="btn s" data-action="open-request" data-id="${request.swapId}">View chore</button></article>`;
+    return `<article class="chore-board-item stack" data-item-kind="chore"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}${request.requestMessage ? `<p class="hint chore-board-preview">${esc(request.requestMessage)}</p>` : ''}<button class="btn s" data-action="open-request" data-id="${request.swapId}">View chore</button></article>`;
   }).join('');
   const covers = requests.filter((r) => r.type === 'skip'), swaps = requests.filter((r) => r.type === 'swap');
   const shownSwaps = swaps.slice(0, Math.max(0, limit - covers.length));
@@ -91,7 +91,7 @@ function row(a) {
   const mine = a.assignedUserId === S.user.userId, d = daysFromToday(a.dueAt);
   const chip = a.isCompleted ? `<span class="st paid">Done ${doneFmt(a.completedAt)}</span>` : a.status === 'overdue' ? '<span class="st overdue">Overdue</span>' : d <= 1 ? `<span class="st today">${d === 0 ? 'Now' : 'Due soon'}</span>` : '<span class="st later">Later</span>';
   const req = openRequestOn(a.assignmentId);
-  return `<div class="item cr click click-row ${a.isCompleted ? 'isdone' : ''}" data-action="chore-detail" data-id="${a.assignmentId}" tabindex="0">
+  return `<div data-item-kind="chore" class="item cr click click-row ${a.isCompleted ? 'isdone' : ''}" data-action="chore-detail" data-id="${a.assignmentId}" tabindex="0">
     ${mine ? `<button class="doneb ${a.isCompleted ? 'on' : ''}" data-action="${a.isCompleted ? 'undo-chore' : 'done-chore'}" data-id="${a.assignmentId}" aria-label="${a.isCompleted ? 'Mark not done' : 'Mark done'}">${ico('check', 16)}</button>` : avatar(who(a.assignedUserId), '')}
     <div class="grow" style="min-width:0"><b class="nm truncate">${esc(c.choreName)}${c.repeats !== 'none' ? ' <span class="mute" title="Repeats">↻</span>' : ''}</b>
       <div class="hint">${mine ? 'You' : esc(first(a.assignedUserId))} · ${whenFmt(a.dueAt)}</div></div>
@@ -107,7 +107,7 @@ function workloadView() {
 function overdueItems() { return visibleAssignments().filter((a) => !a.isCompleted && ymdIn(a.dueAt) < ymdIn(Date.now())); }
 function overdueView(limit = attentionRequests().length ? 1 : 3) {
   const overdue = overdueItems();
-  return `<section class="stack"><h3>Overdue${overdue.length ? ` (${overdue.length})` : ''}</h3>${overdue.slice(0, limit).map((assignment) => `<article class="chore-board-item stack"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}<button class="btn s" data-action="chore-detail" data-id="${assignment.assignmentId}">View chore</button></article>`).join('') || '<p class="hint">No overdue chores.</p>'}${overdue.length > limit ? `<button class="btn s" data-action="all-overdue">View all overdue (${overdue.length})</button>` : ''}</section>`;
+  return `<section class="stack"><h3>Overdue${overdue.length ? ` (${overdue.length})` : ''}</h3>${overdue.slice(0, limit).map((assignment) => `<article class="chore-board-item stack" data-item-kind="chore"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}<button class="btn s" data-action="chore-detail" data-id="${assignment.assignmentId}">View chore</button></article>`).join('') || '<p class="hint">No overdue chores.</p>'}${overdue.length > limit ? `<button class="btn s" data-action="all-overdue">View all overdue (${overdue.length})</button>` : ''}</section>`;
 }
 actions['all-overdue'] = () => openModal(`${mhead('Overdue chores')}<div class="chore-attention-board">${overdueView(Infinity)}</div>`);
 actions['all-chore-requests'] = () => openModal(`${mhead('Chore requests')}<div class="stack chore-attention-board">${choreRequestsBoard(Infinity)}</div>`);
@@ -117,16 +117,15 @@ function scheduleView() {
   const filters = filterChoices('Show chores for', 'chore-filter', [['all', 'Everyone'], ['me', 'Just mine'], ...people.filter((m) => m.userId !== S.user.userId).map((m) => [String(m.userId), m.firstName])], filter);
   const toolbar = scheduleToolbar({ title, monthAction: 'chore-month', viewInput: 'chore-view', view: choreView, filters });
   const items = visibleAssignments();
-  if (!D.chores.length) return toolbar + empty('🧹', 'No chores yet', 'Add one yourself or start with a few common household chores.', '<button class="btn s" data-action="starter-chores">Add common chores</button>');
+  if (!D.chores.length && choreView === 'list') return toolbar + empty('🧹', 'No chores yet', 'Add one yourself or start with a few common household chores.', '<button class="btn s" data-action="starter-chores">Add common chores</button>');
   if (choreView === 'list') {
     const upcoming = items.filter((a) => ymdIn(a.dueAt) >= ymdIn(Date.now()) && ymdIn(a.dueAt).slice(0, 7) === choreMonth.slice(0, 7));
     return toolbar + (upcoming.length ? [...new Set(upcoming.map((a) => ymdIn(a.dueAt)))].map((day) => `<section class="stack home-day"><h3>${esc(choreDayLabel(day))}</h3>${upcoming.filter((a) => ymdIn(a.dueAt) === day).map(row).join('')}</section>`).join('') : '<p class="home-empty">No chores from today onward in this month.</p>');
   }
-  return `${toolbar}<div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => `<span>${day}</span>`).join('')}</div><div class="mgrid home-month">${monthDays(choreMonth).map((day) => {
-    const due = items.filter((a) => ymdIn(a.dueAt) === day);
-    return `<button class="day2 ${day.slice(0, 7) !== choreMonth.slice(0, 7) ? 'out' : ''} ${day === ymdIn(Date.now()) ? 'today' : ''}" data-action="chore-day" data-day="${day}" aria-label="${esc(choreDayLabel(day))}, ${due.length} chores" ${day === ymdIn(Date.now()) ? 'aria-current="date"' : ''}><span class="dn">${Number(day.slice(8))}</span>${due.slice(0, 3).map((a) => `<span class="home-calendar-item ${a.isCompleted ? 'completed' : ''}" style="--ev:${personColor(a.assignedUserId)}"><span>${esc(first(a.assignedUserId))} · ${new Date(a.dueAt).toLocaleTimeString('en-US', { timeZone: tz(), hour: 'numeric', minute: '2-digit' })}</span><b>${esc(choreOf(a.choreId).choreName)}</b></span>`).join('')}${due.length > 3 ? `<span class="home-more">+${due.length - 3} more</span>` : ''}<span class="home-mobile-count" aria-hidden="true">${due.length || ''}</span></button>`;
-  }).join('')}</div>`;
+  return toolbar + monthCalendar({ month: choreMonth, today: ymdIn(Date.now()), action: 'chore-day', dayLabel: choreDayLabel,
+    items: items.map((a) => ({ day: ymdIn(a.dueAt), kind: 'chore', title: choreOf(a.choreId).choreName, person: first(a.assignedUserId), time: new Date(a.dueAt).toLocaleTimeString('en-US', { timeZone: tz(), hour: 'numeric', minute: '2-digit' }), completed: a.isCompleted })) });
 }
+
 actions['chore-day'] = (button) => {
   const day = button.dataset.day, items = visibleAssignments().filter((a) => ymdIn(a.dueAt) === day);
   openModal(`${mhead(esc(choreDayLabel(day)))}<div class="stack">${items.map(row).join('') || '<p class="mute">No chores on this day.</p>'}</div><div class="acts"><button class="btn p" data-action="add-chore" data-day="${esc(day)}">Add chore</button></div>`);
@@ -140,7 +139,7 @@ function chartView() {
   if (!list.length) return `<div class="page-content chores-content"><section class="card">${empty('🧹', D.chores.length ? 'Nothing matches' : 'No chores yet', D.chores.length ? 'Try a different person.' : 'Add one yourself or start with common chores.', D.chores.length ? '' : '<button class="btn s" data-action="starter-chores">Add common chores</button>')}</section></div>`;
   return `<div class="page-content chores-content"><section class="card"><div class="row sp"><h2>All chores</h2>${badge(`${list.length}`, 'gray')}</div><select class="input" data-input="chore-sort" aria-label="Sort chores"><option value="added" ${sortBy === 'added' ? 'selected' : ''}>Sort: date added</option><option value="az" ${sortBy === 'az' ? 'selected' : ''}>Sort: A to Z</option><option value="assignee" ${sortBy === 'assignee' ? 'selected' : ''}>Sort: assignee</option></select>${list.map((c) => {
     const next = nextAsg(c); const rot = c.rotation.filter((u) => who(u) && !who(u).leftDate);
-    return `<div class="item cr click click-row" data-action="chore-rule" data-id="${c.choreId}" tabindex="0"><div class="grow" style="min-width:0"><b class="truncate">${esc(c.choreName)}</b>
+    return `<div class="item cr click click-row" data-item-kind="chore" data-action="chore-rule" data-id="${c.choreId}" tabindex="0"><div class="grow" style="min-width:0"><b class="truncate">${esc(c.choreName)}</b>
       <div class="hint">${esc(c.schedule)}${c.repeats !== 'none' && rot.length > 1 ? ` · takes turns: ${rot.map((u) => esc(first(u))).join(', ')}` : ''}</div>
       <div class="hint">${next ? `Next: ${esc(first(next.assignedUserId))}, ${whenFmt(next.dueAt)}` : c.repeats === 'none' ? 'Done' : 'Nobody to assign (everyone moved out)'}</div></div>${effortChip(c.effort)}<span class="row-chevron">${ico('chevron', 16)}</span></div>`;
   }).join('')}</section></div>`;

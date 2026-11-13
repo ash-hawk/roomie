@@ -32,7 +32,7 @@ export async function financesView() {
   const action = tab === 'settle' ? `<button class="btn p" data-action="add-expense">${ico('plus', 16)} Log expense</button>` : `<button class="btn p" data-action="add-wish">${ico('plus', 16)} Add item</button>`;
   return `${phead('Finances', '', action)}
   <div class="page-controls">${seg([['settle', 'Settle payments'], ['wish', 'Wish list']], tab, 'fin-tab')}</div>
-  <div class="page-content stack">${tab === 'settle' ? settleView() : wishView()}</div>`;
+  <div class="page-content stack finance-content" data-item-kind="finance">${tab === 'settle' ? settleView() : wishView()}</div>`;
 }
 actions['fin-tab'] = (el) => { tab = el.dataset.value; window.dispatchEvent(new Event('roomie:render')); };
 
@@ -202,9 +202,9 @@ forms.pay = async (form) => {
 // ---- wish list --------------------------------------------------------------------------------
 function wishView() {
   const open = D.wish.filter((w) => !w.isBought), done = D.wish.filter((w) => w.isBought);
-  const row = (w) => `<div class="item exp" data-action="wish" data-id="${w.wishlistItemId}"><div class="grow"><b class="truncate">${esc(w.itemName)}</b>
+  const row = (w) => `<div class="item exp" data-action="wish" data-id="${w.wishlistItemId}"><div class="grow"><b class="truncate">${w.isBought ? `<s>${esc(w.itemName)}</s>` : esc(w.itemName)}</b>
     <div class="hint">${esc(first(w.createdByUserId))} added it${w.estimatedPrice ? ' · about ' + $m(w.estimatedPrice) : ''}</div></div>
-    ${badge(w.needOrWant === 'need' ? 'Need' : 'Want', w.needOrWant === 'need' ? 'warn' : '')}${w.isBought ? badge('Bought', 'good') : ''}</div>`;
+    ${w.isBought ? '' : badge(w.needOrWant === 'need' ? 'Need' : 'Want', w.needOrWant === 'need' ? 'warn' : '')}</div>`;
   const groups = [['need', 'Needs'], ['want', 'Wants']].map(([kind, title]) => {
     const items = open.filter((item) => kind === 'need' ? item.needOrWant === 'need' : item.needOrWant !== 'need');
     return `<section class="stack" aria-labelledby="wishlist-${kind}"><h3 id="wishlist-${kind}">${title}</h3>${items.map(row).join('') || `<p class="hint">No ${title.toLowerCase()} yet.</p>`}</section>`;

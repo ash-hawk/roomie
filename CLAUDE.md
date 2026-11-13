@@ -108,6 +108,11 @@
 - DB pool: `api/_lib/db.ts` now handles `error` on the pool and on checked-out clients (a dropped Neon connection used to crash the process with an uncaught exception).
 
 
+## Home finance previews and content colors
+- The expanded Home Finances panel is top-aligned and uses the existing balances response: two totals, separate You owe / Owed to you groups, and Waiting on you payment previews. Each group shows at most three rows with access to the full Finances page. Names/photos open freshly fetched roommate profiles. Compact mode retains its simple totals; changing layout sizes reuses loaded data and never confirms a payment.
+- Colors identify content types, not people: events use purple, chores teal, finances blue, and standalone announcements amber. Calendar dots/cards and list rows use the same type colors across pages. Linked event announcements inherit the event color; chore cover/swap requests use the chore color. Profile initials use a neutral background. Semantic status labels still identify overdue, pending and completed states.
+- Main navigation tabs never show numeric badges, on desktop or mobile. Personal activity counts remain on the separate bell. The former overdue-count request is no longer made for navigation.
+
 ## Current event UI
 - Date is above side-by-side start/end inputs. The custom event label is visible and required only for Other; hidden fields respect the global hidden attribute.
 - Ask for approval explains pending events; Select all roommates excludes the creator and synchronizes checked/partial selection. Progress is shown on Events and Home, including calendar entries and day details.
@@ -156,3 +161,6 @@
 
 - Departure follow-up: Members can Leave household without settling money; owners can remove members through the same cleanup. Owners must transfer ownership first or explicitly delete the household. Announcement threads authored by the departed roommate are archived/unpinned; other people’s replies are retained. Remaining shared chore rules transfer management to the active owner. No financial amount or payment status is changed by departure. Pending payments involving departed roommates leave the action inbox, and backend payment creation/review rejects historical stays.
 - Rejoining starts a new joined_date and onboarding period. Balances include only expenses/payments created during both participants’ current membership periods, so old obligations do not return. Historical unpaid shares are labelled History, and the balances endpoint excludes former members’ payment handles. Light/dark board posts and requests now share the same accent tint; pinned posts use an accent outline instead of a separate yellow palette.
+
+- Events and Chores feature calendars use components/month-calendar.js for identical weekday grids, fixed-height day cells, time/person/title entries, mobile dots, overflow counts, and full day-detail access. Both render the complete selected month, including six-week months; empty Chores calendars remain usable for adding a chore by date. Home retains its adaptive widget calendar.
+- Events separates the Make announcement composer and Announcements reader into two cards in one sidebar column. Current messages / Resolved messages filters affect only the reader and preserve the composition draft. Home uses the same message-filter labels, without numeric badges in those controls.
