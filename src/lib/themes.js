@@ -1,12 +1,18 @@
-// Category color families remain stable across presets and color modes.
+const light = { bg: '#f6f6f5', card: '#ffffff', ink: '#202124', mute: '#55585f', line: '#d8dadd', accent: '#292b30', 'on-accent': '#ffffff', good: '#16733D', warn: '#855000', bad: '#A92B2B' };
+const dark = { bg: '#151515', card: '#222222', ink: '#f5f5f5', mute: '#c0c0c0', line: '#515151', accent: '#eeeeee', 'on-accent': '#202124', good: '#62D493', warn: '#F3B859', bad: '#FF8585' };
+// Source swatches are the user's exact palettes. Dark category accents adapt only
+// the shades that disappear against charcoal; the source palette stays visible.
 export const themes = {
-  coastal: { name: 'Coastal', description: 'Warm ivory, sea glass, and charcoal blue.',
-    light: { bg: '#f6f7f3', card: '#ffffff', ink: '#233d4d', mute: '#566675', line: '#dce3df', accent: '#233d4d', 'on-accent': '#ffffff', 'color-event': '#794c91', 'color-chore': '#426c6c', 'color-finance': '#435e85', 'color-announcement': '#a85818' },
-    dark: { bg: '#111d23', card: '#1b2a31', ink: '#edf3f1', mute: '#b2c2c3', line: '#3b5059', accent: '#b6ccd5', 'on-accent': '#14232a', 'color-event': '#c9a4dc', 'color-chore': '#8cc6b8', 'color-finance': '#9bbde0', 'color-announcement': '#efb568' } },
-  orchid: { name: 'Orchid', description: 'Soft orchid, misty blue, and deep navy.',
-    light: { bg: '#f6f5fa', card: '#ffffff', ink: '#16213c', mute: '#5b6478', line: '#dfe2ed', accent: '#344766', 'on-accent': '#ffffff', 'color-event': '#97509f', 'color-chore': '#326f70', 'color-finance': '#435e85', 'color-announcement': '#a5622d' },
-    dark: { bg: '#111827', card: '#1b253a', ink: '#f0f1fa', mute: '#b6bfd3', line: '#3b4863', accent: '#bcc9e2', 'on-accent': '#16213c', 'color-event': '#d9a0e1', 'color-chore': '#8ac8c3', 'color-finance': '#9bbce6', 'color-announcement': '#e8b47f' } },
-  berry: { name: 'Berry', description: 'Plum, muted aqua, and soft rose neutrals.',
-    light: { bg: '#faf5f7', card: '#fffcfd', ink: '#352b37', mute: '#6b5d6e', line: '#e7dce4', accent: '#433747', 'on-accent': '#ffffff', 'color-event': '#77375e', 'color-chore': '#356e69', 'color-finance': '#485f86', 'color-announcement': '#9a5d20' },
-    dark: { bg: '#201820', card: '#2d2330', ink: '#f6eef4', mute: '#c6b5c4', line: '#524054', accent: '#d9c1d5', 'on-accent': '#2b1c2b', 'color-event': '#daa0c5', 'color-chore': '#94bfbe', 'color-finance': '#a3b9df', 'color-announcement': '#e4b678' } },
+  coastal: { name: 'Coastal', description: 'Orange, golden yellow, olive, and charcoal blue.',
+    palette: ['#FE7F2D', '#FCCA46', '#89925F', '#627F67', '#233D4D', '#426C6C', '#619B8A'],
+    light: { ...light, 'color-event': '#FE7F2D', 'color-chore': '#627F67', 'color-finance': '#233D4D', 'color-announcement': '#FCCA46' },
+    dark: { ...dark, 'color-event': '#FE7F2D', 'color-chore': '#9BB59E', 'color-finance': '#8EADBD', 'color-announcement': '#FCCA46' } },
+  orchid: { name: 'Orchid', description: 'Orchid pink, blue grey, Baltic blue, and navy.',
+    palette: ['#FFFFFF', '#CC87D4', '#709BCE', '#435E85', '#16213C'],
+    light: { ...light, 'color-event': '#CC87D4', 'color-chore': '#709BCE', 'color-finance': '#435E85', 'color-announcement': '#16213C' },
+    dark: { ...dark, 'color-event': '#CC87D4', 'color-chore': '#709BCE', 'color-finance': '#9AB2D2', 'color-announcement': '#C2CDE3' } },
+  berry: { name: 'Berry', description: 'Burgundy, blackberry, rosy grey, aqua, and mint.',
+    palette: ['#5C0029', '#61304B', '#857C8D', '#94BFBE', '#ACF7C1'],
+    light: { ...light, 'color-event': '#5C0029', 'color-chore': '#94BFBE', 'color-finance': '#61304B', 'color-announcement': '#ACF7C1' },
+    dark: { ...dark, 'color-event': '#E19ABB', 'color-chore': '#94BFBE', 'color-finance': '#C39AB2', 'color-announcement': '#ACF7C1' } },
 };
