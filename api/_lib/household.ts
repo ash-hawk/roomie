@@ -29,6 +29,9 @@ export function assertOwner(role: string) {
  * Roommates who moved out keep their history but are never targeted again.
  */
 export async function assertActiveMembers(ex: Executor, householdId: number, userIds: number[]) {
+  // Every writer acquires this before record locks, matching departure's lock order.
+  await ex.select({ householdId: schema.household.householdId }).from(schema.household)
+    .where(eq(schema.household.householdId, householdId)).for('share');
   const wanted = [...new Set(userIds)];
   if (!wanted.length) return;
   const rows = await ex.select({ userId: hm.userId }).from(hm)

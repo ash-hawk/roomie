@@ -225,6 +225,37 @@ describe('chore rotation order', () => {
   });
 });
 
+describe('Home finance widget sizes', () => {
+  it('promotes the totals tile into personal balances and payment previews without extra requests', async () => {
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => path.endsWith('/balances') ? Promise.resolve({
+      mine:[{otherUserId:2,signedAmount:'-1.86'},{otherUserId:3,signedAmount:'22.27'}],
+      incoming:[{paymentId:9,payerUserId:3,amount:'5.00',status:'sent',items:[]}],
+    }) : baseApi(path));
+    localStorage.setItem('roomie.home.layout.1.1', JSON.stringify(['finances','schedule','board'].map(id => ({id,size:'compact'}))));
+    localStorage.setItem('roomie.home.layout.1.1.preset','equal');
+    document.getElementById('page').innerHTML = await homeView();
+    expect(document.querySelector('.home-finances-expanded')).toBeNull();
+    const calls = mockedApi.mock.calls.length;
+    actions['home-layout-preset']({dataset:{layoutPreset:'focus-left'}});
+    const expanded = document.querySelector('.home-finances-expanded');
+    expect(expanded.textContent).toContain('Waiting on you');
+    expect(expanded.textContent).toContain('Jordan');
+    expect(expanded.textContent).toContain('Sam');
+    expect(expanded.textContent).toContain('$1.86');
+    expect(expanded.textContent).toContain('$22.27');
+    expect(mockedApi.mock.calls).toHaveLength(calls);
+    const person = expanded.querySelector('[data-action="board-roommate-profile"]');
+    await actions['board-roommate-profile'](person);
+    expect(document.querySelector('[role="dialog"]').textContent).toContain('Jordan');
+    const { closeModal } = await import('../src/lib/dom.js'); closeModal();
+    actions['home-layout-preset']({dataset:{layoutPreset:'equal'}});
+    expect(document.querySelector('.home-finances-expanded')).toBeNull();
+    expect(document.querySelector('.home-finances').textContent).not.toContain('Waiting on you');
+  });
+});
+
+
 describe('Home household board', () => {
   const assignment = { assignmentId: 20, choreId: 5, assignedUserId: 2, dueAt: '2026-11-16T14:00:00Z', isCompleted: false };
   const request = { swapId: 7, type: 'skip', requesterAssignmentId: 20, targetAssignmentId: null, requesterUserId: 2, targetUserId: null, requestMessage: 'Visiting family' };
@@ -828,15 +859,16 @@ describe('Schedule filtering menus', () => {
       document.getElementById('page').innerHTML = await render();
       let menu = document.querySelector('.schedule-filter-menu');
       expect(menu.open).toBe(false);
-      expect(menu.querySelector('summary').textContent).toBe('Filtering options');
+      expect(menu.querySelector('summary').getAttribute('aria-label')).toBe('Filter options');
+      expect(menu.querySelector('select')).toBeNull();
       expect(document.querySelectorAll('.schedule-display-controls > select')).toHaveLength(1);
-      const filter = menu.querySelector(`[data-input="${filterInput}"]`);
+      const filter = menu.querySelector(`[data-input="${filterInput}"][value="${value}"]`);
       expect(filter.closest('.schedule-filter-panel')).not.toBeNull();
       menu.open = true;
-      filter.value = value; inputs[filterInput](filter);
+      filter.checked = true; inputs[filterInput](filter);
       menu = document.querySelector('.schedule-filter-menu');
       expect(menu.open).toBe(true);
-      expect(menu.querySelector(`[data-input="${filterInput}"]`).value).toBe(value);
+      expect(menu.querySelector(`[data-input="${filterInput}"]:checked`).value).toBe(value);
       document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
       expect(menu.open).toBe(false);
       expect(document.activeElement).toBe(menu.querySelector('summary'));
@@ -941,32 +973,38 @@ describe('Bounded dashboard previews', () => {
 });
 
 
-describe('Home finance widget sizes', () => {
-  it('promotes the totals tile into personal balances and payment previews without extra requests', async () => {
-    const baseApi = mockedApi.getMockImplementation();
-    mockedApi.mockImplementation((path) => path.endsWith('/balances') ? Promise.resolve({
-      mine:[{otherUserId:2,signedAmount:'-1.86'},{otherUserId:3,signedAmount:'22.27'}],
-      incoming:[{paymentId:9,payerUserId:3,amount:'5.00',status:'sent',items:[]}],
-    }) : baseApi(path));
-    localStorage.setItem('roomie.home.layout.1.1', JSON.stringify(['finances','schedule','board'].map(id => ({id,size:'compact'}))));
-    localStorage.setItem('roomie.home.layout.1.1.preset','equal');
+describe('Home announcement event creation', () => {
+  it('preserves an announcement draft on cancel, then links a saved new event without posting the draft', async () => {
     document.getElementById('page').innerHTML = await homeView();
-    expect(document.querySelector('.home-finances-expanded')).toBeNull();
-    const calls = mockedApi.mock.calls.length;
-    actions['home-layout-preset']({dataset:{layoutPreset:'focus-left'}});
-    const expanded = document.querySelector('.home-finances-expanded');
-    expect(expanded.textContent).toContain('Waiting on you');
-    expect(expanded.textContent).toContain('Jordan');
-    expect(expanded.textContent).toContain('Sam');
-    expect(expanded.textContent).toContain('$1.86');
-    expect(expanded.textContent).toContain('$22.27');
-    expect(mockedApi.mock.calls).toHaveLength(calls);
-    const person = expanded.querySelector('[data-action="board-roommate-profile"]');
-    await actions['board-roommate-profile'](person);
-    expect(document.querySelector('[role="dialog"]').textContent).toContain('Jordan');
+    actions['home-make-announcement']();
+    document.querySelector('[name="messageText"]').value = 'Dinner at our place';
+    actions['home-add-linked-event']();
+    expect(document.querySelector('[data-form="event-save"]')).not.toBeNull();
     const { closeModal } = await import('../src/lib/dom.js'); closeModal();
-    actions['home-layout-preset']({dataset:{layoutPreset:'equal'}});
-    expect(document.querySelector('.home-finances-expanded')).toBeNull();
-    expect(document.querySelector('.home-finances').textContent).not.toContain('Waiting on you');
+    expect(document.querySelector('[data-form="home-note-new"] [name="messageText"]').value).toBe('Dinner at our place');
+    expect(mockedApi.mock.calls.filter(([, options]) => options?.method)).toEqual([]);
+    actions['home-add-linked-event']();
+    const eventForm = document.querySelector('[data-form="event-save"]');
+    eventForm.elements.eventName.value = 'House dinner';
+    const saved = { ...events[0], eventId: 88, eventName: 'House dinner', eventDate: '2026-11-20T20:00:00Z' };
+    mockedApi.mockResolvedValueOnce(saved);
+    await forms['event-save'](eventForm);
+    const composer = document.querySelector('[data-form="home-note-new"]');
+    expect(composer.elements.messageText.value).toBe('Dinner at our place');
+    expect(composer.elements.eventId.value).toBe('88');
+    expect(mockedApi.mock.calls.filter(([path, options]) => path.endsWith('/board') && options?.method)).toEqual([]);
+    await forms['home-note-new'](composer);
+    expect(mockedApi).toHaveBeenCalledWith('/households/1/board', { method:'POST', body:{ messageText:'Dinner at our place',eventId:88 } });
+  });
+  it('does not save an event or restore a draft into another account or household', async () => {
+    document.getElementById('page').innerHTML = await homeView();
+    actions['home-make-announcement'](); actions['home-add-linked-event']();
+    const form = document.querySelector('[data-form="event-save"]');
+    S.hid = 2;
+    await forms['event-save'](form);
+    expect(form.querySelector('.err').textContent).toContain('changed');
+    expect(mockedApi.mock.calls.filter(([, options]) => options?.method)).toEqual([]);
+    const { closeModal } = await import('../src/lib/dom.js'); closeModal();
+    expect(document.querySelector('[data-form="home-note-new"]')).toBeNull();
   });
 });

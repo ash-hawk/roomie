@@ -1,4 +1,4 @@
-import { ago, esc, fullName } from '../lib/dom.js';
+import { ago, esc, fullName, ico } from '../lib/dom.js';
 import { boardIdentity } from './board-profile.js';
 import { approvalState } from '../../shared/event-approval.ts';
 
@@ -58,5 +58,5 @@ export function householdBoard({ members, events, chores, notes, user, timezone,
 
 export function announcementForm(events) {
   const upcoming = events.filter((e) => Date.parse(e.endDate ?? e.eventDate) >= Date.now());
-  return `<form class="stack" data-form="home-note-new"><label class="fld"><span>Announcement</span><textarea class="input" name="messageText" rows="4" required maxlength="500" placeholder="Share something with your household"></textarea></label><label class="fld"><span>Link an event (optional)</span><select class="input" name="eventId"><option value="">No linked event</option>${upcoming.map((e) => `<option value="${e.eventId}">${esc(e.eventName)}</option>`).join('')}</select></label><div class="err" role="alert"></div><div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Post</button></div></form>`;
+  return `<form class="stack" data-form="home-note-new"><label class="fld"><span>Announcement</span><textarea class="input" name="messageText" rows="4" required maxlength="500" placeholder="Share something with your household"></textarea></label><label class="fld"><span>Link an event (optional)</span><select class="input" name="eventId"><option value="">No linked event</option>${upcoming.map((e) => `<option value="${e.eventId}">${esc(e.eventName)}</option>`).join('')}</select></label><div><button type="button" class="btn s" data-action="home-add-linked-event">${ico('plus', 14)} Add and link event</button></div><div class="err" role="alert"></div><div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Post</button></div></form>`;
 }

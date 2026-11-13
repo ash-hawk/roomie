@@ -6,14 +6,14 @@ import { avatar, badge, closeModal, confirmDialog, esc, fmtDate, fullName, ico, 
 const PAYMENT_APPS = { venmo: 'Venmo', zelle: 'Zelle', apple_cash: 'Apple Cash' };
 let members = [];
 
-const memberRow = (m, h) => `<div class="item row click-row roommate-row" role="button" tabindex="0" data-action="roommate-profile" data-id="${m.userId}" aria-label="View ${esc(fullName(m))}'s profile">
+const memberRow = (m, h) => `<div class="roommate-entry"><div class="item row click-row roommate-row" role="button" tabindex="0" data-action="roommate-profile" data-id="${m.userId}" aria-label="View ${esc(fullName(m))}'s profile">
   ${avatar(m)}<div class="grow"><b>${esc(fullName(m))}</b>${m.userId === S.user.userId ? ' <span class="mute">(you)</span>' : ''}
   <div class="mute" style="font-size:13px">${m.leftDate ? `Moved out ${fmtDate(m.leftDate, h.timezone)}` : `Joined ${fmtDate(m.joinedDate, h.timezone)}`}</div></div>
   ${badge(m.role === 'owner' ? 'Owner' : 'Member', m.leftDate ? 'gray' : '')}<span class="row-chevron">${ico('chevron', 16)}</span></div>
-  ${household()?.role === 'owner' && !m.leftDate && m.userId !== S.user.userId ? `<div class="row" style="justify-content:flex-end;gap:8px;margin:-8px 0 12px">
+  ${household()?.role === 'owner' && !m.leftDate && m.userId !== S.user.userId ? `<div class="roommate-actions">
     <button class="btn s" data-action="transfer-owner" data-id="${m.userId}" data-name="${esc(fullName(m))}">Transfer ownership</button>
     ${m.role === 'member' ? `<button class="btn s d" data-action="remove-member" data-id="${m.userId}" data-name="${esc(fullName(m))}">Remove</button>` : ''}
-  </div>` : ''}`;
+  </div>` : ''}</div>`;
 
 export async function householdView() {
   const h = household(), response = await api(`/households/${h.householdId}/members`);
@@ -34,7 +34,6 @@ export async function householdView() {
           <label class="fld"><span>Household name</span><input class="input" name="householdName" maxlength="80" required value="${esc(h.householdName)}"></label>
           <label class="fld"><span>Address (optional)</span><input class="input" name="address" maxlength="200" value="${esc(h.address ?? '')}"></label>
           <label class="fld"><span>Timezone</span><input class="input" name="timezone" maxlength="60" required value="${esc(h.timezone)}"></label>
-          <label class="fld"><span>Theme color</span><input class="input" name="themeColor" type="color" value="${/^#[0-9a-f]{6}$/i.test(h.themeColor ?? '') ? h.themeColor : '#4338ca'}"></label>
           <div class="err" role="alert"></div><div class="acts"><button class="btn p" type="submit">Save household details</button></div>
         </form>
       </details>` : '';
@@ -57,7 +56,8 @@ export async function householdView() {
             ${former.map((m) => memberRow(m, h)).join('')}
           </details>
         ` : ''}
-        ${owner ? `<hr class="hr"><div class="stack"><h3>Danger zone</h3><p class="mute">Deleting this household permanently removes its shared data for everyone.</p>
+        ${!owner ? '<hr class="hr"><div><button class="btn" data-action="leave-household">Leave household</button></div>' : '<p class="hint">Transfer ownership to a roommate before leaving, or delete the household if you are the last member.</p>'}
+        ${owner ? `<hr class="hr"><div class="stack"><p class="mute">Deleting this household permanently removes its shared data for everyone.</p>
           <div><button class="btn d" data-action="delete-household">Delete household</button></div></div>` : ''}
       </section>
     </div>`;
@@ -68,7 +68,7 @@ forms['household-settings'] = async (form) => {
   const data = new FormData(form);
   const saved = await api(`/households/${S.hid}`, { method: 'PATCH', body: {
     householdName: data.get('householdName'), address: data.get('address'),
-    timezone: data.get('timezone'), themeColor: data.get('themeColor'),
+    timezone: data.get('timezone'),
   } });
   Object.assign(household(), saved.household);
   toast('Household details saved');
@@ -90,10 +90,19 @@ actions['transfer-owner'] = async (el) => {
   window.dispatchEvent(new Event('roomie:render'));
 };
 actions['remove-member'] = async (el) => {
-  if (!await confirmDialog('Remove roommate?', `${el.dataset.name} will lose access to this household. Their past activity will remain in household history.`, 'Remove')) return;
+  if (!await confirmDialog('Remove roommate?', `${el.dataset.name} will lose access to this household. Their unfinished chores and future hosted events will be removed, and their announcements archived. Balances involving them will leave the active view; past transactions will remain in history.`, 'Remove')) return;
   await api(`/households/${S.hid}/members/${el.dataset.id}`, { method: 'DELETE' });
   toast('Roommate removed');
   window.dispatchEvent(new Event('roomie:render'));
+};
+actions['leave-household'] = async () => {
+  if (!await confirmDialog('Leave household?', 'Your unfinished chores and future hosted events will be removed, and your announcements archived. Balances involving you will leave the active view; past transactions remain in history. Your account and other households will stay.', 'Leave household')) return;
+  await api(`/households/${S.hid}/members/${S.user.userId}`, { method: 'DELETE' });
+  const me = await api('/me'); S.households = me.households;
+  S.hid = S.households[0]?.householdId ?? null;
+  S.navCounts = { overdue: 0, at: 0, hid: null };
+  if (S.hid) localStorage.setItem('roomie.hid', String(S.hid)); else localStorage.removeItem('roomie.hid');
+  toast('You left the household'); window.dispatchEvent(new Event('roomie:render'));
 };
 actions['delete-household'] = async () => {
   const h = household();

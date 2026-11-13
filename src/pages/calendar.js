@@ -1,4 +1,4 @@
-import { scheduleToolbar } from '../components/schedule-toolbar.js';
+import { scheduleToolbar, filterChoices } from '../components/schedule-toolbar.js';
 // Slice (c): household events + sticky-note board. The server owns the rules (who may edit, who was
 // asked about hosting, who gets notified); this page shows data and sends intent.
 // Times are always shown in the household's timezone. The board and calendar poll every 15 seconds,
@@ -129,7 +129,7 @@ actions['day-detail'] = (el) => {
 // ---- the page ---------------------------------------------------------------------------------
 function scheduleContent() {
   const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-  const filters = `<select class="input" data-input="cal-event-type" aria-label="Filter events by type"><option value="all">All event types</option>${CATS.map(([key, label]) => `<option value="${key}" ${eventType === key ? 'selected' : ''}>${label}</option>`).join('')}</select>${view === 'list' ? `<select class="input" data-input="cal-sort" aria-label="Sort by"><option value="date" ${sortBy === 'date' ? 'selected' : ''}>Sort: date</option><option value="color" ${sortBy === 'color' ? 'selected' : ''}>Sort: roommate</option></select>` : ''}`;
+  const filters = filterChoices('Event type', 'cal-event-type', [['all', 'All event types'], ...CATS], eventType) + (view === 'list' ? filterChoices('Sort by', 'cal-sort', [['date', 'Date'], ['color', 'Roommate']], sortBy) : '');
   return `${scheduleToolbar({ title, monthAction: 'month-nav', viewInput: 'cal-view', view, calendarValue: 'month', filters })}<div class="event-schedule-content">${view === 'list' ? listView() : monthView()}</div>`;
 }
 function refreshSchedule(focusInput) {
@@ -138,7 +138,7 @@ function refreshSchedule(focusInput) {
   const filterWasOpen = Boolean(content.querySelector('.schedule-filter-menu[open]'));
   content.innerHTML = scheduleContent();
   if (filterWasOpen && focusInput && !focusInput.endsWith('-view')) content.querySelector('.schedule-filter-menu').open = true;
-  if (focusInput) content.querySelector(`[data-input="${focusInput}"]`)?.focus();
+  if (focusInput) (content.querySelector(`[data-input="${focusInput}"]:checked`) ?? content.querySelector(`[data-input="${focusInput}"]`))?.focus();
 }
 export async function calendarView() {
   loadPrefs();
@@ -189,7 +189,7 @@ function eventForm(e, day, linkToNote = false) {
   const endSame = e?.endDate && ymdIn(e.endDate) === date;
   const tagged = new Set(e?.tags.map((t) => t.userId) ?? []);
   return `${mhead(e ? 'Edit event' : 'Add an event')}
-  <form class="stack" data-form="event-save" ${e ? `data-id="${e.eventId}"` : ''} ${linkToNote ? 'data-link-to-note="1"' : ''} autocomplete="off">
+  <form class="stack" data-form="event-save" data-household="${hid()}" data-user="${S.user.userId}" ${e ? `data-id="${e.eventId}"` : ''} ${linkToNote ? 'data-link-to-note="1"' : ''} autocomplete="off">
     <label class="fld"><span>What is happening?</span><input class="input" name="eventName" required maxlength="120" value="${esc(e?.eventName ?? '')}" placeholder="House meeting"></label>
     <label class="fld"><span>Date</span><input class="input" name="date" type="date" required value="${date}"></label>
     <div class="inline-grid event-time-range"><label class="fld"><span>Starts</span><input class="input" name="time" type="time" required value="${e ? hmIn(e.eventDate) : '18:00'}"></label>
@@ -223,25 +223,46 @@ function syncSelectAll() {
 inputs['event-select-all'] = (el) => { el.form.querySelectorAll('input[name=tag]').forEach((box) => { box.checked = el.checked; }); syncSelectAll(); };
 inputs['event-approver'] = syncSelectAll;
 actions['add-event'] = (el) => { openModal(eventForm(null, el?.dataset?.day)); inputs['event-cat'](); };
-actions['add-and-link-event'] = () => { openModal(eventForm(null, null, true)); inputs['event-cat'](); };
+let linkedEventSession = null;
+// The composer owns its draft; the event editor returns only after an explicit save or cancel.
+export function openLinkedEvent(data, onReturn) {
+  D = { members: data.members, events: [...data.events], notes: data.notes ?? [] };
+  openModal(eventForm(null, null, true)); inputs['event-cat']();
+  linkedEventSession = { userId: S.user.userId, householdId: hid(), onReturn };
+}
+window.addEventListener('roomie:modal-close', () => {
+  const session = linkedEventSession;
+  if (!session) return;
+  linkedEventSession = null;
+  if (session.userId === S.user?.userId && session.householdId === S.hid) session.onReturn(null);
+});
+actions['add-and-link-event'] = () => {
+  const form = document.querySelector('form[data-form="note-new"]');
+  const scope = hid(), userId = S.user.userId;
+  openLinkedEvent(D, (saved) => {
+    if (scope !== S.hid || userId !== S.user?.userId || !form?.isConnected) return;
+    if (saved) {
+      const mode = form.querySelector('[data-input="board-link-mode"]'), picker = form.querySelector('[name="eventId"]');
+      picker.insertAdjacentHTML('beforeend', `<option value="${saved.eventId}">${esc(saved.eventName)}</option>`);
+      mode.value = 'link'; picker.hidden = false; picker.required = true; picker.value = String(saved.eventId);
+    }
+  });
+};
 actions['edit-event'] = (el) => { const e = eventOf(Number(el.dataset.id)); if (!e) return; openModal(eventForm(e)); inputs['event-cat'](); };
 forms['event-save'] = async (form) => {
+  if (form.dataset.household !== String(S.hid) || form.dataset.user !== String(S.user?.userId)) return showError(form, 'Your household or account changed. Reopen the event editor.');
   const f = new FormData(form), id = form.dataset.id;
   const body = { eventName: f.get('eventName'), date: f.get('date'), time: f.get('time'), endTime: f.get('endTime') || null, location: f.get('location'), category: f.get('category'),
     otherLabel: f.get('otherLabel'), reminderMinutesBefore: f.get('reminder') === '' ? null : Number(f.get('reminder')), description: f.get('description'), taggedUserIds: f.getAll('tag').map(Number), notifyRoommates: f.has('notifyRoommates') };
   let saved;
   try { saved = await api(path(id ? `/events/${id}` : '/events'), { method: id ? 'PATCH' : 'POST', body }); } catch (err) { return showError(form, err.message); }
   if (form.dataset.linkToNote === '1') {
-    D.events.push(saved);
-    const noteForm = document.querySelector('form[data-form="note-new"]');
-    const mode = noteForm?.querySelector('[data-input="board-link-mode"]');
-    const picker = noteForm?.querySelector('[name="eventId"]');
-    if (mode && picker) {
-      picker.insertAdjacentHTML('beforeend', `<option value="${saved.eventId}">${esc(saved.eventName)}</option>`);
-      mode.value = 'link'; picker.hidden = false; picker.required = true; picker.value = String(saved.eventId);
-    }
-    seen = JSON.stringify([D.events, D.notes]);
-    closeModal(); toast('Event added and linked'); return;
+    const session = linkedEventSession;
+    linkedEventSession = null;
+    D.events.push(saved); seen = JSON.stringify([D.events, D.notes]);
+    closeModal(); toast('Event added and linked');
+    if (session?.userId === S.user?.userId && session.householdId === S.hid) session.onReturn(saved);
+    return;
   }
   closeModal(); toast(id ? 'Event saved' : 'Event added'); refresh();
 };
