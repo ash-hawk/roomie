@@ -904,7 +904,7 @@ body::before,body::after{display:none}
 .contact-list dt{display:flex;align-items:center;gap:8px;font-weight:650}
 .contact-list dd{margin:0;overflow-wrap:anywhere;font-size:14px}
 .profile-management summary{cursor:pointer;color:var(--mute);font-size:13px}
-.roommate-entry{margin-top:12px}.household-card .roommate-row{margin-top:0}
+.roommate-entry{margin-top:12px}.roommate-card .roommate-row{margin-top:0}
 /* Sections fit their contents rather than stretching to match neighbouring cards. */
 .chore-attention-board>.card{min-width:0}
 .chore-attention-board .chore-board-item{justify-content:flex-start;gap:10px}
