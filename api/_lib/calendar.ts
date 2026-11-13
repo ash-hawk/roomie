@@ -76,6 +76,7 @@ export async function createEvent(user: CurrentUser, householdId: number, b: Rec
   const f = eventFields(b);
   const tz = await householdTz(db, householdId);
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const tagged = f.tagged.filter((u) => u !== user.userId);
     await assertActiveMembers(tx, householdId, tagged);
     const start = sql`((${f.date}::date + ${f.time}::time) AT TIME ZONE ${tz})`;
@@ -95,6 +96,7 @@ export async function updateEvent(user: CurrentUser, householdId: number, eventI
   const f = eventFields(b);
   const tz = await householdTz(db, householdId);
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const old = await loadEvent(tx, householdId, eventId, true);
     assertCreator(old.createdByUserId, user.userId);
     const wanted = f.tagged.filter((u) => u !== user.userId);
@@ -119,6 +121,7 @@ export async function updateEvent(user: CurrentUser, householdId: number, eventI
 
 export async function deleteEvent(user: CurrentUser, householdId: number, eventId: number) {
   await db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const e = await loadEvent(tx, householdId, eventId, true);
     assertCreator(e.createdByUserId, user.userId);
     await skipEventEmails(tx, eventId);
@@ -131,6 +134,7 @@ export async function deleteEvent(user: CurrentUser, householdId: number, eventI
 export async function respondToEvent(user: CurrentUser, householdId: number, eventId: number, b: Record<string, unknown>) {
   if (b.response !== 'accepted' && b.response !== 'declined') throw new HttpError(400, 'Answer accepted or declined');
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const e = await loadEvent(tx, householdId, eventId, true);
     const [tag] = await tx.select().from(s.eventTag).where(and(eq(s.eventTag.eventId, eventId), eq(s.eventTag.userId, user.userId))).for('update');
     if (!tag || tag.response === null) throw new HttpError(400, 'You were not asked about this event');
@@ -187,6 +191,7 @@ export async function listBoard(householdId: number, viewerId: number) {
 export async function postNote(user: CurrentUser, householdId: number, b: Record<string, unknown>) {
   const text = str(b.messageText, 1, 500, 'Note');
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     let eventId: number | null = null, parent: BoardMsg | null = null;
     if (b.eventId != null) { eventId = id(b.eventId, 'event'); await loadEvent(tx, householdId, eventId); }
     if (b.parentMessageId != null) {
@@ -214,6 +219,7 @@ async function ownNote(tx: Tx, householdId: number, messageId: number, userId: n
 /** Household members may resolve a top-level note; only its sender may edit or pin it. */
 export async function updateNote(user: CurrentUser, householdId: number, messageId: number, b: Record<string, unknown>) {
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const [m] = await tx.select(boardMsgSelection).from(s.bulletinMessage).where(and(eq(s.bulletinMessage.messageId, messageId), eq(s.bulletinMessage.householdId, householdId))).for('update');
     if (!m) throw new HttpError(404, 'Note not found');
     const set: Partial<typeof s.bulletinMessage.$inferInsert> = {};
@@ -245,6 +251,7 @@ export async function updateNote(user: CurrentUser, householdId: number, message
 }
 export async function deleteNote(user: CurrentUser, householdId: number, messageId: number) {
   await db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     await ownNote(tx, householdId, messageId, user.userId);
     const replies = await tx.select({ id: s.bulletinMessage.messageId }).from(s.bulletinMessage).where(eq(s.bulletinMessage.parentMessageId, messageId));
     const ids = [messageId, ...replies.map((r) => r.id)];

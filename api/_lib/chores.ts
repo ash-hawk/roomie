@@ -107,6 +107,7 @@ export async function sendDueReminders(opts: { nowIso?: string } = {}) {
 /** A roommate nudges someone about a chore. Shares the throttle with the automatic reminder. */
 export async function remindAssignee(user: CurrentUser, householdId: number, assignmentId: number) {
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const a = await lockAssignment(tx, householdId, assignmentId);
     if (a.assignedUserId === user.userId) throw new HttpError(400, 'That one is yours, so there is nobody to remind');
     if (a.isCompleted) throw new HttpError(400, 'That chore is already done');
@@ -179,6 +180,7 @@ export async function createChore(user: CurrentUser, householdId: number, b: Rec
   if (repeats === 'none' && rotationIds.length !== 1) throw new HttpError(400, 'A one-time chore goes to one person');
 
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     await assertActiveMembers(tx, householdId, rotationIds); // new chores only ever go to current roommates
     if (repeats === 'none') {
       const ok = await tx.execute(sql`SELECT ((${startDate}::date + ${dueTime}::time) AT TIME ZONE ${tz}) > now() AS ok`);
@@ -209,6 +211,7 @@ export async function updateChore(user: CurrentUser, householdId: number, choreI
   if (b.description !== undefined) set.description = optStr(b.description, 500, 'Description');
   if (b.effort !== undefined) { if (!(EFFORTS as readonly string[]).includes(b.effort as string)) throw new HttpError(400, 'Effort must be easy, medium or hard'); set.effort = b.effort as string; }
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const [c] = await tx.select().from(s.chore).where(and(eq(s.chore.choreId, choreId), eq(s.chore.householdId, householdId))).for('update');
     if (!c) throw new HttpError(404, 'Chore not found');
     assertCreator(c.createdByUserId, user.userId); // only the creator edits; schedule changes mean deleting and re-adding
@@ -219,6 +222,7 @@ export async function updateChore(user: CurrentUser, householdId: number, choreI
 
 export async function deleteChore(user: CurrentUser, householdId: number, choreId: number) {
   await db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const [c] = await tx.select().from(s.chore).where(and(eq(s.chore.choreId, choreId), eq(s.chore.householdId, householdId))).for('update');
     if (!c) throw new HttpError(404, 'Chore not found');
     assertCreator(c.createdByUserId, user.userId);
@@ -243,6 +247,7 @@ async function lockAssignment(tx: Tx, householdId: number, assignmentId: number)
 
 export async function completeAssignment(user: CurrentUser, householdId: number, assignmentId: number) {
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const a = await lockAssignment(tx, householdId, assignmentId);
     if (a.assignedUserId !== user.userId) throw new HttpError(403, 'Only the person it is assigned to can mark it done');
     if (a.isCompleted) throw new HttpError(400, 'That one is already done');
@@ -273,6 +278,7 @@ export async function completeAssignment(user: CurrentUser, householdId: number,
 
 export async function uncompleteAssignment(user: CurrentUser, householdId: number, assignmentId: number) {
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const a = await lockAssignment(tx, householdId, assignmentId);
     if (a.assignedUserId !== user.userId) throw new HttpError(403, 'Only the person it is assigned to can change it');
     if (!a.isCompleted) throw new HttpError(400, 'That one is not marked done');
@@ -297,6 +303,7 @@ export async function createSwapRequest(user: CurrentUser, householdId: number, 
   const message = str(b.message, 1, 300, 'A reason');
 
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     // lock in id order so two people acting at once cannot deadlock
     const order = [requesterAid, ...(targetAid ? [targetAid] : [])].sort((x, y) => x - y);
     const locked = new Map<number, Awaited<ReturnType<typeof lockAssignment>>>();
@@ -333,6 +340,7 @@ export async function respondToSwap(user: CurrentUser, householdId: number, swap
   const action = b.action === 'accept' || b.action === 'decline' || b.action === 'withdraw' ? b.action : (() => { throw new HttpError(400, 'Choose accept, decline or withdraw'); })();
   const reply = optStr(b.message, 300, 'Reply');
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const [r] = await tx.select().from(s.choreSwapRequest).where(eq(s.choreSwapRequest.swapId, swapId)).for('update');
     if (!r) throw new HttpError(404, 'Request not found');
     const ids = [r.requesterAssignmentId, ...(r.targetAssignmentId ? [r.targetAssignmentId] : [])].sort((x, y) => x - y);

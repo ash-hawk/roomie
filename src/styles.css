@@ -451,9 +451,9 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .swr i{display:block;width:28px;height:28px;border-radius:50%;border:3px solid var(--card);box-shadow:0 0 0 1px var(--line)}
 .swr input:checked+i{box-shadow:0 0 0 2px var(--ink)}.swr input:focus-visible+i{outline:2px solid var(--accent);outline-offset:3px}
 .notes{display:flex;flex-direction:column;gap:12px;margin-top:14px;max-height:560px;overflow-y:auto;overscroll-behavior:contain;padding-right:4px;scrollbar-gutter:stable}
-.sticky{background:color-mix(in srgb,var(--warn) 9%,var(--card));border:1px solid color-mix(in srgb,var(--warn) 25%,var(--line));border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
-.sticky.pinned{border-color:#b45309;background:color-mix(in srgb,#fef3c7 78%,var(--card));box-shadow:0 10px 24px -12px rgba(120,53,15,.48),0 0 0 2px color-mix(in srgb,#b45309 35%,transparent);color:#292524}
-.pin-mark{display:inline-flex;align-items:center;gap:5px;width:max-content;padding:3px 7px;border-radius:6px;background:#fef3c7;color:#713f12;font-size:12px;font-weight:700}
+.sticky{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.sticky.pinned{border-color:var(--accent);background:var(--soft);box-shadow:0 0 0 1px var(--accent);color:var(--ink)}
+.pin-mark{display:inline-flex;align-items:center;gap:5px;width:max-content;padding:3px 7px;border-radius:6px;background:var(--soft);color:var(--accent);font-size:12px;font-weight:700}
 .board-empty{color:var(--mute);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sticky p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .reply{border-top:1px dashed var(--line);padding-top:8px;font-size:14px}
@@ -786,8 +786,6 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .appearance-choice:has(:checked){background:var(--soft);border-color:var(--accent)}
 .appearance-choice input{accent-color:var(--accent)}
 .dark{--bg:#11131c;--card:#1b1e2b;--ink:#f2f3f8;--mute:#afb5cb;--line:#363b50;--accent:#a89bff;--on-accent:#19132d;--good:#62d493;--bad:#ff8585;--warn:#f3b859;--danger:#a82c35;--soft:color-mix(in srgb,var(--accent) 14%,transparent);color-scheme:dark}
-.dark .sticky{background:color-mix(in srgb,var(--warn) 7%,var(--card));border-color:color-mix(in srgb,var(--warn) 30%,var(--line));color:var(--ink)}
-.dark .sticky.pinned{background:color-mix(in srgb,var(--warn) 14%,var(--card));border-color:var(--warn);color:var(--ink)}
 
 .roommate-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;padding-top:8px}
 .roommate-entry{min-width:0}

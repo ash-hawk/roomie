@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { removeFutureMemberActivity } from '../api/_lib/member-cleanup.js';
+import { cleanupDepartingMember } from '../api/_lib/member-cleanup.js';
 
 // Real PostgreSQL constraints and cascades in an isolated in-memory database. No hosted DB access.
 const pg = new PGlite();
@@ -10,7 +10,7 @@ const dialect = new PgDialect();
 const tx = { execute: async (query: Parameters<typeof dialect.sqlToQuery>[0]) => {
   const { sql, params } = dialect.sqlToQuery(query);
   return pg.query(sql, params);
-} } as Parameters<typeof removeFutureMemberActivity>[0];
+} } as Parameters<typeof cleanupDepartingMember>[0];
 const rows = async (sql: string) => (await pg.query(sql)).rows;
 beforeAll(async () => {
   await pg.exec(readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8'));
@@ -46,30 +46,30 @@ afterAll(() => pg.close());
 describe('departing roommate cleanup', () => {
   it('rolls back all cleanup together when the enclosing removal transaction fails', async () => {
     await pg.exec('BEGIN');
-    await removeFutureMemberActivity(tx, 1, 2);
+    await cleanupDepartingMember(tx, 1, 2);
     await pg.exec('ROLLBACK');
     expect((await rows('SELECT assignment_id FROM chore_assignment')).length).toBe(7);
     expect((await rows('SELECT event_id FROM event')).length).toBe(4);
     expect((await rows('SELECT user_id FROM chore_rotation')).length).toBe(4);
   });
-  it('removes only future incomplete assignments, rotations and hosted events in the selected household', async () => {
+  it('removes unfinished assignments including overdue work, rotations and future hosted events in the selected household', async () => {
     await pg.exec('BEGIN');
-    await removeFutureMemberActivity(tx, 1, 2);
+    await cleanupDepartingMember(tx, 1, 2);
     await pg.exec('COMMIT');
-    expect((await rows('SELECT assignment_id FROM chore_assignment ORDER BY assignment_id')).map((r: any) => Number(r.assignment_id))).toEqual([2,3,4,5,7]);
+    expect((await rows('SELECT assignment_id FROM chore_assignment ORDER BY assignment_id')).map((r: any) => Number(r.assignment_id))).toEqual([2,4,5,7]);
     expect(await rows('SELECT chore_id,user_id FROM chore_rotation ORDER BY chore_id')).toEqual([{chore_id:1,user_id:3},{chore_id:2,user_id:2}]);
     expect((await rows('SELECT event_id FROM event ORDER BY event_id')).map((r: any) => Number(r.event_id))).toEqual([2,3,4]);
     expect(await rows('SELECT user_id FROM event_tag WHERE event_id=3')).toEqual([{user_id:1}]);
     expect(await rows('SELECT event_id,message_text FROM bulletin_message')).toEqual([{event_id:null,message_text:'Keep this announcement'}]);
-    expect(await rows('SELECT status FROM chore_swap_request WHERE swap_id=2')).toEqual([{status:'declined'}]);
+    expect(await rows('SELECT status FROM chore_swap_request WHERE swap_id=2')).toEqual([]); // Its overdue target occurrence was removed.
     expect(await rows('SELECT is_read FROM notification ORDER BY notification_id')).toEqual([{is_read:true},{is_read:true},{is_read:false},{is_read:true}]);
     expect(await rows('SELECT status FROM email_outbox ORDER BY email_id')).toEqual([{status:'skipped'},{status:'pending'},{status:'skipped'}]);
     expect(await rows('SELECT total_amount FROM expense')).toEqual([{total_amount:'12.00'}]);
     expect(await rows('SELECT amount_owed FROM expense_share')).toEqual([{amount_owed:'6.00'}]);
   });
   it('is safe to repeat without erasing history or another household’s records', async () => {
-    await removeFutureMemberActivity(tx, 1, 2);
-    expect((await rows('SELECT assignment_id FROM chore_assignment')).length).toBe(5);
+    await cleanupDepartingMember(tx, 1, 2);
+    expect((await rows('SELECT assignment_id FROM chore_assignment')).length).toBe(4);
     expect(await rows('SELECT status FROM chore_swap_request WHERE swap_id=3')).toEqual([{status:'pending'}]);
   });
 });

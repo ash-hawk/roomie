@@ -56,6 +56,7 @@ export async function householdView() {
             ${former.map((m) => memberRow(m, h)).join('')}
           </details>
         ` : ''}
+        ${!owner ? '<hr class="hr"><div><button class="btn" data-action="leave-household">Leave household</button></div>' : '<p class="hint">Transfer ownership to a roommate before leaving, or delete the household if you are the last member.</p>'}
         ${owner ? `<hr class="hr"><div class="stack"><p class="mute">Deleting this household permanently removes its shared data for everyone.</p>
           <div><button class="btn d" data-action="delete-household">Delete household</button></div></div>` : ''}
       </section>
@@ -89,10 +90,19 @@ actions['transfer-owner'] = async (el) => {
   window.dispatchEvent(new Event('roomie:render'));
 };
 actions['remove-member'] = async (el) => {
-  if (!await confirmDialog('Remove roommate?', `${el.dataset.name} will lose access to this household. Their future chore assignments and hosted events will be removed. Past activity and balances will remain.`, 'Remove')) return;
+  if (!await confirmDialog('Remove roommate?', `${el.dataset.name} will lose access to this household. Their unfinished chores and future hosted events will be removed, and their announcements archived. Balances involving them will leave the active view; past transactions will remain in history.`, 'Remove')) return;
   await api(`/households/${S.hid}/members/${el.dataset.id}`, { method: 'DELETE' });
   toast('Roommate removed');
   window.dispatchEvent(new Event('roomie:render'));
+};
+actions['leave-household'] = async () => {
+  if (!await confirmDialog('Leave household?', 'Your unfinished chores and future hosted events will be removed, and your announcements archived. Balances involving you will leave the active view; past transactions remain in history. Your account and other households will stay.', 'Leave household')) return;
+  await api(`/households/${S.hid}/members/${S.user.userId}`, { method: 'DELETE' });
+  const me = await api('/me'); S.households = me.households;
+  S.hid = S.households[0]?.householdId ?? null;
+  S.navCounts = { overdue: 0, at: 0, hid: null };
+  if (S.hid) localStorage.setItem('roomie.hid', String(S.hid)); else localStorage.removeItem('roomie.hid');
+  toast('You left the household'); window.dispatchEvent(new Event('roomie:render'));
 };
 actions['delete-household'] = async () => {
   const h = household();
