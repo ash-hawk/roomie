@@ -1,3 +1,4 @@
+import { boardRequest } from '../components/board-request.js';
 import { scheduleToolbar, filterChoices } from '../components/schedule-toolbar.js';
 import { validCalendarDay } from '../lib/calendar-create.js';
 // Slice (b): chores. The server owns the rules (rotation, daylight saving, who may do what);
@@ -41,7 +42,7 @@ export async function choresView() {
   loadChoreDisplay();
   choreMonth ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   return `${phead('Chores', 'A clear view of what needs doing, and whose turn it is.', `<button class="btn s" data-action="all-chores">All chores</button><button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
-    <div class="page-content split cal chores-content chore-dashboard-layout"><div class="stack chore-schedule-column"><section class="card" id="chore-schedule">${scheduleView()}</section>${workloadView()}</div><aside class="card stack chore-attention-board" aria-label="Chore board"><h2>Chore board</h2><div id="chore-overdue">${overdueView()}</div>${choreRequestsBoard()}</aside></div>`;
+    <div class="page-content split cal chores-content chore-dashboard-layout"><div class="stack chore-schedule-column"><section class="card" id="chore-schedule">${scheduleView()}</section>${workloadView()}</div><aside class="card stack chore-attention-board" aria-label="Chore board"><div class="row sp home-board-heading"><h2>Chore board</h2></div><div id="chore-overdue">${overdueView()}</div>${choreRequestsBoard()}</aside></div>`;
 
 }
 function choreIdentity(assignment) {
@@ -52,7 +53,12 @@ function choreRequestsBoard(limit = overdueItems().length ? 2 : 3) {
   const requests = attentionRequests();
   const cards = (list) => list.map((request) => {
     const assignment = asgOf(request.requesterAssignmentId);
-    return `<article class="chore-board-item stack" data-item-kind="chore"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}${request.requestMessage ? `<p class="hint chore-board-preview">${esc(request.requestMessage)}</p>` : ''}<button class="btn s" data-action="open-request" data-id="${request.swapId}">View chore</button></article>`;
+    return boardRequest({
+      kind: request.type === 'skip' ? 'Cover request' : 'Swap request',
+      title: `${request.requesterUserId === S.user.userId ? 'You' : fullName(who(request.requesterUserId))} ${request.type === 'skip' ? (request.requesterUserId === S.user.userId ? 'need someone to cover' : 'needs someone to cover') : 'asked to swap'} ${choreOf(assignment.choreId).choreName}`,
+      metadata: choreIdentity(assignment), message: request.requestMessage, className: 'chore-board-item',
+      actions: `<button type="button" class="btn s home-board-view" data-action="open-request" data-id="${request.swapId}">View chore</button>`,
+    });
   }).join('');
   const covers = requests.filter((r) => r.type === 'skip'), swaps = requests.filter((r) => r.type === 'swap');
   const shownSwaps = swaps.slice(0, Math.max(0, limit - covers.length));

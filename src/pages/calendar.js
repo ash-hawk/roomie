@@ -1,3 +1,4 @@
+import { boardAnnouncement } from '../components/board-announcement.js';
 import { monthCalendar } from '../components/month-calendar.js';
 import { scheduleToolbar, filterChoices } from '../components/schedule-toolbar.js';
 // Slice (c): household events + sticky-note board. The server owns the rules (who may edit, who was
@@ -9,7 +10,6 @@ import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
 import { ago as agoIn, avatar, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, itemColor, phead, showError, toast } from '../lib/dom.js';
 
-import { boardIdentity } from '../components/board-profile.js';
 import { approvalState } from '../../shared/event-approval.ts';
 
 const CATS = [['meeting', 'Meeting'], ['hosting', 'Hosting guests'], ['other', 'Other']];
@@ -262,18 +262,13 @@ forms['event-save'] = async (form) => {
 
 // ---- the board ----------------------------------------------------------------------------------
 function noteHtml(n) {
-  const ev = n.eventId ? eventOf(n.eventId) : null;
-  return `<article data-item-kind="${ev ? 'event' : 'announcement'}" data-board-message-ids="${[n.messageId, ...n.replies.map((r) => r.messageId)].join(' ')}" class="sticky ${n.isPinned ? 'pinned' : ''} ${n.isResolved ? 'resolved' : ''}">
-    <div class="row t" style="gap:8px">${boardIdentity(who(n.senderUserId), first(n.senderUserId))}<div class="grow"> <span class="hint">${ago(n.postedDate)}</span></div>
-      ${n.isResolved ? '<span class="st paid">Resolved</span>' : ''}
-      ${n.canEdit ? `<button class="x" data-action="note-pin" data-id="${n.messageId}" data-pinned="${n.isPinned ? '' : '1'}" aria-label="${n.isPinned ? 'Unpin' : 'Pin'}" title="${n.isPinned ? 'Unpin' : 'Pin'}">📌</button><button class="x" data-action="note-delete" data-id="${n.messageId}" aria-label="Delete note">✕</button>` : (n.isPinned ? '<span title="Pinned">📌</span>' : '')}</div>
-    ${n.isPinned ? '<div class="pin-mark"><span aria-hidden="true">📌</span> Pinned</div>' : ''}
-    <p>${esc(n.messageText)}</p>
-    ${ev ? `<button class="chip" data-action="event-detail" data-id="${ev.eventId}">${ico('calendar', 13)} ${esc(ev.eventName)}</button>` : ''}
-    ${n.canResolve !== false ? `<button type="button" class="btn s" data-action="note-resolve" data-id="${n.messageId}" data-resolved="${!n.isResolved}">${n.isResolved ? 'Reopen' : 'Mark as Resolved'}</button><div class="err" role="alert"></div>` : ''}
-    ${n.replies.map((r) => `<div class="reply row t" style="gap:8px">${boardIdentity(who(r.senderUserId), null)}<div class="grow">${boardIdentity(who(r.senderUserId), first(r.senderUserId), false)} <span class="hint">${ago(r.postedDate)}</span><div>${esc(r.messageText)}</div></div>
-      ${r.canEdit ? `<button class="x" data-action="note-delete" data-id="${r.messageId}" aria-label="Delete reply">✕</button>` : ''}</div>`).join('')}
-    <form class="row replyf" data-form="note-reply" data-id="${n.messageId}"><input class="input" name="messageText" maxlength="500" placeholder="Reply" aria-label="Reply" required><button class="btn s" type="submit">Send</button></form></article>`;
+  return boardAnnouncement(n, {
+    members: D.members, user: S.user, timezone: tz(), event: n.eventId ? eventOf(n.eventId) : null,
+    eventLink: (event) => `<button type="button" class="btn s home-board-view" data-action="event-detail" data-id="${event.eventId}">View event</button>`,
+    resolveAction: 'note-resolve', replyForm: 'note-reply',
+    replyManagement: (r) => r.canEdit ? `<button class="x" data-action="note-delete" data-id="${r.messageId}" aria-label="Delete reply">✕</button>` : '',
+    management: n.canEdit ? `<details class="board-message-options"><summary aria-label="Message options">⋯</summary><div class="row"><button class="btn s" data-action="note-pin" data-id="${n.messageId}" data-pinned="${n.isPinned ? '' : '1'}">${n.isPinned ? 'Unpin' : 'Pin'}</button><button class="btn s" data-action="note-delete" data-id="${n.messageId}">Delete</button></div></details>` : '',
+  });
 }
 function composerHtml() {
   const existing = document.querySelector(`[data-form="note-new"][data-household="${hid()}"][data-user="${S.user.userId}"]`);
@@ -289,9 +284,9 @@ function composerHtml() {
 }
 function boardInner() {
   const visibleNotes = D.notes.filter((n) => Boolean(n.isResolved) === boardArchive);
-  return `<div class="row board-heading"><h2>Announcements</h2></div>
+  return `<div class="row sp home-board-heading"><h2>Announcements</h2></div>
     <div class="row home-board-filters" role="group" aria-label="Announcement messages"><button type="button" class="btn s ${boardArchive ? '' : 'p'}" data-action="calendar-board-filter" data-archive="false" aria-pressed="${!boardArchive}">Current messages</button><button type="button" class="btn s ${boardArchive ? 'p' : ''}" data-action="calendar-board-filter" data-archive="true" aria-pressed="${boardArchive}">Resolved messages</button></div>
-    <div class="notes">${visibleNotes.length ? visibleNotes.map(noteHtml).join('') : `<p class="board-empty">${boardArchive ? 'No resolved messages.' : 'No current messages.'}</p>`}</div>`;
+    <div class="stack home-board-feed">${visibleNotes.length ? visibleNotes.map(noteHtml).join('') : `<p class="board-empty">${boardArchive ? 'No resolved messages.' : 'No current messages.'}</p>`}</div>`;
 }
 inputs['board-link-mode'] = (el) => {
   const picker = el.form?.querySelector('[name="eventId"]'); if (!picker) return;

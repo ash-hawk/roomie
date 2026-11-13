@@ -1,5 +1,6 @@
+import { boardRequest } from './board-request.js';
+import { boardAnnouncement } from './board-announcement.js';
 import { ago, esc, fullName, ico } from '../lib/dom.js';
-import { boardIdentity } from './board-profile.js';
 import { approvalState } from '../../shared/event-approval.ts';
 
 export function householdBoard({ members, events, chores, notes, user, timezone, compact = false, archive = false, limit = Infinity }) {
@@ -15,11 +16,14 @@ export function householdBoard({ members, events, chores, notes, user, timezone,
     const a = assignment(request.requesterAssignmentId), target = assignment(request.targetAssignmentId);
     if (!a || a.isCompleted) return '';
     const cover = request.type === 'skip';
-    return `<article class="home-board-request stack" data-item-kind="chore"><span class="home-kind">${cover ? 'Cover request' : 'Swap request'}</span><b>${mine ? `You ${cover ? 'need someone to cover' : 'asked to swap'}` : `${esc(name(request.requesterUserId))} ${cover ? 'needs someone to cover' : 'asked to swap'}`} ${esc(choreName(a))}</b>
-      <p class="hint">${esc(when(a.dueAt))}${target ? ` · Swap with ${esc(choreName(target))} (${esc(when(target.dueAt))})` : ''}</p>
-      ${request.requestMessage ? `<p class="home-board-message">${esc(request.requestMessage)}</p>` : ''}
-      ${mine ? `<span class="st unpaid">${cover ? 'Waiting for a volunteer' : `Waiting for ${esc(name(request.targetUserId))}`}</span>` : ''}
-      <div class="acts"><button type="button" class="btn s home-board-view" data-action="home-chore-detail" data-id="${a.assignmentId}">View chore</button>${mine ? button('chore', request.swapId, 'withdraw', 'Cancel request') : cover ? '' : `${button('chore', request.swapId, 'accept', 'Accept swap', true)}${button('chore', request.swapId, 'decline', 'Decline swap')}`}</div><div class="err" role="alert"></div></article>`;
+    return boardRequest({
+      kind: cover ? 'Cover request' : 'Swap request',
+      title: `${mine ? `You ${cover ? 'need someone to cover' : 'asked to swap'}` : `${name(request.requesterUserId)} ${cover ? 'needs someone to cover' : 'asked to swap'}`} ${choreName(a)}`,
+      metadata: `<p class="hint">${esc(when(a.dueAt))}${target ? ` · Swap with ${esc(choreName(target))} (${esc(when(target.dueAt))})` : ''}</p>`,
+      message: request.requestMessage,
+      status: mine ? `<span class="st unpaid">${cover ? 'Waiting for a volunteer' : `Waiting for ${esc(name(request.targetUserId))}`}</span>` : '',
+      actions: `<button type="button" class="btn s home-board-view" data-action="home-chore-detail" data-id="${a.assignmentId}">View chore</button>${mine ? button('chore', request.swapId, 'withdraw', 'Cancel request') : cover ? '' : `${button('chore', request.swapId, 'accept', 'Accept swap', true)}${button('chore', request.swapId, 'decline', 'Decline swap')}`}`,
+    });
   };
   const openEvents = events.filter((e) => Date.parse(e.endDate ?? e.eventDate) >= Date.now());
   const incoming = [
@@ -30,12 +34,7 @@ export function householdBoard({ members, events, chores, notes, user, timezone,
     ...(chores.swapRequests ?? []).filter((r) => r.requesterUserId === user.userId).map((r) => entry(requestCard(r, true), r.requestedDate ?? assignment(r.requesterAssignmentId)?.dueAt, `chore-${r.swapId}`)),
     ...openEvents.filter((e) => e.createdByUserId === user.userId && approvalState(e.tags).total && approvalState(e.tags).status !== 'confirmed').map((e) => { const state = approvalState(e.tags); return entry(`<article class="home-board-request stack" data-item-kind="event"><span class="home-kind">Event approval</span><b>${esc(e.eventName)}</b><p class="hint">${esc(when(e.eventDate))}</p><span class="st ${state.status === 'changes_requested' ? 'disputed' : 'unpaid'}">${state.label} · ${state.approved} of ${state.total} approved</span><div class="acts">${eventLink(e)}</div></article>`, e.createdAt ?? e.eventDate, `event-${e.eventId}`); }),
   ].filter(Boolean);
-  const note = (n) => {
-    const event = events.find((e) => e.eventId === n.eventId);
-    return `<article data-item-kind="${event ? 'event' : 'announcement'}" class="sticky ${n.isPinned ? 'pinned' : ''}"><span class="home-kind">Announcement</span><div class="row">${boardIdentity(who(n.senderUserId), name(n.senderUserId))}<span class="hint">${ago(n.postedDate, timezone)}</span>${n.isPinned ? '<span class="pin-mark">Pinned</span>' : ''}${n.isResolved ? '<span class="st paid">Resolved</span>' : ''}</div><p>${esc(n.messageText)}</p>
-      ${event ? eventLink(event) : ''}${n.canResolve !== false ? `<div class="acts"><button type="button" class="btn s" data-action="home-board-resolve" data-id="${n.messageId}" data-resolved="${!n.isResolved}">${n.isResolved ? 'Reopen' : 'Mark as Resolved'}</button></div><div class="err" role="alert"></div>` : ''}${compact ? '' : `<details class="home-board-conversation" data-board-entry="replies-${n.messageId}"><summary>${n.replies?.length ? `${n.replies.length} ${n.replies.length === 1 ? 'reply' : 'replies'}` : 'Reply'}</summary>`}${(n.replies ?? []).map((r) => `<div class="reply board-comment">${boardIdentity(who(r.senderUserId), null)}<div class="grow"><div class="row">${boardIdentity(who(r.senderUserId), name(r.senderUserId), false)}<span class="hint">${ago(r.postedDate, timezone)}</span></div><p>${esc(r.messageText)}</p></div></div>`).join('')}
-      <form class="stack" data-form="home-note-reply" data-id="${n.messageId}"><div class="row replyf"><input class="input" name="messageText" maxlength="500" placeholder="Reply" aria-label="Reply to ${esc(fullName(who(n.senderUserId)))}" required><button class="btn s" type="submit">Reply</button></div><div class="err" role="alert"></div></form>${compact ? '' : '</details>'}</article>`;
-  };
+  const note = (n) => boardAnnouncement(n, { members, user, timezone, compact, event: events.find((e) => e.eventId === n.eventId), eventLink });
   const visibleNotes = notes.filter((n) => Boolean(n.isResolved) === archive);
   const feed = [...(archive ? [] : [...incoming, ...outgoing]), ...visibleNotes.map((n) => entry(note(n), n.postedDate, `note-${n.messageId}`, Boolean(n.isPinned)))]
     .filter((item) => item.html)

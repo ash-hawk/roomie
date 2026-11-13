@@ -227,7 +227,7 @@ describe('chore rotation order', () => {
 });
 
 describe('Home finance widget sizes', () => {
-  it('promotes the totals tile into personal balances and payment previews without extra requests', async () => {
+  it('retains personal balances and payment previews across widget widths without extra requests', async () => {
     const baseApi = mockedApi.getMockImplementation();
     mockedApi.mockImplementation((path) => path.endsWith('/balances') ? Promise.resolve({
       mine:[{otherUserId:2,signedAmount:'-1.86'},{otherUserId:3,signedAmount:'22.27'}],
@@ -236,7 +236,7 @@ describe('Home finance widget sizes', () => {
     localStorage.setItem('roomie.home.layout.1.1', JSON.stringify(['finances','schedule','board'].map(id => ({id,size:'compact'}))));
     localStorage.setItem('roomie.home.layout.1.1.preset','equal');
     document.getElementById('page').innerHTML = await homeView();
-    expect(document.querySelector('.home-finances-expanded')).toBeNull();
+    expect(document.querySelector('.home-finances-narrow')).not.toBeNull();
     const calls = mockedApi.mock.calls.length;
     actions['home-layout-preset']({dataset:{layoutPreset:'focus-left'}});
     const expanded = document.querySelector('.home-finances-expanded');
@@ -251,8 +251,8 @@ describe('Home finance widget sizes', () => {
     expect(document.querySelector('[role="dialog"]').textContent).toContain('Jordan');
     const { closeModal } = await import('../src/lib/dom.js'); closeModal();
     actions['home-layout-preset']({dataset:{layoutPreset:'equal'}});
-    expect(document.querySelector('.home-finances-expanded')).toBeNull();
-    expect(document.querySelector('.home-finances').textContent).not.toContain('Waiting on you');
+    expect(document.querySelector('.home-finances-narrow')).not.toBeNull();
+    expect(document.querySelector('.home-finances').textContent).toContain('Waiting on you');
   });
 });
 
