@@ -968,3 +968,15 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .av:not(img),.acct:not(:has(img)){background:var(--outline);color:var(--on-outline,var(--ink))}
 .invite-card .rowline{display:flex;justify-content:flex-start;gap:12px;margin-top:14px}
 .household-lifecycle{justify-content:flex-start;margin-top:18px}
+
+/* Layered palette surfaces, shared across every page in both color modes. */
+:root,.dark{--soft:var(--surface-raised)}
+.top,.main .top,.tabbar,.card,.setup-card,.sheet,.theme-choice{background:var(--card)}
+.item,.input,.home-board-request[data-item-kind],.home-board-summary[data-item-kind],.chore-board-item[data-item-kind],.sticky[data-item-kind]{background:var(--surface-raised)}
+.home-board-feed>.sticky:nth-child(even),.home-board-feed>.home-board-summary:nth-child(even){background:var(--surface-alternate)}
+.home-board-summary[data-item-kind]>article{background:transparent}
+.home-finances-expanded .home-balance>span{background:var(--surface-tile);border-color:var(--line)}
+.home-calendar-item,.schedule-calendar-item{background:var(--surface-alternate)}
+.day2{background:var(--card)}
+.day2:hover{background:var(--surface-tile)}
+.home-widget-tools,.schedule-filter-panel{background:var(--surface-raised)}

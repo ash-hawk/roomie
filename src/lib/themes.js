@@ -8,14 +8,33 @@ const definitions = {
   retro: ['Retro', 'Mustard yellow, paprika, berry pink, blue, and teal.', ['#F1C40F','#E5643C','#D90368','#913977','#2274A5','#11A086','#00CC66'], [1,3,0,4,5,2,6]],
   sunset: ['Sunset', 'Deep purples, blush pink, tangerine, and saffron.', ['#22162B','#341B40','#451F55','#724E91','#E54F6D','#EF8B4F','#F8C630'], [5,3,6,4,2,1,0]],
 };
+// Mix to opaque hex values: every surface is solid, not a translucent overlay.
+function blend(base, color, amount) {
+  const channels = hex => hex.slice(1).match(/../g).map(c => parseInt(c, 16));
+  const a = channels(base), b = channels(color);
+  return '#' + a.map((v, i) => Math.round(v * (1 - amount) + b[i] * amount).toString(16).padStart(2, '0')).join('');
+}
 function themeColors(base, palette, order) {
   const [accent, nav, highlight, detail, secondary, decoration, outline] = order.map(i => palette[i]);
-  const readable = palette.filter(c => contrastRatio(c, base.card) >= 4.5 && contrastRatio(c, base.bg) >= 4.5);
-  const textAccent = readable.includes(detail) ? detail : readable[0] ?? base.ink;
-  const focus = [highlight, detail, accent, ...palette].find(c => contrastRatio(c, base.card) >= 3 && contrastRatio(c, base.bg) >= 3) ?? base.ink;
-  return { ...base, accent, 'on-accent': onColor(accent), 'nav-accent': nav, 'on-nav': onColor(nav),
+  const isDark = base === dark;
+  const bg = isDark ? blend('#111115', outline, .42) : blend('#ffffff', decoration, .16);
+  const card = isDark ? blend('#222226', nav, .38) : blend('#ffffff', nav, .09);
+  const raised = isDark ? blend('#303034', secondary, .30) : blend('#ffffff', secondary, .19);
+  const alternate = isDark ? blend('#303034', accent, .19) : blend('#ffffff', accent, .15);
+  const tile = isDark ? blend('#303034', highlight, .18) : blend('#ffffff', highlight, .25);
+  const surfaces = [bg, card, raised, alternate, tile];
+  const ink = isDark ? '#ffffff' : '#202124';
+  let mute = isDark ? '#d4d0d8' : '#55505b';
+  for (let i = 0; i < 10 && surfaces.some(c => contrastRatio(c, mute) < 4.5); i++) mute = blend(mute, ink, .25);
+  const readable = palette.filter(c => surfaces.every(surface => contrastRatio(c, surface) >= 4.5));
+  const textAccent = readable.includes(detail) ? detail : readable[0] ?? ink;
+  const focus = [highlight, detail, accent, ...palette].find(c => surfaces.every(surface => contrastRatio(c, surface) >= 3)) ?? ink;
+  return { ...base, bg, card, ink, mute, line: blend(card, ink, isDark ? .25 : .22),
+    'surface-raised': raised, 'surface-alternate': alternate, 'surface-tile': tile,
+    accent, 'on-accent': onColor(accent), 'nav-accent': nav, 'on-nav': onColor(nav),
     highlight, 'on-highlight': onColor(highlight), 'on-decoration': onColor(decoration), 'on-outline': onColor(outline), detail, secondary, decoration, outline,
     'text-accent': textAccent, focus, good: textAccent, warn: textAccent, bad: textAccent, danger: accent };
+
 }
 export const themes = Object.fromEntries(Object.entries(definitions).map(([id, [name, description, palette, order]]) => [id, {
   name, description, palette, light: themeColors(light, palette, order), dark: themeColors(dark, palette, order),
