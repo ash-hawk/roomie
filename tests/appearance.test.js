@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { themes, onColor } from '../src/lib/themes.js';
+import { themes, onColor, contrastRatio } from '../src/lib/themes.js';
 import { appearanceView } from '../src/pages/appearance.js';
 import { S } from '../src/lib/state.js';
 import { inputs } from '../src/lib/events.js';
@@ -77,11 +77,22 @@ it('uses only the chosen theme across pages, markers and statuses', () => {
       expect(document.documentElement.style.getPropertyValue('--accent')).toBe(colors[mode].accent);
       expect(document.documentElement.style.getPropertyValue('--on-accent')).toBe(onColor(colors[mode].accent));
       for (const kind of ['event', 'chore', 'finance', 'announcement']) {
-        expect(document.documentElement.style.getPropertyValue(`--color-${kind}`)).toBe(colors[mode].accent);
+        expect(document.documentElement.style.getPropertyValue(`--color-${kind}`)).toBe(colors[mode].detail);
       }
       for (const status of ['good', 'bad', 'warn']) {
         expect(document.documentElement.style.getPropertyValue(`--${status}`)).toBe(document.documentElement.style.getPropertyValue('--good'));
       }
     }
+  }
+});
+
+it('uses all seven source colors as interface roles with readable navigation and actions', () => {
+  for (const preset of Object.values(themes)) for (const mode of ['light', 'dark']) {
+    const colors = preset[mode];
+    expect(new Set(['accent','nav-accent','highlight','detail','secondary','decoration','outline'].map(role => colors[role]))).toEqual(new Set(preset.palette));
+    expect(contrastRatio(colors['nav-accent'], colors['on-nav'])).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.highlight, colors['on-highlight'])).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.card, colors['text-accent'])).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.card, colors.focus)).toBeGreaterThanOrEqual(3);
   }
 });

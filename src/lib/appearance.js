@@ -1,4 +1,4 @@
-import { themes, onColor, contrastRatio } from './themes.js';
+import { themes, onColor } from './themes.js';
 import { S } from './state.js';
 import { inputs } from './events.js';
 
@@ -16,12 +16,10 @@ export function applyAppearance(mode = appearance(), preset = theme()) {
   document.documentElement.style.colorScheme = mode;
   document.documentElement.dataset.theme = preset;
   const colors = themes[preset][mode];
-  // Until category semantics are designed, every decorative marker shares the theme.
-  const textAccent = mode === 'dark' ? colors.accent : themes[preset].light.accent;
-  const readableAccent = contrastRatio(textAccent, colors.card) >= 4.5 ? textAccent : colors.ink;
-  const accents = Object.fromEntries(['event', 'chore', 'finance', 'announcement'].map(kind => [`color-${kind}`, colors.accent]));
-  for (const [token, value] of Object.entries({ ...colors, ...accents, good: readableAccent, warn: readableAccent, bad: readableAccent, danger: colors.accent })) document.documentElement.style.setProperty(`--${token}`, value);
-  for (const kind of ['event', 'chore', 'finance', 'announcement']) document.documentElement.style.setProperty(`--on-${kind}`, onColor(colors.accent));
+  // All content types share the decorative role until category meanings are designed.
+  const accents = Object.fromEntries(['event', 'chore', 'finance', 'announcement'].map(kind => [`color-${kind}`, colors.detail]));
+  for (const [token, value] of Object.entries({ ...colors, ...accents })) document.documentElement.style.setProperty(`--${token}`, value);
+  for (const kind of ['event', 'chore', 'finance', 'announcement']) document.documentElement.style.setProperty(`--on-${kind}`, onColor(colors.detail));
 
 }
 inputs.appearance = (el) => {
