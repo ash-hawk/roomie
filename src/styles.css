@@ -764,7 +764,7 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .chore-attention-board h3{font-size:14px}
 .chore-attention-board h4{font-size:14px;overflow-wrap:anywhere}
 .chore-attention-board .chore-requests-board{margin:0}
-.chore-attention-board .chore-board-item{gap:9px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.chore-attention-board .chore-board-item{gap:8px;padding:14px;border-radius:12px}
 .chore-attention-board .chore-occurrence{align-items:center}
 .chore-attention-board .chore-occurrence b{font-size:12px}
 .chore-attention-board .hint{font-size:12px;line-height:1.4}
@@ -848,3 +848,13 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .event-link-controls select{flex:1;min-width:0}
 
 @media(max-width:400px){.tabbar .nav-i{min-width:0;font-size:9px;gap:4px}}
+
+/* Feature boards follow the Home board card and conversation rhythm. */
+.home-board-feed{gap:10px}
+.home-board-request{gap:8px}
+.home-board-request p{margin:0}
+.home-board-heading{gap:10px;align-items:center}
+.home-board-heading h2{font-size:18px}
+.board-message-options{margin-left:auto;position:relative}
+.board-message-options>summary{cursor:pointer;list-style:none;padding:2px 8px;border-radius:6px;font-size:20px}
+.board-message-options[open]>.row{position:absolute;right:0;top:100%;z-index:5;padding:8px;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
