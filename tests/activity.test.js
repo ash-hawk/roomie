@@ -78,7 +78,7 @@ describe('personal activity panel', () => {
   });
   it('supports empty and unavailable-source updates without broken links', async () => {
     notifications = []; await openActivityPanel();
-    expect(document.getElementById('activity-panel').textContent).toContain('No updates yet');
+    expect(document.getElementById('activity-panel').textContent).toContain('No unread updates');
     notifications = [{ ...base, sourceGone: true }]; await openActivityPanel();
     expect(document.getElementById('activity-panel').textContent).toContain('No longer available');
     expect(document.querySelector('[data-action=activity-open]')).toBeNull();
@@ -89,6 +89,19 @@ describe('personal activity panel', () => {
     expect(api).toHaveBeenCalledWith('/notifications/read-all', { method: 'POST', body: {} });
     expect(document.querySelector('[data-bell] .bdot')).toBeNull();
     expect(document.querySelector('.activity-dot.unread')).toBeNull();
+    expect(document.querySelector('.activity-item')).toBeNull();
+    expect(document.getElementById('activity-panel').textContent).toContain('No unread updates');
+    await openActivityPanel();
+    expect(document.querySelector('.activity-item')).toBeNull();
+  });
+  it('excludes previously read updates while keeping unread updates visible', async () => {
+    notifications = [{ ...base, isRead: true, message: 'Already read update' },
+      { ...base, notificationId: 2, message: 'New unread update' }];
+    await openActivityPanel();
+    const panel = document.getElementById('activity-panel');
+    expect(panel.textContent).not.toContain('Already read update');
+    expect(panel.textContent).toContain('New unread update');
+    expect(panel.querySelectorAll('.activity-item')).toHaveLength(1);
   });
   it('shows retryable errors without losing the current page', async () => {
     vi.mocked(api).mockRejectedValueOnce(new Error('Offline'));

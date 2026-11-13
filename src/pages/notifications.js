@@ -43,8 +43,9 @@ function activityRow(n) {
     : `<div class="activity-item ${n.isRead ? '' : 'unread'}">${content}</div>`;
 }
 function panelContent() {
+  const unread = D.notifications.filter((n) => !n.isRead);
   return `${mhead('Activity')}<div class="row sp activity-heading"><p class="hint">Updates for you</p>${D.unread ? '<button class="activity-read-all" data-action="activity-read-all">Mark all read</button>' : ''}</div>
-    <div id="activity-error" class="err" role="alert"></div><div class="activity-list">${D.notifications.length ? [...D.notifications].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map(activityRow).join('') : '<p class="activity-empty">No updates yet.</p>'}</div>`;
+    <div id="activity-error" class="err" role="alert"></div><div class="activity-list">${unread.length ? [...unread].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map(activityRow).join('') : '<p class="activity-empty">No unread updates.</p>'}</div>`;
 }
 function paintPanel() {
   const sheet = document.getElementById('activity-panel');
