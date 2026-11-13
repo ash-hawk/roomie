@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { themes, categoryColors, onColor } from '../src/lib/themes.js';
+import { themes, onColor } from '../src/lib/themes.js';
 import { appearanceView } from '../src/pages/appearance.js';
 import { S } from '../src/lib/state.js';
 import { inputs } from '../src/lib/events.js';
@@ -69,15 +69,18 @@ describe('personal theme presets', () => {
   });
 });
 
-it('uses the chosen theme across every page while category markers stay independent', () => {
+it('uses only the chosen theme across pages, markers and statuses', () => {
   for (const [preset, colors] of Object.entries(themes)) for (const mode of ['light', 'dark']) {
     for (const page of ['home', 'calendar', 'chores', 'finances', 'household', 'appearance']) {
       history.replaceState(null, '', `#/${page}`);
       applyAppearance(mode, preset);
       expect(document.documentElement.style.getPropertyValue('--accent')).toBe(colors[mode].accent);
       expect(document.documentElement.style.getPropertyValue('--on-accent')).toBe(onColor(colors[mode].accent));
-      for (const [token, value] of Object.entries(categoryColors[mode])) {
-        expect(document.documentElement.style.getPropertyValue(`--${token}`)).toBe(value);
+      for (const kind of ['event', 'chore', 'finance', 'announcement']) {
+        expect(document.documentElement.style.getPropertyValue(`--color-${kind}`)).toBe(colors[mode].accent);
+      }
+      for (const status of ['good', 'bad', 'warn']) {
+        expect(document.documentElement.style.getPropertyValue(`--${status}`)).toBe(document.documentElement.style.getPropertyValue('--good'));
       }
     }
   }

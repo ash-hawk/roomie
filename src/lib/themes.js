@@ -1,10 +1,5 @@
 const light = { bg: '#f6f6f5', card: '#ffffff', ink: '#202124', mute: '#55585f', line: '#d8dadd', accent: '#292b30', 'on-accent': '#ffffff', good: '#16733D', warn: '#855000', bad: '#A92B2B' };
 const dark = { bg: '#151515', card: '#222222', ink: '#f5f5f5', mute: '#c0c0c0', line: '#515151', accent: '#eeeeee', 'on-accent': '#202124', good: '#62D493', warn: '#F3B859', bad: '#FF8585' };
-// Category markers are independent of theme selection while category design is paused.
-export const categoryColors = {
-  light: { 'color-event': '#FE7F2D', 'color-chore': '#627F67', 'color-finance': '#233D4D', 'color-announcement': '#FCCA46' },
-  dark: { 'color-event': '#FE7F2D', 'color-chore': '#9BB59E', 'color-finance': '#8EADBD', 'color-announcement': '#FCCA46' },
-};
 const themeColors = (base, accent) => ({ ...base, accent, 'on-accent': onColor(accent) });
 // Exact source palettes remain visible; each supplies an app-wide accent in both modes.
 export const themes = {
@@ -37,4 +32,14 @@ export function onColor(hex) {
   };
   const value = luminance(hex), darkText = 0;
   return (value + 0.05) / (darkText + 0.05) >= 1.05 / (value + 0.05) ? '#000000' : '#FFFFFF';
+}
+
+export function contrastRatio(a, b) {
+  const luminance = hex => {
+    const c = hex.slice(1).match(/../g).map(part => parseInt(part, 16) / 255)
+      .map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    return c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
+  };
+  const x = luminance(a), y = luminance(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }

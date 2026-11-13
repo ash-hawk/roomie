@@ -207,7 +207,7 @@ img.av::after{display:none}
 .dark .pill.event{color:#c4b5fd}.dark .pill.chore{color:#5eead4}.dark .pill.pay{color:#fbbf24}
 
 /* misc */
-.feat{height:120px;border-radius:16px;background:linear-gradient(135deg,var(--accent),#ec4899 80%);display:grid;place-items:center;font-size:40px;position:relative;overflow:hidden}
+.feat{height:120px;border-radius:16px;background:var(--accent);display:grid;place-items:center;font-size:40px;position:relative;overflow:hidden}
 .feat::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 20% 10%,rgba(255,255,255,.35),transparent 50%)}
 .bubble{background:var(--bg);border-radius:16px;padding:9px 13px}
 #devbtn{position:fixed;left:12px;bottom:92px;z-index:40;width:38px;height:38px;border-radius:50%;border:0;background:var(--card);font-size:16px;box-shadow:var(--shadow);opacity:.7;transition:opacity .2s,transform .2s}
@@ -461,10 +461,10 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 
 /* ---- slice (d): notifications ---- */
 .bdot{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;padding:0 4px;border-radius:99px;background:var(--accent);color:#fff;font-size:10.5px;font-weight:700;line-height:17px;text-align:center;box-shadow:0 0 0 2px var(--card)}
-.bdot.red{background:#dc2626}
+.bdot.red{background:var(--accent)}
 .nt{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
 .nt.unread{background:var(--soft);border-color:color-mix(in srgb,var(--accent) 25%,var(--line))}
-.nt.alert{box-shadow:inset 3px 0 0 #dc2626}
+.nt.alert{box-shadow:inset 3px 0 0 var(--accent)}
 .ntdot{width:9px;height:9px;border-radius:50%;margin-top:7px;flex:none;background:transparent}
 .nt.unread .ntdot{background:var(--accent)}
 .nt .acts .ghost{background:transparent;box-shadow:none;color:var(--mute)}
@@ -601,7 +601,7 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 
 
 /* Content colors describe item types, independently of who created or owns them. */
-:root{--color-event:#6d28d9;--color-chore:#0f766e;--color-finance:#1d4ed8;--color-announcement:#b45309}
+:root{--color-event:var(--accent);--color-chore:var(--accent);--color-finance:var(--accent);--color-announcement:var(--accent)}
 [data-item-kind="event"]{--item-color:var(--color-event)}
 [data-item-kind="chore"]{--item-color:var(--color-chore)}
 [data-item-kind="finance"]{--item-color:var(--color-finance)}
@@ -861,9 +861,9 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .home-finances-narrow .home-finance-groups{grid-template-columns:minmax(0,1fr)}
 .home-finances-narrow .home-finance-heading{align-items:flex-start;flex-wrap:wrap;gap:10px}
 
-/* Board controls use neutral colors, leaving category colors on content. */
-.btn.p.home-make-announcement,.btn.p.home-make-announcement:hover{background:var(--ink);color:var(--card);border-color:var(--ink);box-shadow:none}
-.home-board-filters .btn.p,.home-board-filters .btn.p:hover{background:color-mix(in srgb,var(--ink) 7%,var(--card));color:var(--ink);border-color:var(--line);box-shadow:inset 0 -2px 0 var(--ink);filter:none}
+/* Board actions follow the chosen theme, like every other primary action. */
+.btn.p.home-make-announcement,.btn.p.home-make-announcement:hover{background:var(--accent);color:var(--on-accent);border-color:var(--accent);box-shadow:none}
+.home-board-filters .btn.p,.home-board-filters .btn.p:hover{background:var(--accent);color:var(--on-accent);border-color:var(--accent);box-shadow:none;filter:none}
 .home-layout-hint{margin:0;font-size:12px}
 
 .theme-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:14px}
@@ -939,3 +939,18 @@ body::before,body::after{display:none}
 
 .page-header-compact .page-actions{margin-left:auto;width:auto;flex-wrap:wrap}
 .page-header-compact .page-actions .btn{flex:none}
+
+/* Neutral surfaces; all decorative color comes from the selected theme. */
+.pill.event,.pill.chore,.pill.pay,.dark .pill.event,.dark .pill.chore,.dark .pill.pay{background:var(--bg);color:var(--ink);border-color:var(--accent)}
+.mark{background:var(--accent);color:var(--on-accent)}
+.btn.d,.btn.d:hover,.doneb.on,.cr .doneb.on,.cr.completing .doneb,.bdot{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+
+/* Nest dashboard tiles by content height; never stretch a short card to its neighbour. */
+@media(min-width:901px){
+  .home-dashboard[data-preset]{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:none;grid-template-rows:none;grid-auto-rows:8px;grid-auto-flow:row dense;gap:0 18px}
+  .home-dashboard[data-preset]>.home-widget:nth-child(n){grid-area:auto;margin-bottom:18px}
+  .home-dashboard[data-preset="focus-left"]>.home-widget:nth-child(1){grid-column:1 / span 2}
+  .home-dashboard[data-preset="focus-left"]>.home-widget:nth-child(n+2){grid-column:3}
+  .home-dashboard[data-preset="focus-right"]>.home-widget:nth-child(1){grid-column:2 / span 2}
+  .home-dashboard[data-preset="focus-right"]>.home-widget:nth-child(n+2){grid-column:1}
+}

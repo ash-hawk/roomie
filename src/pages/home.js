@@ -88,7 +88,7 @@ function calendarView() {
   const compact = widgetSize('schedule') === 'compact';
   const today = ymdIn(Date.now());
   return `${monthNav('calendar')}
-    <div class="schedule-color-key" aria-label="Calendar item types"><span><i style="background:${itemColor('event')}"></i>Events</span><span><i style="background:${itemColor('chore')}"></i>Chores</span></div><div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div>
+    <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div>
     <div class="mgrid home-month">${monthDays(monthStart).map((day) => {
       const items = D.items.filter((item) => item.ymd === day);
       return `<button class="day2 ${day.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${day === today ? 'today' : ''}" data-action="home-day" data-day="${day}" aria-label="${esc(dayLabel(day))}, ${items.length} items" ${day === today ? 'aria-current="date"' : ''}>
@@ -352,7 +352,16 @@ function previewWidgetMove(x, y) {
   drag.ghost.style.transform = `translate(${x - drag.offsetX}px, ${y - drag.offsetY}px)`;
   const target = document.elementFromPoint(x, y);
   const preset = target?.closest('[data-layout-preset]')?.dataset.layoutPreset;
-  const tile = target?.closest('.home-widget');
+  let tile = target?.closest('.home-widget');
+  // Blank dashboard space is also a drop target: choose the nearest tile slot.
+  const dashboard = document.querySelector('.home-dashboard');
+  const bounds = dashboard?.getBoundingClientRect();
+  if (!tile && bounds && x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom) {
+    tile = [...dashboard.querySelectorAll('.home-widget')].filter(w => w !== drag.widget).sort((a, b) => {
+      const distance = w => { const r = w.getBoundingClientRect(); return Math.hypot(x - Math.max(r.left, Math.min(x, r.right)), y - Math.max(r.top, Math.min(y, r.bottom))); };
+      return distance(a) - distance(b);
+    })[0];
+  }
   if (HOME_PRESETS.includes(preset) && (preset !== layoutMode || preset !== 'equal' && layout[0].id !== drag.id)) {
     const order = [drag.id, ...layout.filter((w) => w.id !== drag.id).map((w) => w.id)];
     setLayout(preset, order);

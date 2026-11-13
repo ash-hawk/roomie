@@ -46,7 +46,13 @@ export async function listNotifications(userId: number) {
     bulletin_message: await present('bulletin_message', s.bulletinMessage.messageId, s.bulletinMessage),
   };
 
+  // Historical notices must not reintroduce identities from a departed household stay.
+  const householdIds = [...new Set(rows.map(r => r.householdId))];
+  const activeMembers = householdIds.length ? await db.select({ householdId: hm.householdId, userId: hm.userId })
+    .from(hm).where(and(inArray(hm.householdId, householdIds), isNull(hm.leftDate))) : [];
+  const activeActors = new Set(activeMembers.map(m => `${m.householdId}:${m.userId}`));
   const visible = rows.filter((r) => {
+    if (r.actorUserId !== null && !activeActors.has(`${r.householdId}:${r.actorUserId}`)) return false;
     const sid = r.sourceId === null ? null : Number(r.sourceId);
     return !hideRequestFromInbox(r, { viewerId: userId, eventCreatorId: sid === null ? undefined : eventCreators.get(sid), eventResponse: sid === null ? undefined : myTags.get(sid), requesterId: sid === null ? undefined : requesters.get(sid), requestStatus: sid === null ? undefined : swaps.get(sid) });
   }).slice(0, 100);
@@ -61,7 +67,8 @@ export async function listNotifications(userId: number) {
     }
     return { ...r, sourceId: sid, createdAt: iso(r.createdAt), sourceGone, sourceStatus, canRespond, swapPending: r.sourceType === 'chore_swap_request' && sourceStatus === 'pending' && !r.isRead };
   });
-  return { notifications: out, unread: out.filter((x) => !x.isRead).length, swapPending: out.filter((x) => x.swapPending).length };
+  const available = out.filter(n => !n.sourceGone);
+  return { notifications: available, unread: available.filter((x) => !x.isRead).length, swapPending: available.filter((x) => x.swapPending).length };
 }
 
 /** Mark all of the caller's notifications read, optionally just one section. */
