@@ -530,6 +530,10 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .finance-summary .item{font-size:14px;line-height:1.5}
 .finance-history .item{font-size:14px}
 .board-heading{justify-content:space-between;margin-bottom:14px}
+.board[data-board]{display:flex;flex-direction:column;gap:14px;min-width:0}
+.board[data-board]>.board-heading{margin-bottom:0}
+.board[data-board]>.home-board-filters{gap:8px}
+.board[data-board]>.notes{margin-top:0}
 .board-heading:empty{display:none}
 .board-empty{grid-column:1/-1;text-align:center;padding:28px 16px;font-size:15px;font-weight:400;line-height:1.6;letter-spacing:normal}
 .sticky{min-width:0;font-size:14px;line-height:1.5;letter-spacing:normal}
