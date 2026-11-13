@@ -17,9 +17,10 @@ describe('expanded Home finances', () => {
     expect(root.querySelector('script')).toBeNull();
     expect(root.textContent).toContain('<script>bad()</script>');
   });
-  it('keeps compact mode to totals and shows clear empty states in expanded mode', () => {
+  it('shows balance details and clear empty states even in a narrow card', () => {
     const compact=render({mine:[],incoming:[]},true);
-    expect(compact.querySelector('.home-finance-group')).toBeNull();
+    expect(compact.querySelectorAll('.home-finance-group')).toHaveLength(3);
+    expect(compact.querySelector('.home-finances-narrow')).not.toBeNull();
     expect(compact.querySelectorAll('.home-balance b')).toHaveLength(2);
     const expanded=render({mine:[],incoming:[]});
     expect(expanded.textContent).toContain('You don’t owe anyone.');

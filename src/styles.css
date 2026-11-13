@@ -858,3 +858,7 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .board-message-options{margin-left:auto;position:relative}
 .board-message-options>summary{cursor:pointer;list-style:none;padding:2px 8px;border-radius:6px;font-size:20px}
 .board-message-options[open]>.row{position:absolute;right:0;top:100%;z-index:5;padding:8px;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+
+.home-widget.compact .home-finances.home-finances-expanded{justify-content:flex-start;gap:16px}
+.home-finances-narrow .home-finance-groups{grid-template-columns:minmax(0,1fr)}
+.home-finances-narrow .home-finance-heading{align-items:flex-start;flex-wrap:wrap;gap:10px}
