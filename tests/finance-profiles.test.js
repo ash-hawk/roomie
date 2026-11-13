@@ -52,9 +52,7 @@ describe('finance roommate profiles', () => {
     vi.mocked(api).mockResolvedValueOnce({ members: [{ ...members[1], leftDate: '2026-11-01' }] });
     await actions['board-roommate-profile'](document.querySelector('[data-action=board-roommate-profile][data-id="2"]'));
     const modal = document.querySelector('[role=dialog]');
-    expect(modal.textContent).toContain('Contact details are hidden for former roommates');
-    expect(modal.textContent).not.toContain('daisy@example.test');
-    expect(modal.textContent).not.toContain('@daisy');
+    expect(modal).toBeNull();
   });
 });
 

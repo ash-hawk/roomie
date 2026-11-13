@@ -10,15 +10,12 @@ const memberRow = (m, h) => `<div class="roommate-entry"><div class="item row cl
   ${avatar(m)}<div class="grow"><b>${esc(fullName(m))}</b>${m.userId === S.user.userId ? ' <span class="mute">(you)</span>' : ''}
   <div class="mute" style="font-size:13px">${m.leftDate ? `Moved out ${fmtDate(m.leftDate, h.timezone)}` : `Joined ${fmtDate(m.joinedDate, h.timezone)}`}</div></div>
   ${badge(m.role === 'owner' ? 'Owner' : 'Member', m.leftDate ? 'gray' : '')}<span class="row-chevron">${ico('chevron', 16)}</span></div>
-  ${household()?.role === 'owner' && !m.leftDate && m.userId !== S.user.userId ? `<div class="roommate-actions">
-    <button class="btn s" data-action="transfer-owner" data-id="${m.userId}" data-name="${esc(fullName(m))}">Transfer ownership</button>
-    ${m.role === 'member' ? `<button class="btn s d" data-action="remove-member" data-id="${m.userId}" data-name="${esc(fullName(m))}">Remove</button>` : ''}
-  </div>` : ''}</div>`;
+  </div>`;
 
 export async function householdView() {
   const h = household(), response = await api(`/households/${h.householdId}/members`);
   members = response.members;
-  const current = members.filter((m) => !m.leftDate), former = members.filter((m) => m.leftDate);
+  const current = members.filter((m) => !m.leftDate);
   const owner = h.role === 'owner';
   const invite = owner ? `<section class="card invite-card" aria-labelledby="invite-roommates-title">
         <h2 id="invite-roommates-title">Invite roommates</h2>
@@ -49,12 +46,6 @@ export async function householdView() {
         <hr class="hr">
         <h3>Roommates</h3>
         ${current.map((m) => memberRow(m, h)).join('')}
-        ${former.length ? `
-          <details style="margin-top:16px">
-            <summary>Former roommates (${former.length})</summary>
-            ${former.map((m) => memberRow(m, h)).join('')}
-          </details>
-        ` : ''}
         ${!owner ? '<hr class="hr"><div><button class="btn" data-action="leave-household">Leave household</button></div>' : '<p class="hint">Transfer ownership to a roommate before leaving, or delete the household if you are the last member.</p>'}
         ${owner ? `<hr class="hr"><div class="stack"><p class="mute">Deleting this household permanently removes its shared data for everyone.</p>
           <div><button class="btn d" data-action="delete-household">Delete household</button></div></div>` : ''}
@@ -119,13 +110,14 @@ actions['roommate-profile'] = (el) => {
   const m = members.find((member) => member.userId === Number(el.dataset.id)); if (m) openRoommateProfile(m);
 };
 export function openRoommateProfile(m) {
+  if (m.leftDate) { toast('This roommate is no longer in the household.'); return; }
   const methods = [...(m.paymentMethods ?? [])].sort((a, b) => Number(b.isPreferred) - Number(a.isPreferred));
-  const contact = m.leftDate ? '<p class="mute">Contact details are hidden for former roommates.</p>' : `<div class="profile-contact">
-    <div><span class="hint">Email</span><b>${m.email ? `<a href="mailto:${encodeURIComponent(m.email)}">${esc(m.email)}</a>` : 'Not added'}</b></div>
-    <div><span class="hint">Phone</span><b>${m.phoneNumber ? `<a href="tel:${encodeURIComponent(m.phoneNumber)}">${esc(m.phoneNumber)}</a>` : 'Not added'}</b></div></div>`;
-  const payments = !m.leftDate && methods.length ? `<div class="stack roommate-payments">${methods.map((method) => `<div class="item row"><div class="grow"><b>${esc(PAYMENT_APPS[method.app] ?? method.app)}</b><div class="hint">${esc(method.username)}</div></div>${method.isPreferred ? badge('Preferred') : ''}</div>`).join('')}</div>` : '<p class="mute">No payment methods added.</p>';
-  openModal(`${mhead(esc(fullName(m)))}<div class="roommate-profile-head">${avatar(m, 'lg')}<div><h3>${esc(fullName(m))}</h3><p class="mute">${m.role === 'owner' ? 'Household owner' : 'Household member'}</p></div></div>
-    <h4>Contact</h4>${contact}<h4>Payment methods</h4>${payments}
-    ${m.userId === S.user.userId ? '<div class="acts"><button class="btn p" data-action="open-profile">Edit my profile</button></div>' : ''}`);
+  const contact = [
+    m.phoneNumber ? `<div class="contact-list-row"><dt>Phone</dt><dd><a href="tel:${encodeURIComponent(m.phoneNumber)}">${esc(m.phoneNumber)}</a></dd></div>` : '',
+    m.email ? `<div class="contact-list-row"><dt>Email</dt><dd><a href="mailto:${encodeURIComponent(m.email)}">${esc(m.email)}</a></dd></div>` : '',
+  ].join('');
+  const payments = methods.length ? `<section class="profile-section"><h3>Payment preferences</h3><dl class="contact-list">${methods.map(method => `<div class="contact-list-row"><dt>${esc(PAYMENT_APPS[method.app] ?? method.app)} ${method.isPreferred ? badge('Preferred', 'gray') : ''}</dt><dd>${esc(method.username)}</dd></div>`).join('')}</dl></section>` : '';
+  const management = household()?.role === 'owner' && m.userId !== S.user.userId ? `<details class="profile-management"><summary>Manage roommate</summary><div class="acts"><button class="btn s" data-action="transfer-owner" data-id="${m.userId}" data-name="${esc(fullName(m))}">Transfer ownership</button>${m.role === 'member' ? `<button class="btn s d" data-action="remove-member" data-id="${m.userId}" data-name="${esc(fullName(m))}">Remove from household</button>` : ''}</div></details>` : '';
+  openModal(`${mhead(esc(fullName(m)))}<div class="roommate-profile-list"><div class="roommate-profile-head">${avatar(m, 'lg')}<p class="mute">${m.role === 'owner' ? 'Household owner' : 'Household member'}</p></div>${contact ? `<dl class="contact-list">${contact}</dl>` : ''}${payments}${management}${m.userId === S.user.userId ? '<div class="acts"><button class="btn p" data-action="open-profile">Edit my profile</button></div>' : ''}</div>`);
 }
 actions['open-profile'] = () => { closeModal(); location.hash = '#/settings'; };

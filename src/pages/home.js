@@ -1,3 +1,4 @@
+import { currentHouseholdData } from '../lib/current-household.js';
 import { openLinkedEvent } from './calendar.js';
 import { scheduleToolbar } from '../components/schedule-toolbar.js';
 // Home shows one household schedule in two formats; feature pages own editing and responses.
@@ -102,10 +103,11 @@ function compactUpcoming() {
 }
 
 export async function homeView() {
-  const [{ members }, { events }, chores, balances, { notes }] = await Promise.all([
-    api(`/households/${hid()}/members`), api(`/households/${hid()}/events`), api(`/households/${hid()}/chores`), api(`/households/${hid()}/balances`), api(`/households/${hid()}/board`),
+  const [{ members }, { events }, chores, balances, { notes }, wishlist] = await Promise.all([
+    api(`/households/${hid()}/members`), api(`/households/${hid()}/events`), api(`/households/${hid()}/chores`), api(`/households/${hid()}/balances`), api(`/households/${hid()}/board`), api(`/households/${hid()}/wishlist`),
   ]);
-  D = { householdId: hid(), members, events, chores, balances, notes, user: S.user, timezone: tz(), items: scheduleItems(events, chores, tz()) };
+  const visible = currentHouseholdData(members, { events, chores, notes });
+  D = { householdId: hid(), members, ...visible, balances, wish: wishlist.items ?? [], user: S.user, timezone: tz(), items: scheduleItems(visible.events, visible.chores, tz()) };
   if (monthHousehold !== hid()) { monthStart = null; monthHousehold = hid(); homeBoardArchive = false; }
   monthStart ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   if (editingKey !== layoutKey()) { editing = false; editingKey = layoutKey(); }
@@ -177,10 +179,17 @@ actions['home-board-all'] = () => openModal(`${mhead('Household board')}<div cla
 
 async function refreshHomeBoard(onlyChanged = false) {
   const householdId = D.householdId;
-  const [{ events }, chores, { notes }] = await Promise.all([api(`/households/${householdId}/events`), api(`/households/${householdId}/chores`), api(`/households/${householdId}/board`)]);
+  const [{ members }, { events }, chores, { notes }, balances, wishlist] = await Promise.all([
+    api(`/households/${householdId}/members`), api(`/households/${householdId}/events`),
+    api(`/households/${householdId}/chores`), api(`/households/${householdId}/board`),
+    api(`/households/${householdId}/balances`), api(`/households/${householdId}/wishlist`),
+  ]);
   if (hid() !== householdId || !document.getElementById('home-board')) return;
-  if (onlyChanged && JSON.stringify([events, chores, notes]) === JSON.stringify([D.events, D.chores, D.notes])) return;
-  D = { ...D, events, chores, notes, items: scheduleItems(events, chores, tz()) };
+  const visible = currentHouseholdData(members, { events, chores, notes });
+  const wish = wishlist.items ?? [];
+  if (onlyChanged && JSON.stringify([members, visible, balances, wish]) === JSON.stringify([D.members, { events: D.events, chores: D.chores, notes: D.notes }, D.balances, D.wish])) return;
+  D = { ...D, members, ...visible, balances, wish, items: scheduleItems(visible.events, visible.chores, tz()) };
+  renderWidgetSize('finances');
   paintHomeBoards();
   const content = document.getElementById('home-schedule-content');
   if (content) content.innerHTML = content.dataset.view === 'calendar' ? calendarView() : listView();
@@ -409,4 +418,5 @@ document.addEventListener('keydown', (event) => {
   document.querySelector('.home-layout-status').textContent = `${widgetNames[grip.dataset.widgetDrag]} moved. Layout saved.`;
 });
 
+actions['home-open-wishlist'] = () => { prepareFinanceActivity('wishlist_item'); location.hash = '#/finances'; };
 actions['home-open-finances'] = () => { prepareFinanceActivity('payment'); location.hash = '#/finances'; };

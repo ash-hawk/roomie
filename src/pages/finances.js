@@ -1,3 +1,4 @@
+import { isCurrentMember } from '../lib/current-household.js';
 // Slice (a): Expense tracker. Balances are CALCULATED on the server from expenses, shares and payments;
 // this page only displays them. Amounts arrive as strings ("12.34") and are converted to integer cents
 // with the same shared money helpers the API uses.
@@ -28,7 +29,7 @@ export async function financesView() {
   const h = hid();
   const [{ members }, bal, { expenses }] = await Promise.all([api(`/households/${h}/members`), api(`/households/${h}/balances`), api(`/households/${h}/expenses`)]);
   D = { members, bal, expenses, wish: D?.wish ?? [] };
-  if (tab === 'wish') D.wish = (await api(`/households/${h}/wishlist`)).items;
+  if (tab === 'wish') D.wish = (await api(`/households/${h}/wishlist`)).items.filter(w => isCurrentMember(members, w.createdByUserId));
   const action = tab === 'settle' ? `<button class="btn p" data-action="add-expense">${ico('plus', 16)} Log expense</button>` : `<button class="btn p" data-action="add-wish">${ico('plus', 16)} Add item</button>`;
   return `${phead('Finances', '', action)}
   <div class="page-controls">${seg([['settle', 'Settle payments'], ['wish', 'Wish list']], tab, 'fin-tab')}</div>
@@ -36,14 +37,14 @@ export async function financesView() {
 }
 actions['fin-tab'] = (el) => { tab = el.dataset.value; window.dispatchEvent(new Event('roomie:render')); };
 
-const profileLink = (id, label = first(id), withAvatar = true) => roommateIdentity(who(id), label, withAvatar).replace('class="board-profile-link"', 'class="board-profile-link finance-profile-link"');
+const profileLink = (id, label = first(id), withAvatar = true) => isCurrentMember(D.members, id) ? roommateIdentity(who(id), label, withAvatar).replace('class="board-profile-link"', 'class="board-profile-link finance-profile-link"') : '<span class="mute">Former roommate</span>';
 
 // ---- settle tab -------------------------------------------------------------------------------
 function person(id, extra = '') { const m = who(id); return `<div class="row" style="gap:10px;min-width:0">${profileLink(id, null)}<div style="min-width:0">${profileLink(id, first(id), false)}${m?.leftDate ? ' <span class="mute" style="font-size:12px">(moved out)</span>' : ''}${extra}</div></div>`; }
 
 function settleView() {
   const { bal } = D;
-  const mine = bal.mine.map((b) => {
+  const mine = bal.mine.filter(b => isCurrentMember(D.members, b.otherUserId)).map((b) => {
     const cents = toCents(b.signedAmount);
     const owe = cents < 0;
     const payable = bal.payable.some((p) => p.payeeUserId === b.otherUserId);
@@ -53,12 +54,12 @@ function settleView() {
       <div class="grow"></div>${owe && payable ? `<button class="btn s" data-action="pay" data-payee="${b.otherUserId}">Pay back</button>` : ''}</div>`;
   }).join('');
 
-  const incoming = bal.incoming.map((p) => `<div class="item" data-activity-payment="${p.paymentId}"><div class="row t">${profileLink(p.payerUserId, null)}<div class="grow">${profileLink(p.payerUserId, first(p.payerUserId), false)} says they paid you <b class="amount">${$m(p.amount)}</b> via ${APP_LABEL[p.paidWith]}
+  const incoming = bal.incoming.filter(p => isCurrentMember(D.members,p.payerUserId)).map((p) => `<div class="item" data-activity-payment="${p.paymentId}"><div class="row t">${profileLink(p.payerUserId, null)}<div class="grow">${profileLink(p.payerUserId, first(p.payerUserId), false)} says they paid you <b class="amount">${$m(p.amount)}</b> via ${APP_LABEL[p.paidWith]}
 
       <div class="hint">${p.items.map((i) => esc(i.itemName)).join(', ')}</div>
       ${p.status === 'disputed' ? '<div style="margin-top:2px">' + stChip('disputed') + '</div>' : ''}
       <div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="confirmed">${p.status === 'disputed' ? 'Mark received' : 'Got it'}</button>${p.status === 'sent' ? `<button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="disputed">Did not get it</button>` : ''}</div></div></div></div>`).join('');
-  const outgoing = bal.outgoing.map((p) => `<div class="item row" data-activity-payment="${p.paymentId}">${person(p.payeeUserId, `<div class="hint">You sent ${$m(p.amount)} via ${APP_LABEL[p.paidWith]}</div>`)}<div class="grow"></div>${stChip(p.status === 'sent' ? 'pending' : 'disputed')}</div>`).join('');
+  const outgoing = bal.outgoing.filter(p => isCurrentMember(D.members,p.payeeUserId)).map((p) => `<div class="item row" data-activity-payment="${p.paymentId}">${person(p.payeeUserId, `<div class="hint">You sent ${$m(p.amount)} via ${APP_LABEL[p.paidWith]}</div>`)}<div class="grow"></div>${stChip(p.status === 'sent' ? 'pending' : 'disputed')}</div>`).join('');
 
 
   return `<div class="stack finance-summary">
@@ -76,7 +77,7 @@ function settleView() {
 }
 
 function expenseRow(e) {
-  const others = e.shares.filter((s) => s.userId !== e.paidByUserId);
+  const others = e.shares.filter((s) => s.userId !== e.paidByUserId && isCurrentMember(D.members, s.userId));
   return `<div class="item exp click click-row" data-action="expense" data-id="${e.expenseId}" tabindex="0"><div class="grow"><b class="truncate">${esc(e.itemName)}</b>
     <div class="hint expense-detail">${fmtDay(e.purchaseDate)} · ${profileLink(e.paidByUserId, first(e.paidByUserId), false)} paid</div>
     <div class="chips">${others.map((s) => `<span class="sharechip">${profileLink(s.userId, null)}${$m(s.amountOwed)} ${stChip(s.status)}</span>`).join('')}</div></div>
@@ -94,8 +95,8 @@ actions.review = async (el) => {
 actions.expense = (el) => {
   const e = D.expenses.find((x) => x.expenseId === Number(el.dataset.id)); if (!e) return;
   openModal(`${mhead(esc(e.itemName))}
-    <div class="tot">${$m(e.totalAmount)}</div><p class="mute">${fmtDay(e.purchaseDate, { weekday: 'long', month: 'long', day: 'numeric' })} · paid by ${esc(first(e.paidByUserId).toLowerCase() === 'you' ? 'you' : first(e.paidByUserId))}</p>
-    <div>${e.shares.map((s) => `<div class="item row">${profileLink(s.userId, null)}<span class="grow">${profileLink(s.userId, first(s.userId), false)}</span><b class="amount">${$m(s.amountOwed)}</b>${stChip(s.status)}</div>`).join('')}</div>
+    <div class="tot">${$m(e.totalAmount)}</div><p class="mute">${fmtDay(e.purchaseDate, { weekday: 'long', month: 'long', day: 'numeric' })} · paid by ${(isCurrentMember(D.members,e.paidByUserId) ? esc(first(e.paidByUserId).toLowerCase() === 'you' ? 'you' : first(e.paidByUserId)) : 'a former roommate')}</p>
+    <div>${e.shares.filter(s => isCurrentMember(D.members,s.userId)).map((s) => `<div class="item row">${profileLink(s.userId, null)}<span class="grow">${profileLink(s.userId, first(s.userId), false)}</span><b class="amount">${$m(s.amountOwed)}</b>${stChip(s.status)}</div>`).join('')}</div>
     <p class="hint">The buyer's own share is never owed. History means a previous household stay and is excluded from active balances; it does not mean paid.</p>
     ${e.canDelete ? `<div class="acts"><button class="btn d" data-action="delete-expense" data-id="${e.expenseId}">Delete</button></div>` : ''}`);
 };
