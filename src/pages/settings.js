@@ -39,7 +39,7 @@ export async function settingsView() {
     <div class="stack">
       ${profileForm()}
 
-      <section class="card"><h2>Email notifications</h2><p class="body-copy notification-description">Choose what Roomie may send for this household. Everything is off unless you turn it on.</p>
+      <section class="card"><h2>Email notifications</h2><p class="body-copy">Choose what Roomie may send for this household. Everything is off unless you turn it on.</p>
         <form class="stack" data-form="notification-channel"><label class="fld"><span>Notification email</span><input class="input" type="email" name="destination" autocomplete="email" required maxlength="320" value="${esc(notificationChannel?.destination ?? S.user.email ?? '')}"></label>
           <div class="hint" role="status">${notificationChannel?.verifiedAt ? 'Verified — this address can receive important event notifications.' : notificationChannel ? 'Not verified — request a new confirmation link if the address changed.' : 'Confirm an address separately from sign-in before Roomie sends event notifications.'}</div>
           <div class="err" role="alert"></div><div class="acts"><button class="btn" type="submit">${notificationChannel?.verifiedAt ? 'Change or re-confirm email' : 'Send confirmation email'}</button></div></form>
