@@ -108,7 +108,7 @@ actions['delete-expense'] = async (el) => {
 
 // ---- log an expense ---------------------------------------------------------------------------
 actions['add-expense'] = async (_el, _e, preset = {}) => {
-  const wish = (await api(`/households/${hid()}/wishlist`)).items.filter((w) => !w.isBought);
+  const wish = (await api(`/households/${hid()}/wishlist`)).items.filter((w) => !w.isBought && isCurrentMember(D.members, w.createdByUserId));
   D.wish = wish;
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: household().timezone }).format(new Date());
   const others = active().filter((m) => m.userId !== S.user.userId);

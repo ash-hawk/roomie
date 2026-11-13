@@ -13,7 +13,7 @@ let notificationChannel = null;
 function profileForm() {
   const methods = Object.fromEntries((S.user.paymentMethods ?? []).map((m) => [m.app, m]));
   const preferred = (S.user.paymentMethods ?? []).find((m) => m.isPreferred)?.app ?? 'venmo';
-  return `<section class="card profile-card"><div class="row sp"><div><h2>Your profile</h2><p class="body-copy">Help roommates recognize you and know where to send their share.</p></div><div id="profile-avatar">${avatar(S.user, 'lg')}</div></div>
+  return `<section class="card profile-card"><div class="row sp"><div><h2>Your profile</h2></div><div id="profile-avatar">${avatar(S.user, 'lg')}</div></div>
     <form class="stack" data-form="profile" autocomplete="on">
       <div class="inline-grid"><label class="fld"><span>First name</span><input class="input" name="firstName" data-input="profile-dirty" autocomplete="given-name" maxlength="80" required value="${esc(S.user.firstName)}"><small class="field-error" data-error-for="firstName"></small></label>
         <label class="fld"><span>Last name</span><input class="input" name="lastName" data-input="profile-dirty" autocomplete="family-name" maxlength="80" value="${esc(S.user.lastName)}"><small class="field-error" data-error-for="lastName"></small></label></div>
@@ -34,12 +34,12 @@ export async function settingsView() {
   }
   const emailChoices = [['event_hosting', 'New parties and hosting', 'Email me when a roommate creates a hosting event.'], ['event_other', 'Other new events', 'Email me about meetings and other events.'], ['approval_request', 'Approval requests', 'Email me when an event needs my response.']];
   return `
-    ${phead('Profile', 'Manage the information your roommates can see.')}
+    ${phead('Profile')}
 
     <div class="stack">
       ${profileForm()}
 
-      <section class="card"><h2>Email notifications</h2><p class="body-copy">Choose what Roomie may send for this household. Everything is off unless you turn it on.</p>
+      <section class="card"><h2>Email notifications</h2>
         <form class="stack" data-form="notification-channel"><label class="fld"><span>Notification email</span><input class="input" type="email" name="destination" autocomplete="email" required maxlength="320" value="${esc(notificationChannel?.destination ?? S.user.email ?? '')}"></label>
           <div class="hint" role="status">${notificationChannel?.verifiedAt ? 'Verified — this address can receive important event notifications.' : notificationChannel ? 'Not verified — request a new confirmation link if the address changed.' : 'Confirm an address separately from sign-in before Roomie sends event notifications.'}</div>
           <div class="err" role="alert"></div><div class="acts"><button class="btn" type="submit">${notificationChannel?.verifiedAt ? 'Change or re-confirm email' : 'Send confirmation email'}</button></div></form>
