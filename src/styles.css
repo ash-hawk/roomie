@@ -847,3 +847,5 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .event-composer h2{margin:0;font-size:18px}
 .event-link-controls{gap:8px;flex-wrap:wrap}
 .event-link-controls select{flex:1;min-width:0}
+
+@media(max-width:400px){.tabbar .nav-i{min-width:0;font-size:9px;gap:4px}}
