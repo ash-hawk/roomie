@@ -3,10 +3,10 @@
 Use this checklist instead of repeatedly reconstructing the full chat. Distinguish implemented code, published PRs, merged code, and live verification. Do not call local drafts shipped.
 
 ## Latest decisions
-- Selected palettes set the overall vibe. Every decorative accent follows the chosen theme. No fixed Coastal category colors. Category meaning/design is paused.
+- Selected palettes set the overall vibe. Use all seven palette colors in interface roles (actions, navigation, hover highlights, focus, markers and decorative details), not one hue everywhere. No fixed Coastal category colors. Category meaning/design is paused.
 - Keep all five exact palette strips, personal preferences and light/dark modes. Keep neutral surfaces; no overall tinted wash.
 - Page titles are visually hidden; navigation labels remain. Home overview sentence has no exclamation mark.
-- Household is the top card with code, settings and delete/leave controls. Current Roommates have a separate card. No former-roommate dropdown; management is inside profiles.
+- Three independent cards in order: Invite roommates (code/Copy/Regenerate), current Roommates, Household details (rename/timezone/delete or leave). No former-roommate dropdown; management is inside profiles.
 
 ## Merged through PR 56
 - Board filters replace Current/Resolved buttons; current is default.
@@ -19,7 +19,7 @@ Use this checklist instead of repeatedly reconstructing the full chat. Distingui
 - Profile save refreshes from the saved response and leaves the button enabled.
 
 ## Follow-up branch: theme-accents-and-followups
-- Remove fixed category colors and white announcement-action override; statuses and markers follow selected theme. Remove misleading calendar color legend while categories share one theme accent.
+- PR57 merged: remove fixed category colors and white announcement-action override; statuses and markers follow selected theme. Remove misleading calendar color legend while categories share one theme accent.
 - Remove leftover descriptive Profile/email introductory copy.
 - Exclude departed members' wishlist items from the Log expense picker.
 - Exclude departed actors and unavailable sources from personal Activity responses.

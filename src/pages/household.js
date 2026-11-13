@@ -17,14 +17,14 @@ export async function householdView() {
   members = response.members;
   const current = members.filter((m) => !m.leftDate);
   const owner = h.role === 'owner';
-  const invite = owner ? `<div class="invite-card" aria-labelledby="invite-roommates-title">
-        <h3 id="invite-roommates-title">Invite roommates</h3>
-        <p class="mute invite-description">Share this code. Anyone who signs up can join with it.</p>
+  const invite = owner ? `<section class="card invite-card" aria-labelledby="invite-roommates-title">
+        <h2 id="invite-roommates-title">Invite roommates</h2>
+
         <div class="rowline">
           <span class="code">${esc(h.joinCode)}</span>
           <button class="btn" data-action="copy-code" data-code="${esc(h.joinCode)}">Copy code</button>
           <button class="btn" data-action="rotate-join-code">Regenerate</button>
-        </div></div>` : '';
+        </div></section>` : '';
   const settings = owner ? `<details class="household-admin" style="margin-top:16px">
         <summary>Edit household details</summary>
         <form class="stack" data-form="household-settings" style="margin-top:12px">
@@ -37,19 +37,17 @@ export async function householdView() {
 
   return `${phead('Household')}
     <div class="stack">
-      <section class="card household-card" aria-labelledby="household-details-title">
-        <h2 id="household-details-title">Household</h2>
-        <p><b>${esc(h.householdName)}</b></p>
-        <p class="mute">${current.length} ${current.length === 1 ? 'member' : 'members'} · ${esc(h.timezone)}</p>
-        ${invite}
-        ${settings}
-        ${!owner ? '<hr class="hr"><div><button class="btn" data-action="leave-household">Leave household</button></div>' : '<p class="hint">Transfer ownership to a roommate before leaving, or delete the household if you are the last member.</p>'}
-        ${owner ? `<hr class="hr"><div class="stack"><p class="mute">Deleting this household permanently removes its shared data for everyone.</p>
-          <div><button class="btn d" data-action="delete-household">Delete household</button></div></div>` : ''}
-      </section>
+      ${invite}
       <section class="card roommate-card" aria-labelledby="roommates-title">
-        <h2 id="roommates-title">Roommates</h2>
+        <div class="row sp"><h2 id="roommates-title">Roommates</h2><span class="hint">${current.length} members</span></div>
         ${current.map((m) => memberRow(m, h)).join('')}
+      </section>
+      <section class="card household-card" aria-labelledby="household-details-title">
+        <h2 id="household-details-title">Household details</h2>
+        <p><b>${esc(h.householdName)}</b></p>
+        <p class="mute">${esc(h.timezone)}</p>
+        ${settings}
+        <div class="acts household-lifecycle">${owner ? '<button class="btn" data-action="delete-household">Delete household</button>' : '<button class="btn" data-action="leave-household">Leave household</button>'}</div>
       </section>
     </div>`;
 }

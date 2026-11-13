@@ -954,3 +954,17 @@ body::before,body::after{display:none}
   .home-dashboard[data-preset="focus-right"]>.home-widget:nth-child(1){grid-column:2 / span 2}
   .home-dashboard[data-preset="focus-right"]>.home-widget:nth-child(n+2){grid-column:1}
 }
+
+/* Each palette supplies several interface roles, with neutral, opaque surfaces. */
+.pillnav .nav-i.on,.tabbar .nav-i.on{background:var(--nav-accent);border-color:var(--nav-accent);color:var(--on-nav)}
+.mark{background:var(--decoration);color:var(--on-decoration,var(--ink))}
+.btn:not(.p):not(.d):hover{background:var(--highlight);color:var(--on-highlight);border-color:var(--highlight)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline-color:var(--focus)}
+.input:focus{border-color:var(--focus)}
+.schedule-filter-menu[open]>summary{background:var(--highlight);color:var(--on-highlight);border-color:var(--highlight)}
+.theme-choice:has(input:checked){border-color:var(--secondary);box-shadow:0 0 0 1px var(--secondary)}
+.home-layout-choice[aria-pressed="true"] svg{fill:var(--highlight);stroke:var(--focus)}
+.activity-dot.unread{background:var(--detail)}
+.av:not(img),.acct:not(:has(img)){background:var(--outline);color:var(--on-outline,var(--ink))}
+.invite-card .rowline{display:flex;justify-content:flex-start;gap:12px;margin-top:14px}
+.household-lifecycle{justify-content:flex-start;margin-top:18px}
