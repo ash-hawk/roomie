@@ -1,4 +1,4 @@
-import { scheduleToolbar } from '../components/schedule-toolbar.js';
+import { scheduleToolbar, filterChoices } from '../components/schedule-toolbar.js';
 import { validCalendarDay } from '../lib/calendar-create.js';
 // Slice (b): chores. The server owns the rules (rotation, daylight saving, who may do what);
 // this page shows the data and sends the user's intent. Times are always shown in the household's timezone.
@@ -77,7 +77,7 @@ function refreshChoreSchedule(focusInput) {
   if (filterWasOpen && focusInput && !focusInput.endsWith('-view')) schedule.querySelector('.schedule-filter-menu').open = true;
   document.getElementById('chore-overdue').innerHTML = overdueView();
   const rules = document.getElementById('chore-rules'); if (rules) rules.innerHTML = chartView();
-  if (focusInput) schedule.querySelector(`[data-input="${focusInput}"]`)?.focus();
+  if (focusInput) (schedule.querySelector(`[data-input="${focusInput}"]:checked`) ?? schedule.querySelector(`[data-input="${focusInput}"]`))?.focus();
 }
 inputs['chore-view'] = (el) => { if (!['calendar', 'list'].includes(el.value)) return; choreView = el.value; saveChoreDisplay(); refreshChoreSchedule('chore-view'); };
 inputs['chore-filter'] = (el) => { filter = el.value; saveChoreDisplay(); refreshChoreSchedule('chore-filter'); };
@@ -102,7 +102,7 @@ const choreDayLabel = (day) => day === ymdIn(Date.now()) ? 'Today' : new Date(`$
 function workloadView() {
   const counts = active().map((member) => [member, D.assignments.filter((a) => !a.isCompleted && a.assignedUserId === member.userId).length]);
   const max = Math.max(1, ...counts.map(([, count]) => count));
-  return `<section class="card"><div class="row sp"><h2>Household workload</h2><span class="hint workload-label">Open chores</span></div>${counts.map(([member, count]) => `<div class="row" style="padding:7px 0">${avatar(member, 'sm')}<span class="truncate" style="width:74px">${esc(first(member.userId))}</span><div class="bar grow" style="--w:${Math.round(count / max * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${count}</b></div>`).join('')}</section>`;
+  return `<section class="card"><div class="row sp"><h2>Household workload</h2></div>${counts.map(([member, count]) => `<div class="row" style="padding:7px 0">${avatar(member, 'sm')}<span class="truncate" style="width:74px">${esc(first(member.userId))}</span><div class="bar grow" style="--w:${Math.round(count / max * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${count}</b></div>`).join('')}</section>`;
 }
 function overdueItems() { return visibleAssignments().filter((a) => !a.isCompleted && ymdIn(a.dueAt) < ymdIn(Date.now())); }
 function overdueView(limit = attentionRequests().length ? 1 : 3) {
@@ -114,7 +114,7 @@ actions['all-chore-requests'] = () => openModal(`${mhead('Chore requests')}<div 
 function scheduleView() {
   const title = new Date(`${choreMonth}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
   const people = active();
-  const filters = `<select class="input" data-input="chore-filter" aria-label="Show chores for"><option value="all" ${filter === 'all' ? 'selected' : ''}>Everyone</option><option value="me" ${filter === 'me' ? 'selected' : ''}>Just mine</option>${people.filter((m) => m.userId !== S.user.userId).map((m) => `<option value="${m.userId}" ${String(filter) === String(m.userId) ? 'selected' : ''}>${esc(m.firstName)}</option>`).join('')}</select>`;
+  const filters = filterChoices('Show chores for', 'chore-filter', [['all', 'Everyone'], ['me', 'Just mine'], ...people.filter((m) => m.userId !== S.user.userId).map((m) => [String(m.userId), m.firstName])], filter);
   const toolbar = scheduleToolbar({ title, monthAction: 'chore-month', viewInput: 'chore-view', view: choreView, filters });
   const items = visibleAssignments();
   if (!D.chores.length) return toolbar + empty('🧹', 'No chores yet', 'Add one yourself or start with a few common household chores.', '<button class="btn s" data-action="starter-chores">Add common chores</button>');
@@ -134,7 +134,7 @@ actions['chore-day'] = (button) => {
 
 // ---- chore chart (the rules) ------------------------------------------------------------------
 function chartView() {
-  let list = D.chores.filter((c) => { const next = nextAsg(c); return filter === 'all' || c.rotation.some((u) => passes(u)) || (next && passes(next.assignedUserId)); });
+  let list = D.chores.filter((c) => c.rotation.some((id) => active().some((m) => m.userId === id))).filter((c) => { const next = nextAsg(c); return filter === 'all' || c.rotation.some((u) => passes(u)) || (next && passes(next.assignedUserId)); });
   const nm = (c) => (nextAsg(c) ? first(nextAsg(c).assignedUserId) : 'zzz');
   list = [...list].sort(sortBy === 'az' ? (a, b) => a.choreName.localeCompare(b.choreName) : sortBy === 'assignee' ? (a, b) => nm(a).localeCompare(nm(b)) || a.choreName.localeCompare(b.choreName) : (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   if (!list.length) return `<div class="page-content chores-content"><section class="card">${empty('🧹', D.chores.length ? 'Nothing matches' : 'No chores yet', D.chores.length ? 'Try a different person.' : 'Add one yourself or start with common chores.', D.chores.length ? '' : '<button class="btn s" data-action="starter-chores">Add common chores</button>')}</section></div>`;

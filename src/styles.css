@@ -451,9 +451,9 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .swr i{display:block;width:28px;height:28px;border-radius:50%;border:3px solid var(--card);box-shadow:0 0 0 1px var(--line)}
 .swr input:checked+i{box-shadow:0 0 0 2px var(--ink)}.swr input:focus-visible+i{outline:2px solid var(--accent);outline-offset:3px}
 .notes{display:flex;flex-direction:column;gap:12px;margin-top:14px;max-height:560px;overflow-y:auto;overscroll-behavior:contain;padding-right:4px;scrollbar-gutter:stable}
-.sticky{background:color-mix(in srgb,var(--warn) 9%,var(--card));border:1px solid color-mix(in srgb,var(--warn) 25%,var(--line));border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
-.sticky.pinned{border-color:#b45309;background:color-mix(in srgb,#fef3c7 78%,var(--card));box-shadow:0 10px 24px -12px rgba(120,53,15,.48),0 0 0 2px color-mix(in srgb,#b45309 35%,transparent);color:#292524}
-.pin-mark{display:inline-flex;align-items:center;gap:5px;width:max-content;padding:3px 7px;border-radius:6px;background:#fef3c7;color:#713f12;font-size:12px;font-weight:700}
+.sticky{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.sticky.pinned{border-color:var(--accent);background:var(--soft);box-shadow:0 0 0 1px var(--accent);color:var(--ink)}
+.pin-mark{display:inline-flex;align-items:center;gap:5px;width:max-content;padding:3px 7px;border-radius:6px;background:var(--soft);color:var(--accent);font-size:12px;font-weight:700}
 .board-empty{color:var(--mute);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sticky p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .reply{border-top:1px dashed var(--line);padding-top:8px;font-size:14px}
@@ -751,3 +751,41 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .home-board-view-all{align-self:flex-start}
 .chore-schedule-column{min-width:0}
 @media(max-width:900px){.home-dashboard[data-preset]{grid-template-columns:minmax(0,1fr);grid-template-areas:none;grid-template-rows:auto}.home-dashboard[data-preset]>.home-widget:nth-child(n){grid-area:auto}.home-dashboard[data-preset]>.home-widget>.card{height:auto}}
+
+/* Dashboard choices preview alignment without opening another dialog. */
+.home-layout-choices{flex-direction:column;align-items:flex-start;gap:8px}
+.home-layout-label{font-size:12px;font-weight:600;color:var(--mute)}
+.home-layout-options{display:flex;flex-wrap:wrap;gap:10px}
+.home-layout-choice{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:12px 14px;min-width:108px;font-size:12px}
+.home-layout-choice svg{fill:var(--soft);stroke:var(--mute);stroke-width:1.5;pointer-events:none}
+.home-layout-choice[aria-pressed="true"] svg{stroke:var(--accent)}
+.home-layout-choice span{pointer-events:none}
+@media(max-width:400px){.home-layout-options{gap:8px}.home-layout-choice{min-width:0;padding:10px;font-size:11px}}
+
+/* Filters live in one corner panel with visible choices, rather than nested selects. */
+.schedule-filter-menu{margin-left:auto}
+.schedule-filter-menu>summary.schedule-filter-trigger{display:grid;place-items:center;width:36px;height:36px;padding:8px}
+.schedule-filter-menu>summary::after{content:none}
+.schedule-filter-menu[open]>summary{background:var(--soft);color:var(--accent)}
+.schedule-filter-panel{left:auto;right:0;width:min(280px,100%);max-height:60vh;overflow:auto}
+.schedule-filter-group{border:0;margin:0;padding:0;display:grid;gap:3px;min-width:0}
+.schedule-filter-group legend{font-size:12px;font-weight:650;color:var(--mute);padding:0 0 6px}
+.schedule-filter-group label{display:flex;align-items:center;gap:8px;padding:8px;border-radius:6px;cursor:pointer;font-size:13px}
+.schedule-filter-group label:has(:checked){background:var(--soft)}
+.schedule-filter-group input{accent-color:var(--accent);flex:none}
+
+/* Buttons retain equal padding when labels wrap in smaller cards. */
+.btn{box-sizing:border-box;line-height:1.35;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-align:center;max-width:100%;overflow-wrap:anywhere;flex-shrink:0}
+.btn.s{padding:7px 12px;min-height:34px}
+.rowline,.page-actions{flex-wrap:wrap}
+.household-admin summary{padding:10px 0;cursor:pointer}
+.invite-card .rowline{gap:10px;align-items:center}
+.invite-card .code{overflow-wrap:anywhere}
+.appearance-options{display:flex;gap:10px;flex-wrap:wrap}
+.appearance-choice{position:relative;display:flex;align-items:center;gap:8px;border:1px solid var(--line);padding:12px 16px;border-radius:10px;cursor:pointer}
+.appearance-choice:has(:checked){background:var(--soft);border-color:var(--accent)}
+.appearance-choice input{accent-color:var(--accent)}
+.dark{--bg:#11131c;--card:#1b1e2b;--ink:#f2f3f8;--mute:#afb5cb;--line:#363b50;--accent:#a89bff;--on-accent:#19132d;--good:#62d493;--bad:#ff8585;--warn:#f3b859;--danger:#a82c35;--soft:color-mix(in srgb,var(--accent) 14%,transparent);color-scheme:dark}
+
+.roommate-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;padding-top:8px}
+.roommate-entry{min-width:0}

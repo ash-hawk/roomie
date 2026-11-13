@@ -19,7 +19,7 @@ const who = (id) => D.members.find((m) => m.userId === id);
 const first = (id) => (id === S.user.userId ? 'You' : who(id)?.firstName ?? 'Someone');
 const nm = (id) => (id === S.user.userId ? 'you' : who(id)?.firstName ?? 'someone');
 const active = () => D.members.filter((m) => !m.leftDate);
-const STATUS = { buyer: ['buyer', 'Bought it'], unpaid: ['unpaid', 'Owes'], pending: ['pending', 'Sent, waiting'], paid: ['paid', 'Paid back'], disputed: ['disputed', 'Disputed'] };
+const STATUS = { archived: ['later', 'History'], buyer: ['buyer', 'Bought it'], unpaid: ['unpaid', 'Owes'], pending: ['pending', 'Sent, waiting'], paid: ['paid', 'Paid back'], disputed: ['disputed', 'Disputed'] };
 const stChip = (status) => `<span class="st ${STATUS[status][0]}">${STATUS[status][1]}</span>`;
 
 export function prepareFinanceActivity(type) { tab = type === 'wishlist_item' ? 'wish' : 'settle'; }
@@ -70,7 +70,7 @@ function settleView() {
   ${incoming || outgoing ? `<div class="grid2">
     ${incoming ? `<section class="card"><h2>Waiting on you</h2>${incoming}</section>` : ''}
     ${outgoing ? `<section class="card"><h2>You sent</h2>${outgoing}</section>` : ''}</div>` : ''}
-  <section class="card finance-history"><div class="row sp"><h2>Past purchases</h2>${badge(`${D.expenses.length}`, 'gray')}</div>
+  <section class="card finance-history"><div class="row sp"><h2>Past purchases</h2></div>
     <p class="section-description">Shared expense history and how each purchase was split.</p>
     ${D.expenses.length ? D.expenses.map(expenseRow).join('') : empty('🧾', 'No purchases yet', 'Use Log expense above and the split is figured out for you.')}</section>`;
 }
@@ -96,7 +96,7 @@ actions.expense = (el) => {
   openModal(`${mhead(esc(e.itemName))}
     <div class="tot">${$m(e.totalAmount)}</div><p class="mute">${fmtDay(e.purchaseDate, { weekday: 'long', month: 'long', day: 'numeric' })} · paid by ${esc(first(e.paidByUserId).toLowerCase() === 'you' ? 'you' : first(e.paidByUserId))}</p>
     <div>${e.shares.map((s) => `<div class="item row">${profileLink(s.userId, null)}<span class="grow">${profileLink(s.userId, first(s.userId), false)}</span><b class="amount">${$m(s.amountOwed)}</b>${stChip(s.status)}</div>`).join('')}</div>
-    <p class="hint">The buyer's own share is never owed. A share counts as paid back only after the buyer confirms the payment.</p>
+    <p class="hint">The buyer's own share is never owed. History means a previous household stay and is excluded from active balances; it does not mean paid.</p>
     ${e.canDelete ? `<div class="acts"><button class="btn d" data-action="delete-expense" data-id="${e.expenseId}">Delete</button></div>` : ''}`);
 };
 actions['delete-expense'] = async (el) => {

@@ -19,7 +19,7 @@ export const PATCH = withHousehold(async ({ householdId, role, req }) => {
   if (themeColor && !/^#[0-9a-f]{6}$/i.test(themeColor)) throw new HttpError(400, 'Theme color must be a six-digit hex color');
 
   const [saved] = await db.update(schema.household).set({
-    householdName, address: address || null, timezone, themeColor: themeColor || null,
+    householdName, address: address || null, timezone, ...(b.themeColor !== undefined ? { themeColor: themeColor || null } : {}),
   }).where(eq(schema.household.householdId, householdId))
     .returning({ householdId: schema.household.householdId, householdName: schema.household.householdName, address: schema.household.address, timezone: schema.household.timezone, themeColor: schema.household.themeColor });
   if (!saved) throw new HttpError(404, 'Household not found');

@@ -1,3 +1,4 @@
+import { openLinkedEvent } from './calendar.js';
 import { scheduleToolbar } from '../components/schedule-toolbar.js';
 // Home shows one household schedule in two formats; feature pages own editing and responses.
 import { actions, forms, inputs } from '../lib/events.js';
@@ -43,7 +44,12 @@ function getPreset() {
   return 'focus-left';
 }
 function presetChoices() {
-  return `<div class="home-layout-choices" ${editing ? '' : 'hidden'}>${[['focus-left', 'Large left'], ['equal', 'Equal tiles'], ['focus-right', 'Large right']].map(([key, label]) => `<button class="btn s" data-action="home-layout-preset" data-layout-preset="${key}" aria-pressed="${layoutMode === key}">${label}</button>`).join('')}</div>`;
+  const diagrams = {
+    'focus-left': '<rect x="1" y="1" width="39" height="38" rx="3"/><rect x="44" y="1" width="19" height="17" rx="3"/><rect x="44" y="22" width="19" height="17" rx="3"/>',
+    equal: '<rect x="1" y="1" width="18" height="38" rx="3"/><rect x="23" y="1" width="18" height="38" rx="3"/><rect x="45" y="1" width="18" height="38" rx="3"/>',
+    'focus-right': '<rect x="1" y="1" width="19" height="17" rx="3"/><rect x="1" y="22" width="19" height="17" rx="3"/><rect x="24" y="1" width="39" height="38" rx="3"/>',
+  };
+  return `<div class="home-layout-choices" ${editing ? '' : 'hidden'}><span class="home-layout-label" id="home-layout-label">Layout</span><div class="home-layout-options" role="group" aria-labelledby="home-layout-label">${[['focus-left', 'Wide left'], ['equal', 'Equal columns'], ['focus-right', 'Wide right']].map(([key, label]) => `<button class="btn home-layout-choice" data-action="home-layout-preset" data-layout-preset="${key}" aria-pressed="${layoutMode === key}"><svg viewBox="0 0 64 40" width="64" height="40" aria-hidden="true">${diagrams[key]}</svg><span>${label}</span></button>`).join('')}</div></div>`;
 }
 const widgetSize = (id) => layout.find((w) => w.id === id)?.size;
 let monthStart = null, monthHousehold = null, D = null, homeBoardArchive = false;
@@ -220,7 +226,24 @@ actions['home-board-resolve'] = async (button) => {
   toast(button.dataset.resolved === 'true' ? 'Announcement moved to the resolved archive' : 'Announcement reopened');
   try { await refreshHomeBoard(); } catch { toast('Saved. Refresh Home to see the updated board.'); }
 };
-actions['home-make-announcement'] = () => openModal(`${mhead('Make announcement')}${announcementForm(D.events)}`);
+function openAnnouncement(draft = {}) {
+  openModal(`${mhead('Make announcement')}${announcementForm(D.events)}`);
+  const form = document.querySelector('[data-form="home-note-new"]');
+  form.elements.messageText.value = draft.message ?? '';
+  form.elements.eventId.value = String(draft.eventId ?? '');
+}
+actions['home-make-announcement'] = () => openAnnouncement();
+actions['home-add-linked-event'] = () => {
+  const form = document.querySelector('[data-form="home-note-new"]');
+  if (!form) return;
+  const draft = { message: form.elements.messageText.value, eventId: form.elements.eventId.value };
+  const scope = D.householdId, userId = S.user.userId;
+  openLinkedEvent(D, (saved) => {
+    if (scope !== S.hid || userId !== S.user?.userId) return;
+    if (saved) { if (!D.events.some((event) => event.eventId === saved.eventId)) D.events.push(saved); draft.eventId = saved.eventId; }
+    openAnnouncement(draft);
+  });
+};
 const postHomeNote = async (form, reply) => {
   const data = new FormData(form), body = { messageText: data.get('messageText') };
   if (reply) body.parentMessageId = Number(form.dataset.id);

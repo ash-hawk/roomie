@@ -1,3 +1,4 @@
+import { appearance } from '../lib/appearance.js';
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S } from '../lib/state.js';
@@ -37,6 +38,7 @@ export async function settingsView() {
     ${phead('Profile', 'Manage the information your roommates can see.')}
 
     <div class="stack">
+      <section class="card stack"><h2>Appearance</h2><div class="appearance-options" role="group" aria-label="Color mode">${['light', 'dark'].map((mode) => `<label class="appearance-choice"><input type="radio" name="appearance" data-input="appearance" value="${mode}" ${appearance() === mode ? 'checked' : ''}><span>${mode === 'light' ? 'Light mode' : 'Dark mode'}</span></label>`).join('')}</div></section>
       ${profileForm()}
 
       <section class="card"><h2>Email notifications</h2><p class="body-copy">Choose what Roomie may send for this household. Everything is off unless you turn it on.</p>
