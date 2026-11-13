@@ -32,7 +32,7 @@ export async function financesView() {
   const action = tab === 'settle' ? `<button class="btn p" data-action="add-expense">${ico('plus', 16)} Log expense</button>` : `<button class="btn p" data-action="add-wish">${ico('plus', 16)} Add item</button>`;
   return `${phead('Finances', '', action)}
   <div class="page-controls">${seg([['settle', 'Settle payments'], ['wish', 'Wish list']], tab, 'fin-tab')}</div>
-  <div class="page-content stack">${tab === 'settle' ? settleView() : wishView()}</div>`;
+  <div class="page-content stack finance-content" data-item-kind="finance">${tab === 'settle' ? settleView() : wishView()}</div>`;
 }
 actions['fin-tab'] = (el) => { tab = el.dataset.value; window.dispatchEvent(new Event('roomie:render')); };
 

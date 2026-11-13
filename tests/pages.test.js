@@ -939,3 +939,34 @@ describe('Bounded dashboard previews', () => {
     actions['all-chore-requests']();expect(document.querySelectorAll('[role=dialog] .chore-board-item')).toHaveLength(5);
   });
 });
+
+
+describe('Home finance widget sizes', () => {
+  it('promotes the totals tile into personal balances and payment previews without extra requests', async () => {
+    const baseApi = mockedApi.getMockImplementation();
+    mockedApi.mockImplementation((path) => path.endsWith('/balances') ? Promise.resolve({
+      mine:[{otherUserId:2,signedAmount:'-1.86'},{otherUserId:3,signedAmount:'22.27'}],
+      incoming:[{paymentId:9,payerUserId:3,amount:'5.00',status:'sent',items:[]}],
+    }) : baseApi(path));
+    localStorage.setItem('roomie.home.layout.1.1', JSON.stringify(['finances','schedule','board'].map(id => ({id,size:'compact'}))));
+    localStorage.setItem('roomie.home.layout.1.1.preset','equal');
+    document.getElementById('page').innerHTML = await homeView();
+    expect(document.querySelector('.home-finances-expanded')).toBeNull();
+    const calls = mockedApi.mock.calls.length;
+    actions['home-layout-preset']({dataset:{layoutPreset:'focus-left'}});
+    const expanded = document.querySelector('.home-finances-expanded');
+    expect(expanded.textContent).toContain('Waiting on you');
+    expect(expanded.textContent).toContain('Jordan');
+    expect(expanded.textContent).toContain('Sam');
+    expect(expanded.textContent).toContain('$1.86');
+    expect(expanded.textContent).toContain('$22.27');
+    expect(mockedApi.mock.calls).toHaveLength(calls);
+    const person = expanded.querySelector('[data-action="board-roommate-profile"]');
+    await actions['board-roommate-profile'](person);
+    expect(document.querySelector('[role="dialog"]').textContent).toContain('Jordan');
+    const { closeModal } = await import('../src/lib/dom.js'); closeModal();
+    actions['home-layout-preset']({dataset:{layoutPreset:'equal'}});
+    expect(document.querySelector('.home-finances-expanded')).toBeNull();
+    expect(document.querySelector('.home-finances').textContent).not.toContain('Waiting on you');
+  });
+});

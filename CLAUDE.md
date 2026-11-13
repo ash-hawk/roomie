@@ -108,6 +108,11 @@
 - DB pool: `api/_lib/db.ts` now handles `error` on the pool and on checked-out clients (a dropped Neon connection used to crash the process with an uncaught exception).
 
 
+## Home finance previews and content colors
+- The expanded Home Finances panel is top-aligned and uses the existing balances response: two totals, separate You owe / Owed to you groups, and Waiting on you payment previews. Each group shows at most three rows with access to the full Finances page. Names/photos open freshly fetched roommate profiles. Compact mode retains its simple totals; changing layout sizes reuses loaded data and never confirms a payment.
+- Colors identify content types, not people: events use purple, chores teal, finances blue, and standalone announcements amber. Calendar dots/cards and list rows use the same type colors across pages. Linked event announcements inherit the event color; chore cover/swap requests use the chore color. Profile initials use a neutral background. Semantic status labels still identify overdue, pending and completed states.
+- Main navigation tabs never show numeric badges, on desktop or mobile. Personal activity counts remain on the separate bell. The former overdue-count request is no longer made for navigation.
+
 ## Current event UI
 - Date is above side-by-side start/end inputs. The custom event label is visible and required only for Other; hidden fields respect the global hidden attribute.
 - Ask for approval explains pending events; Select all roommates excludes the creator and synchronizes checked/partial selection. Progress is shown on Events and Home, including calendar entries and day details.

@@ -3,14 +3,16 @@ import { scheduleToolbar } from '../components/schedule-toolbar.js';
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { avatar, closeModal, esc, mhead, money, openModal, personColor, phead, showError, toast } from '../lib/dom.js';
+import { avatar, closeModal, esc, mhead, openModal, itemColor, phead, showError, toast } from '../lib/dom.js';
 import { addDays } from '../../shared/chore-dates.ts';
 import { monthDays, scheduleItems } from '../../shared/home-schedule.ts';
 import { householdBoard, announcementForm } from '../components/household-board.js';
 import { openChoreDetails } from './chores.js';
 import { fitHomeWidgets, normalizeHomeLayout, HOME_PRESETS } from '../components/home-layout.js';
 import { queueCalendarCreate } from '../lib/calendar-create.js';
-import { toCents } from '../../shared/money.ts';
+
+import { homeFinances } from '../components/home-finances.js';
+import { prepareFinanceActivity } from './finances.js';
 
 const hid = () => household().householdId;
 const tz = () => household().timezone;
@@ -52,7 +54,7 @@ function row(item) {
   const member = D.members.find((m) => m.userId === item.userId);
   const name = item.userId === S.user.userId ? 'You' : member?.firstName || 'Someone';
   const overdue = item.kind === 'chore' && !item.completed && Date.parse(item.at) < Date.now();
-  return `<a class="item click row ev home-schedule-row ${item.completed ? 'completed' : ''} ${item.approval?.status ?? ''}" href="#/${item.kind === 'event' ? 'calendar' : 'chores'}" data-action="home-open" data-kind="${item.kind}" data-id="${item.eventId ?? ''}" style="--ev:${personColor(item.userId)}">
+  return `<a class="item click row ev home-schedule-row ${item.completed ? 'completed' : ''} ${item.approval?.status ?? ''}" href="#/${item.kind === 'event' ? 'calendar' : 'chores'}" data-action="home-open" data-kind="${item.kind}" data-id="${item.eventId ?? ''}" style="--ev:${itemColor(item.kind)}">
     <span class="evbar"></span><div class="grow"><div class="home-item-heading"><span class="home-kind">${esc(item.label)}</span>${item.approval?.total ? `<span class="st ${item.approval.status === 'confirmed' ? 'paid' : item.approval.status === 'changes_requested' ? 'disputed' : 'unpaid'}">${item.approval.label} · ${item.approval.approved} of ${item.approval.total} approved</span>` : ''}${item.completed ? '<span class="st paid">Completed</span>' : overdue ? '<span class="st overdue">Overdue</span>' : ''}</div><b>${esc(item.name)}</b>
     <div class="hint">${timeFmt(item.at)} · ${item.kind === 'event' ? 'Added by ' : ''}${esc(name)}${item.location ? ` · ${esc(item.location)}` : ''}</div></div>${avatar(member, 'sm')}</a>`;
 }
@@ -79,11 +81,11 @@ function calendarView() {
   const compact = widgetSize('schedule') === 'compact';
   const today = ymdIn(Date.now());
   return `${monthNav('calendar')}
-    <div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div>
+    <div class="schedule-color-key" aria-label="Calendar item types"><span><i style="background:${itemColor('event')}"></i>Events</span><span><i style="background:${itemColor('chore')}"></i>Chores</span></div><div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div>
     <div class="mgrid home-month">${monthDays(monthStart).map((day) => {
       const items = D.items.filter((item) => item.ymd === day);
       return `<button class="day2 ${day.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${day === today ? 'today' : ''}" data-action="home-day" data-day="${day}" aria-label="${esc(dayLabel(day))}, ${items.length} items" ${day === today ? 'aria-current="date"' : ''}>
-        <span class="dn">${Number(day.slice(8))}</span>${compact ? `<span class="home-day-dots" aria-hidden="true">${items.slice(0, 3).map((item) => `<i style="background:${personColor(item.userId)}"></i>`).join('')}</span>` : `${items.slice(0, 3).map((item) => `<span class="home-calendar-item ${item.completed ? 'completed' : ''}" style="--ev:${personColor(item.userId)}"><span>${timeFmt(item.at)} · ${esc(item.label)}</span><b>${esc(item.name)}</b>${item.approval?.total ? `<span class="home-calendar-approval">${item.approval.label} · ${item.approval.approved}/${item.approval.total}</span>` : ''}</span>`).join('')}
+        <span class="dn">${Number(day.slice(8))}</span>${compact ? `<span class="home-day-dots" aria-hidden="true">${items.slice(0, 3).map((item) => `<i style="background:${itemColor(item.kind)}"></i>`).join('')}</span>` : `${items.slice(0, 3).map((item) => `<span class="home-calendar-item ${item.completed ? 'completed' : ''}" style="--ev:${itemColor(item.kind)}"><span>${timeFmt(item.at)} · ${esc(item.label)}</span><b>${esc(item.name)}</b>${item.approval?.total ? `<span class="home-calendar-approval">${item.approval.label} · ${item.approval.approved}/${item.approval.total}</span>` : ''}</span>`).join('')}
         ${items.length > 3 ? `<span class="home-more">+${items.length - 3} more</span>` : ''}<span class="home-mobile-count" aria-hidden="true">${items.length || ''}</span>` }</button>`;
     }).join('')}</div>${compact ? compactUpcoming() : ''}`;
 }
@@ -97,19 +99,17 @@ export async function homeView() {
   const [{ members }, { events }, chores, balances, { notes }] = await Promise.all([
     api(`/households/${hid()}/members`), api(`/households/${hid()}/events`), api(`/households/${hid()}/chores`), api(`/households/${hid()}/balances`), api(`/households/${hid()}/board`),
   ]);
-  D = { householdId: hid(), members, events, chores, notes, user: S.user, timezone: tz(), items: scheduleItems(events, chores, tz()) };
+  D = { householdId: hid(), members, events, chores, balances, notes, user: S.user, timezone: tz(), items: scheduleItems(events, chores, tz()) };
   if (monthHousehold !== hid()) { monthStart = null; monthHousehold = hid(); homeBoardArchive = false; }
   monthStart ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   if (editingKey !== layoutKey()) { editing = false; editingKey = layoutKey(); }
   layoutMode = getPreset();
   layout = getLayout();
   const view = getView();
-  const owed = balances.mine.reduce((sum, b) => sum + Math.max(0, -toCents(b.signedAmount)), 0);
-  const owingMe = balances.mine.reduce((sum, b) => sum + Math.max(0, toCents(b.signedAmount)), 0);
   const widgets = {
     board: `<section class="card stack home-board" id="home-board" data-home-board-root>${householdBoard({ ...D, compact: widgetSize('board') === 'compact', archive: homeBoardArchive, limit: 3 })}</section>`,
     schedule: `<section class="card stack home-schedule" aria-label="Shared household schedule"><div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content" data-view="${view}">${view === 'calendar' ? calendarView() : listView()}</div></section>`,
-    finances: `<section class="card home-finances"><div><h2>Finances</h2><p class="hint">Your shared expense overview</p></div><div class="home-balance"><span>You owe <b>${money(owed)}</b></span><span>Owed to you <b>${money(owingMe)}</b></span></div><a class="btn s" href="#/finances">Open finances</a></section>`,
+    finances: homeFinances({ ...D, compact: widgetSize('finances') === 'compact' }),
   };
   return `${phead('Shared household schedule', 'Here you can see an overview of what’s happening in your household', `<button class="btn s" data-action="home-edit-layout">${editing ? 'Done' : 'Edit dashboard'}</button>`)}
     <div class="home-layout-status sr-only" role="status"></div>${presetChoices()}<div class="page-content home-dashboard" data-preset="${layoutMode}">${layout.map(({ id, size }) => `<div class="home-widget ${size}" data-widget="${id}" data-editing="${editing}">${widgets[id]}</div>`).join('')}</div>`;
@@ -273,6 +273,7 @@ function renderWidgetSize(id) {
     content.innerHTML = content.dataset.view === 'calendar' ? calendarView() : listView();
   }
   if (id === 'board') paintHomeBoards();
+  if (id === 'finances') document.querySelector('[data-widget=finances] .home-finances').outerHTML = homeFinances({ ...D, compact: widgetSize('finances') === 'compact' });
 }
 function setLayout(preset, order = layout.map((w) => w.id)) {
   const previous = new Map(layout.map((w) => [w.id, w.size]));
@@ -384,3 +385,5 @@ document.addEventListener('keydown', (event) => {
   document.querySelector(`.home-widget[data-widget="${grip.dataset.widgetDrag}"] [data-widget-drag]`)?.focus();
   document.querySelector('.home-layout-status').textContent = `${widgetNames[grip.dataset.widgetDrag]} moved. Layout saved.`;
 });
+
+actions['home-open-finances'] = () => { prepareFinanceActivity('payment'); location.hash = '#/finances'; };

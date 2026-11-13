@@ -39,15 +39,6 @@ async function loadMe() {
   if (S.hid) localStorage.setItem('roomie.hid', String(S.hid));
 }
 
-async function loadNavCounts() {
-  if (S.navCounts.hid === S.hid && Date.now() - S.navCounts.at < 30_000) return;
-  const chores = await api(`/households/${S.hid}/chores`);
-  S.navCounts = {
-    overdue: chores.assignments.filter((a) => !a.isCompleted && a.status === 'overdue' && a.assignedUserId === S.user.userId).length,
-    at: Date.now(), hid: S.hid,
-  };
-}
-
 function accentInk(hex) {
   const value = /^#[0-9a-f]{6}$/i.test(hex) ? hex : '#4338ca';
   const rgb = [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16) / 255).map((c) => c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
@@ -56,8 +47,7 @@ function accentInk(hex) {
 
 function shell(page, body) {
   const h = household();
-  const count = (key) => key === 'chores' && S.navCounts.overdue ? String(S.navCounts.overdue) : '';
-  const items = NAV.map(([k, i, l]) => `<a href="#/${k}" class="nav-i ${k === page ? 'on' : ''}" ${k === page ? 'aria-current="page"' : ''}>${ico(i, 19)}<span>${l}</span>${count(k) ? `<span class="nav-count" aria-label="${count(k)} overdue">${count(k)}</span>` : ''}</a>`).join('');
+  const items = NAV.map(([k, i, l]) => `<a href="#/${k}" class="nav-i ${k === page ? 'on' : ''}" ${k === page ? 'aria-current="page"' : ''}>${ico(i, 19)}<span>${l}</span></a>`).join('');
   const accent = h.themeColor || '#4338ca'; document.documentElement.style.setProperty('--accent', accent); document.documentElement.style.setProperty('--on-accent', accentInk(accent));
   const account = S.user.profilePhoto ? `<img class="acct-photo" src="${esc(S.user.profilePhoto)}" alt="" referrerpolicy="no-referrer">` : esc(((S.user.firstName || '?')[0]).toUpperCase());
   return `<div class="shell"><div class="main">
@@ -81,7 +71,7 @@ export async function render() {
     const legacyActivity = location.hash.replace(/^#\/?/, '').split('/')[0] === 'notifications';
     if (legacyActivity) history.replaceState(null, '', '#/home');
     const page = route();
-    await Promise.all([loadAlerts().catch(() => {}), loadNavCounts().catch(() => {})]);
+    await loadAlerts().catch(() => {});
     const keep = $('#page') && root.dataset.page === page && root.dataset.hid === String(S.hid); // soft refresh keeps the shell
     if (!keep) root.innerHTML = shell(page, loading);
     const body = pages[page] ? await pages[page]() : soonView(page);

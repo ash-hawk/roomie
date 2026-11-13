@@ -18,13 +18,12 @@ const ICONS = {
 export const ico = (n, s = 20) => `<svg class="i" viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] ?? ''}</svg>`;
 export const mark = (cls = '') => `<span class="mark ${cls}">${ico('home', cls ? 30 : 18)}</span>`;
 
-const PALETTE = ['#4338ca', '#db2777', '#0d9488', '#d97706', '#7c3aed', '#0284c7', '#475569', '#be123c', '#15803d', '#c2410c', '#6d28d9', '#0369a1'];
-export const personColor = (userId) => PALETTE[Math.abs(Number(userId) || 0) % PALETTE.length];
+export const itemColor = (kind) => `var(--color-${['event', 'chore', 'finance', 'announcement'].includes(kind) ? kind : 'announcement'})`;
 export function avatar(u, sz = '') {
   if (!u) return '';
   const first = (u.firstName || '?')[0];
   const photo = u.profilePhoto ? `<img src="${esc(u.profilePhoto)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc(first.toUpperCase());
-  return `<span class="av ${sz}" style="background:${personColor(u.userId)}" title="${esc(`${u.firstName ?? ''} ${u.lastName ?? ''}`.trim())}">${photo}</span>`;
+  return `<span class="av ${sz}"  title="${esc(`${u.firstName ?? ''} ${u.lastName ?? ''}`.trim())}">${photo}</span>`;
 }
 export const fullName = (u) => (u ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() : 'Someone');
 

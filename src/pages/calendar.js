@@ -6,7 +6,7 @@ import { scheduleToolbar } from '../components/schedule-toolbar.js';
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
-import { ago as agoIn, avatar, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, personColor, phead, showError, toast } from '../lib/dom.js';
+import { ago as agoIn, avatar, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, itemColor, phead, showError, toast } from '../lib/dom.js';
 
 import { boardIdentity } from '../components/board-profile.js';
 import { approvalState } from '../../shared/event-approval.ts';
@@ -65,7 +65,7 @@ function items() {
   const out = [];
   for (const e of D.events) {
     if (eventType !== 'all' && e.category !== eventType) continue;
-    out.push({ kind: 'event', at: e.eventDate, ymd: ymdIn(e.eventDate), color: personColor(e.createdByUserId), e });
+    out.push({ kind: 'event', at: e.eventDate, ymd: ymdIn(e.eventDate), color: itemColor('event'), e });
   }
   return out.sort((x, y) => Date.parse(x.at) - Date.parse(y.at));
 }
@@ -95,7 +95,7 @@ function listView() {
   let list = items().filter((i) => i.ymd >= today && i.ymd.slice(0, 7) === monthStart.slice(0, 7));
   if (!list.length) return empty('📅', 'No matching events', 'No upcoming events match this month and event type.');
   if (sortBy === 'color') {
-    list = [...list].sort((x, y) => (x.color === y.color ? Date.parse(x.at) - Date.parse(y.at) : x.color < y.color ? -1 : 1));
+    list = [...list].sort((x, y) => fullName(who(x.e.createdByUserId)).localeCompare(fullName(who(y.e.createdByUserId))) || Date.parse(x.at) - Date.parse(y.at));
     return list.map((i) => `${row(i)}`).join('');
   }
   const days = [...new Set(list.map((i) => i.ymd))];
@@ -164,7 +164,7 @@ actions['event-detail'] = (el) => {
   const mine = e.tags.find((t) => t.userId === S.user.userId);
   const answer = (t) => (t.response === 'accepted' ? '<span class="st paid">Approved</span>' : t.response === 'declined' ? '<span class="st disputed">Changes requested</span>' : t.response === 'pending' ? '<span class="st unpaid">Waiting</span>' : '');
   openModal(`${mhead(esc(e.eventName))}
-    <div class="row" style="gap:8px;flex-wrap:wrap"><span class="evdot" style="background:${personColor(e.createdByUserId)}"></span><b>${whenFull(e.eventDate)}${e.endDate ? ` to ${timeFmt(e.endDate)}` : ''}</b></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><span class="evdot" style="background:${itemColor('event')}"></span><b>${whenFull(e.eventDate)}${e.endDate ? ` to ${timeFmt(e.endDate)}` : ''}</b></div>
     <div class="hint">${esc(e.category === 'other' ? e.otherLabel || 'Other' : CATS.find(([k]) => k === e.category)?.[1] ?? '')}${e.location ? ` · ${esc(e.location)}` : ''}${e.reminderMinutesBefore != null ? ` · reminder ${e.reminderMinutesBefore >= 60 && e.reminderMinutesBefore % 60 === 0 ? `${e.reminderMinutesBefore / 60}h` : `${e.reminderMinutesBefore}m`} before` : ''}</div>
     ${approvalChip(e)}
     ${e.description ? `<p>${esc(e.description)}</p>` : ''}
@@ -249,7 +249,7 @@ forms['event-save'] = async (form) => {
 // ---- the board ----------------------------------------------------------------------------------
 function noteHtml(n) {
   const ev = n.eventId ? eventOf(n.eventId) : null;
-  return `<article data-board-message-ids="${[n.messageId, ...n.replies.map((r) => r.messageId)].join(' ')}" class="sticky ${n.isPinned ? 'pinned' : ''} ${n.isResolved ? 'resolved' : ''}">
+  return `<article data-item-kind="${ev ? 'event' : 'announcement'}" data-board-message-ids="${[n.messageId, ...n.replies.map((r) => r.messageId)].join(' ')}" class="sticky ${n.isPinned ? 'pinned' : ''} ${n.isResolved ? 'resolved' : ''}">
     <div class="row t" style="gap:8px">${boardIdentity(who(n.senderUserId), first(n.senderUserId))}<div class="grow"> <span class="hint">${ago(n.postedDate)}</span></div>
       ${n.isResolved ? '<span class="st paid">Resolved</span>' : ''}
       ${n.canEdit ? `<button class="x" data-action="note-pin" data-id="${n.messageId}" data-pinned="${n.isPinned ? '' : '1'}" aria-label="${n.isPinned ? 'Unpin' : 'Pin'}" title="${n.isPinned ? 'Unpin' : 'Pin'}">📌</button><button class="x" data-action="note-delete" data-id="${n.messageId}" aria-label="Delete note">✕</button>` : (n.isPinned ? '<span title="Pinned">📌</span>' : '')}</div>
