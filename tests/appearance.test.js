@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { themes, onColor } from '../src/lib/themes.js';
+import { themes, categoryColors, onColor } from '../src/lib/themes.js';
 import { appearanceView } from '../src/pages/appearance.js';
 import { S } from '../src/lib/state.js';
 import { inputs } from '../src/lib/events.js';
@@ -32,14 +32,14 @@ describe('personal theme presets', () => {
     inputs.appearance({value:'dark',checked:true});
     applyAppearance();
     expect(theme()).toBe('berry');
-    expect(document.documentElement.style.getPropertyValue('--color-event')).toBe(themes.berry.dark['color-event']);
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.berry.dark.accent);
     S.user={userId:2};applyAppearance();
     expect(theme()).toBe('coastal');expect(appearance()).toBe('light');
     S.user={userId:1};applyAppearance();
     expect(theme()).toBe('berry');expect(appearance()).toBe('dark');
     inputs.appearance({value:'light',checked:true});
     expect(theme()).toBe('berry');
-    expect(document.documentElement.style.getPropertyValue('--color-event')).toBe(themes.berry.light['color-event']);
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.berry.light.accent);
   });
   it('falls back safely for invalid stored themes and ignores invalid selections', () => {
     localStorage.setItem('roomie.theme.1','bad-theme');
@@ -48,10 +48,11 @@ describe('personal theme presets', () => {
     document.body.innerHTML=appearanceView();
     expect(document.querySelectorAll('[data-input=theme]')).toHaveLength(5);
     expect(document.querySelector('[data-input=theme]:checked').value).toBe('coastal');
-    expect(document.querySelectorAll('.theme-swatches i')).toHaveLength(20);
+    expect(document.querySelector('.theme-swatches')).toBeNull();
+    expect(document.querySelectorAll('.theme-palette i')).toHaveLength(35);
     expect([...document.querySelectorAll('.theme-palette i')].map(el=>el.title)).toContain('#CC87D4');
   });
-  it('provides readable text and distinct category accents in all ten combinations', () => {
+  it('provides readable theme controls in all ten combinations', () => {
     const luminance=hex=>{
       const channels=hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4);
       return channels[0]*0.2126+channels[1]*0.7152+channels[2]*0.0722;
@@ -61,22 +62,23 @@ describe('personal theme presets', () => {
       const colors=preset[mode];
       for(const surface of ['card','bg']) for(const text of ['ink','mute']) expect(contrast(colors[surface],colors[text]),`${preset.name} ${mode} ${surface}/${text}`).toBeGreaterThanOrEqual(4.5);
       expect(contrast(colors.accent,colors['on-accent'])).toBeGreaterThanOrEqual(4.5);
-      const categories=['event','chore','finance','announcement'].map(kind=>colors[`color-${kind}`]);
-      expect(new Set(categories).size).toBe(4);
       expect(preset.palette).toHaveLength(7);
-      for(const color of categories) expect(contrast(color,onColor(color))).toBeGreaterThanOrEqual(4.5);
       // Pale source swatches have readable adjacent labels and contrasting outlines.
       expect(preset.palette.every(color=>/^#[0-9a-f]{6}$/i.test(color))).toBe(true);
     }
   });
 });
 
-it('applies the category accent on feature pages and restores neutral controls on Home', () => {
-  inputs.theme({value:'coastal',checked:true});
-  for(const [page,kind] of [['calendar','event'],['chores','chore'],['finances','finance']]) {
-    history.replaceState(null,'',`#/${page}`);applyAppearance();
-    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.coastal.light[`color-${kind}`]);
+it('uses the chosen theme across every page while category markers stay independent', () => {
+  for (const [preset, colors] of Object.entries(themes)) for (const mode of ['light', 'dark']) {
+    for (const page of ['home', 'calendar', 'chores', 'finances', 'household', 'appearance']) {
+      history.replaceState(null, '', `#/${page}`);
+      applyAppearance(mode, preset);
+      expect(document.documentElement.style.getPropertyValue('--accent')).toBe(colors[mode].accent);
+      expect(document.documentElement.style.getPropertyValue('--on-accent')).toBe(onColor(colors[mode].accent));
+      for (const [token, value] of Object.entries(categoryColors[mode])) {
+        expect(document.documentElement.style.getPropertyValue(`--${token}`)).toBe(value);
+      }
+    }
   }
-  history.replaceState(null,'','#/home');applyAppearance();
-  expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.coastal.light.accent);
 });

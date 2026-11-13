@@ -46,8 +46,10 @@ export function toast(msg) {
   $('#toast').appendChild(t); setTimeout(() => t.remove(), 3200);
 }
 
+// Navigation already names the page. Keep its heading for screen readers without
+// reserving a visible title row; descriptions and page actions retain their space.
 export const phead = (title, sub = '', actions = '') =>
-  `<header class="ph page-header"><div><h1>${title}</h1>${sub ? `<p class="mute">${sub}</p>` : ''}</div>${actions ? `<div class="row page-actions">${actions}</div>` : ''}</header>`;
+  `<h1 class="sr-only">${title}</h1>${sub || actions ? `<header class="ph page-header page-header-compact">${sub ? `<p class="mute">${sub}</p>` : ''}${actions ? `<div class="row page-actions">${actions}</div>` : ''}</header>` : ''}`;
 export const badge = (text, kind = '') => `<span class="badge ${kind}">${text}</span>`;
 export const empty = (icon, title, sub, action = '') => `<div class="empty"><div style="font-size:34px">${icon}</div><b>${title}</b><p class="mute" style="font-size:14px">${sub}</p>${action}</div>`;
 export const seg = (options, current, action) =>
