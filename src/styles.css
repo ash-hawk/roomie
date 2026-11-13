@@ -936,3 +936,6 @@ body::before,body::after{display:none}
 #chore-schedule .empty{padding:24px 12px;min-height:0}
 .home-schedule-toolbar{min-width:0}
 @media(max-width:900px){.home-dashboard[data-preset]{grid-template-rows:auto}}
+
+.page-header-compact .page-actions{margin-left:auto;width:auto;flex-wrap:wrap}
+.page-header-compact .page-actions .btn{flex:none}
