@@ -29,6 +29,7 @@ beforeEach(() => {
     if (path.endsWith("/events")) return { events };
     if (path.endsWith("/chores")) return chores;
     if (path.endsWith("/board")) return { notes: [] };
+    if (path.endsWith("/wishlist")) return { items: [] };
     if (path.endsWith("/balances")) return { mine: [] };
     if (path.endsWith("/notification-settings")) return { settings: { event_hosting: false, event_other: false, approval_request: false } };
     if (path === "/notification-channel") return { channel: null };
@@ -146,7 +147,7 @@ describe("Home views", () => {
     expect(content.textContent).toContain('No events or chores from today onward in this month.');
     actions['home-month'](content.querySelector('[data-n="-1"]'));
     expect(content.textContent).toContain('January plan');
-    expect(mockedApi).toHaveBeenCalledTimes(5);
+    expect(mockedApi).toHaveBeenCalledTimes(6);
   });
 
   it("switches the same household-wide items between list and calendar, with pending approval visible", async () => {
@@ -172,7 +173,7 @@ describe("Home views", () => {
     picker.value = 'list';
     inputs['home-view'](picker);
     expect(document.getElementById("home-schedule-content").textContent.indexOf("Dishes")).toBeLessThan(document.getElementById("home-schedule-content").textContent.indexOf("Dinner"));
-    expect(mockedApi).toHaveBeenCalledTimes(5);
+    expect(mockedApi).toHaveBeenCalledTimes(6);
   });
 });
 
@@ -240,7 +241,7 @@ describe('Home finance widget sizes', () => {
     const calls = mockedApi.mock.calls.length;
     actions['home-layout-preset']({dataset:{layoutPreset:'focus-left'}});
     const expanded = document.querySelector('.home-finances-expanded');
-    expect(expanded.textContent).toContain('Waiting on you');
+    expect(expanded.textContent).toContain('Wish list');
     expect(expanded.textContent).toContain('Jordan');
     expect(expanded.textContent).toContain('Sam');
     expect(expanded.textContent).toContain('$1.86');
@@ -252,7 +253,7 @@ describe('Home finance widget sizes', () => {
     const { closeModal } = await import('../src/lib/dom.js'); closeModal();
     actions['home-layout-preset']({dataset:{layoutPreset:'equal'}});
     expect(document.querySelector('.home-finances-narrow')).not.toBeNull();
-    expect(document.querySelector('.home-finances').textContent).toContain('Waiting on you');
+    expect(document.querySelector('.home-finances').textContent).toContain('Wish list');
   });
 });
 
@@ -270,6 +271,7 @@ describe('Home household board', () => {
       if (path.endsWith('/members')) return { members };
       if (path.endsWith('/events')) return { events: boardEvents };
       if (path.endsWith('/chores')) return boardChores;
+      if (path.endsWith('/wishlist')) return { items: [] };
       if (path.endsWith('/balances')) return { mine: [] };
       if (path.endsWith('/board')) return { notes };
       throw new Error('Unexpected path ' + path);
@@ -313,6 +315,7 @@ describe('Home household board', () => {
       if (path.endsWith('/members')) return { members };
       if (path.endsWith('/events')) return { events: boardEvents };
       if (path.endsWith('/chores')) return boardChores;
+      if (path.endsWith('/wishlist')) return { items: [] };
       if (path.endsWith('/balances')) return { mine: [] };
       if (path.endsWith('/board')) return { notes };
       throw new Error('Unexpected path ' + path);
@@ -331,6 +334,7 @@ describe('Home household board', () => {
       if (path.endsWith('/members')) return { members };
       if (path.endsWith('/events')) return { events: boardEvents };
       if (path.endsWith('/chores')) return boardChores;
+      if (path.endsWith('/wishlist')) return { items: [] };
       if (path.endsWith('/balances')) return { mine: [] };
       if (path.endsWith('/board')) return { notes };
       throw new Error('Unexpected path ' + path);
@@ -355,8 +359,8 @@ describe('Home household board', () => {
     const { choresView } = await import('../src/pages/chores.js');
     document.getElementById('page').innerHTML = await choresView();
     const board = document.querySelector('.chore-requests-board');
-    expect(board.textContent).toContain('Cover Requests');
-    expect(board.textContent).toContain('Cover Requests');
+    expect(board.textContent).toContain('Cover requests');
+    expect(board.textContent).toContain('Cover requests');
     expect(board.querySelector('[data-action=open-request]')).not.toBeNull();
     expect(board.querySelector('.chore-occurrence').textContent).toContain('Jordan');
     expect(board.querySelector('.chore-occurrence').textContent).toContain('Mon Nov 16');
@@ -374,12 +378,12 @@ describe('Home household board', () => {
     expect(document.querySelector('.chore-requests-board').textContent).toContain('Laundry');
     inputs['chore-view']({ value: 'list' });
   });
-  it('keeps Cover Requests empty when only swaps are open and still exposes those swaps', async () => {
+  it('keeps Cover requests empty when only swaps are open and still exposes those swaps', async () => {
     await renderBoard();
     boardChores = { ...boardChores, swapRequests: [{ ...request, type: 'swap', targetUserId: 1 }] };
     const { choresView } = await import('../src/pages/chores.js');
     document.getElementById('page').innerHTML = await choresView();
-    expect(document.querySelector('.chore-requests-board h3').textContent).toBe('Cover Requests');
+    expect(document.querySelector('.chore-requests-board h2').textContent).toBe('Cover requests');
     expect(document.querySelector('.chore-requests-board').textContent).toContain('No chores need to be covered.');
     expect(document.querySelector('.chore-swap-board').textContent).toContain('Laundry');
   });
@@ -410,9 +414,9 @@ describe('Home household board', () => {
     mockedApi.mockResolvedValueOnce({ members: [{ userId: 3, firstName: 'Sam', leftDate: '2026-11-01', email: 'hidden@example.test', paymentMethods: [{ app: 'venmo', username: '@hidden' }] }] });
     await actions['board-roommate-profile'](document.querySelector('.reply [data-action=board-roommate-profile]'));
     const profile = document.querySelector('[role=dialog]');
-    expect(profile.textContent).toContain('Contact details are hidden for former roommates');
-    expect(profile.textContent).not.toContain('hidden@example.test');
-    expect(profile.textContent).not.toContain('@hidden');
+    expect(profile).toBeNull();
+    expect(document.body.textContent).not.toContain('hidden@example.test');
+    expect(document.body.textContent).not.toContain('@hidden');
   });
   it('opens the exact chore details from Home and submits coverage from the standard popup', async () => {
     await renderBoard();
@@ -800,7 +804,7 @@ describe('Chores schedule formats', () => {
     expect([...picker().options].map((option) => option.textContent)).toEqual(['Calendar view', 'List view']);
     expect(document.querySelector('[data-action="chore-tab"]')).toBeNull();
     expect(schedule.querySelectorAll('[data-action="chore-detail"]')).toHaveLength(1);
-    expect(document.getElementById('chore-overdue').textContent).toContain('Overdue (1)');
+    expect(document.getElementById('chore-overdue').textContent).toContain('Overdue chores (1)');
     expect(document.querySelector('#chore-overdue [data-action="chore-detail"]').dataset.id).toBe('1');
     expect(document.querySelector('.chore-attention-board .chore-requests-board')).not.toBeNull();
     expect(document.querySelector('.chore-management')).toBeNull();
@@ -894,7 +898,10 @@ describe('Household role controls', () => {
     expect(document.querySelector('[data-form="household-settings"]')).not.toBeNull();
     expect(document.querySelector('[data-action="rotate-join-code"]')).not.toBeNull();
     expect(document.querySelector('[data-action="delete-household"]')).not.toBeNull();
-    expect(document.querySelector('[data-action="remove-member"]')).not.toBeNull();
+    expect(document.querySelector('[data-action="remove-member"]')).toBeNull();
+    actions['roommate-profile'](document.querySelector('[data-action=roommate-profile][data-id="2"]'));
+    expect(document.querySelector('[role=dialog] [data-action=remove-member]')).not.toBeNull();
+    document.getElementById('modal').remove();
 
     S.households[0].role = 'member';
     document.getElementById('page').innerHTML = await householdView();
@@ -1035,7 +1042,7 @@ describe('Parallel feature calendar structure', () => {
     expect(form.isConnected).toBe(true);
     expect(form.elements.messageText.value).toBe('Keep this draft while I browse');
     expect(document.querySelector('[data-board]').textContent).toContain('Current messages');
-    expect(document.querySelector('[data-board]').textContent).toContain('Resolved messages');
+    expect(document.querySelector('[data-board]').textContent).toContain('Past messages');
     expect(document.querySelector('[data-board] form[data-form=note-new]')).toBeNull();
     await forms['note-new'](form);
     expect(form.elements.messageText.value).toBe('');

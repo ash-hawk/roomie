@@ -1,3 +1,5 @@
+import { currentHouseholdData } from '../lib/current-household.js';
+import { boardFilter } from '../components/board-filter.js';
 import { boardAnnouncement } from '../components/board-announcement.js';
 import { monthCalendar } from '../components/month-calendar.js';
 import { scheduleToolbar, filterChoices } from '../components/schedule-toolbar.js';
@@ -57,8 +59,8 @@ const savePrefs = () => { try { localStorage.setItem(prefsKey(), JSON.stringify(
 async function load() {
   const [{ members }, { events }, { notes }] = await Promise.all([api(path('/members')), api(path('/events')), api(path('/board'))]);
   if (boardArchiveHousehold !== hid()) { boardArchive = false; boardArchiveHousehold = hid(); }
-  D = { members, events, notes };
-  seen = JSON.stringify([events, notes]);
+  D = { members, ...currentHouseholdData(members, { events, notes }) };
+  seen = JSON.stringify([members, events, notes]);
 }
 
 // Events shown in the list and month views.
@@ -252,7 +254,7 @@ forms['event-save'] = async (form) => {
   if (form.dataset.linkToNote === '1') {
     const session = linkedEventSession;
     linkedEventSession = null;
-    D.events.push(saved); seen = JSON.stringify([D.events, D.notes]);
+    D.events.push(saved); seen = JSON.stringify([D.members, D.events, D.notes]);
     closeModal(); toast('Event added and linked');
     if (session?.userId === S.user?.userId && session.householdId === S.hid) session.onReturn(saved);
     return;
@@ -284,8 +286,8 @@ function composerHtml() {
 }
 function boardInner() {
   const visibleNotes = D.notes.filter((n) => Boolean(n.isResolved) === boardArchive);
-  return `<div class="row sp home-board-heading"><h2>Announcements</h2></div>
-    <div class="row home-board-filters" role="group" aria-label="Announcement messages"><button type="button" class="btn s ${boardArchive ? '' : 'p'}" data-action="calendar-board-filter" data-archive="false" aria-pressed="${!boardArchive}">Current messages</button><button type="button" class="btn s ${boardArchive ? 'p' : ''}" data-action="calendar-board-filter" data-archive="true" aria-pressed="${boardArchive}">Resolved messages</button></div>
+  return `<div class="row sp home-board-heading"><h2>Announcements</h2>${boardFilter(boardArchive, 'calendar-board-filter')}</div>
+
     <div class="stack home-board-feed">${visibleNotes.length ? visibleNotes.map(noteHtml).join('') : `<p class="board-empty">${boardArchive ? 'No resolved messages.' : 'No current messages.'}</p>`}</div>`;
 }
 inputs['board-link-mode'] = (el) => {
@@ -296,7 +298,7 @@ inputs['board-link-mode'] = (el) => {
   if (picker.hidden) picker.value = '';
 };
 const paintBoard = () => document.querySelectorAll('[data-board]').forEach((el) => { el.innerHTML = boardInner(); });
-async function reloadBoard() { const [{ notes }, { events }] = await Promise.all([api(path('/board')), api(path('/events'))]); D.notes = notes; D.events = events; paintBoard(); }
+async function reloadBoard() { await load(); paintBoard(); refreshSchedule(); }
 forms['note-new'] = async (form) => {
   const f = new FormData(form), body = { messageText: f.get('messageText') }; if (f.get('eventId')) body.eventId = Number(f.get('eventId'));
   try { await api(path('/board'), { method: 'POST', body }); } catch (err) { return showError(form, err.message); }
@@ -338,7 +340,7 @@ setInterval(async () => {
   try {
     if (document.hidden || document.getElementById('root')?.dataset.page !== 'calendar' || document.getElementById('modal') || !D) return;
     if (document.activeElement?.closest?.('form,textarea,input,select') || document.querySelector('.schedule-filter-menu[open]')) return;
-    const [{ events }, { notes }] = await Promise.all([api(path('/events')), api(path('/board'))]);
-    if (JSON.stringify([events, notes]) !== seen) refresh();
+    const [{ members }, { events }, { notes }] = await Promise.all([api(path('/members')), api(path('/events')), api(path('/board'))]);
+    if (JSON.stringify([members, events, notes]) !== seen) refresh();
   } catch { /* offline or signed out: try again next tick */ }
 }, 15000);

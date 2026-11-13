@@ -1,3 +1,4 @@
+import { boardFilter } from './board-filter.js';
 import { boardRequest } from './board-request.js';
 import { boardAnnouncement } from './board-announcement.js';
 import { ago, esc, fullName, ico } from '../lib/dom.js';
@@ -48,8 +49,8 @@ export function householdBoard({ members, events, chores, notes, user, timezone,
     const type = event ? 'Event approval' : request ? (request.type === 'skip' ? 'Cover request' : 'Swap request') : `${announcement?.isResolved ? 'Resolved announcement' : 'Announcement'} · ${name(announcement?.senderUserId)}`;
     return `<details class="home-board-summary" data-item-kind="${event || events.some((e) => e.eventId === announcement?.eventId) ? 'event' : request ? 'chore' : 'announcement'}" data-board-entry="${item.key}"><summary><span class="home-kind">${esc(type)}</span><b>${esc(title)}</b><span class="hint">${event ? esc(when(event.eventDate)) : request ? esc(when(assignment(request.requesterAssignmentId)?.dueAt)) : esc(ago(announcement?.postedDate, timezone))}</span></summary>${item.html}</details>`;
   };
-  return `<div class="row sp home-board-heading"><h2>Household board</h2><button type="button" class="btn p home-make-announcement" data-action="home-make-announcement">Make announcement</button></div>
-    <div class="row home-board-filters" role="group" aria-label="Household board filter"><button type="button" class="btn s ${archive ? '' : 'p'}" data-action="home-board-filter" data-archive="false" aria-pressed="${!archive}">Current messages</button><button type="button" class="btn s ${archive ? 'p' : ''}" data-action="home-board-filter" data-archive="true" aria-pressed="${archive}">Resolved messages</button></div>
+  return `<div class="row sp home-board-heading"><h2>Household board</h2><div class="row home-board-controls"><button type="button" class="btn p home-make-announcement" data-action="home-make-announcement">Make announcement</button>${boardFilter(archive, 'home-board-filter')}</div></div>
+
     <div class="stack home-board-feed" aria-label="${archive ? 'Resolved household announcements' : 'Household announcements and requests'}">${feed.slice(0, limit).map((item) => compact ? compactEntry(item) : item.html).join('') || `<p class="hint">${archive ? 'No resolved messages.' : 'No announcements or open requests right now.'}</p>`}</div>${Number.isFinite(limit) && feed.length ? `<button class="btn s home-board-view-all" data-action="home-board-all">View all (${feed.length})</button>` : ''}`;
 
 }

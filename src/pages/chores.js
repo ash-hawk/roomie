@@ -1,3 +1,4 @@
+import { currentHouseholdData } from '../lib/current-household.js';
 import { boardRequest } from '../components/board-request.js';
 import { scheduleToolbar, filterChoices } from '../components/schedule-toolbar.js';
 import { validCalendarDay } from '../lib/calendar-create.js';
@@ -38,11 +39,11 @@ const openRequestOn = (aid) => D.swapRequests.find((r) => r.requesterAssignmentI
 export async function choresView() {
   const h = hid();
   const [{ members }, data] = await Promise.all([api(`/households/${h}/members`), api(`/households/${h}/chores`)]);
-  D = { members, ...data };
+  D = { members, ...currentHouseholdData(members, data) };
   loadChoreDisplay();
   choreMonth ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   return `${phead('Chores', '', `<button class="btn s" data-action="all-chores">All chores</button><button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
-    <div class="page-content split cal chores-content chore-dashboard-layout"><div class="stack chore-schedule-column"><section class="card" id="chore-schedule">${scheduleView()}</section>${workloadView()}</div><aside class="card stack chore-attention-board" aria-label="Chore board"><div class="row sp home-board-heading"><h2>Chore board</h2></div><div id="chore-overdue">${overdueView()}</div>${choreRequestsBoard()}</aside></div>`;
+    <div class="page-content split cal chores-content chore-dashboard-layout"><div class="stack chore-schedule-column"><section class="card" id="chore-schedule">${scheduleView()}</section>${workloadView()}</div><aside class="stack chore-attention-board" aria-label="Chore activity"><section class="card" id="chore-overdue">${overdueView()}</section><section class="card stack">${choreRequestsBoard()}</section></aside></div>`;
 
 }
 function choreIdentity(assignment) {
@@ -62,7 +63,7 @@ function choreRequestsBoard(limit = overdueItems().length ? 2 : 3) {
   }).join('');
   const covers = requests.filter((r) => r.type === 'skip'), swaps = requests.filter((r) => r.type === 'swap');
   const shownSwaps = swaps.slice(0, Math.max(0, limit - covers.length));
-  return `<section class="stack chore-requests-board"><h3>Cover Requests${covers.length ? ` (${covers.length})` : ''}</h3>${cards(covers.slice(0, limit)) || '<p class="hint">No chores need to be covered.</p>'}</section>${shownSwaps.length ? `<section class="stack chore-swap-board"><h3>Swap requests (${swaps.length})</h3>${cards(shownSwaps)}</section>` : ''}${requests.length > limit ? `<button class="btn s" data-action="all-chore-requests">View all requests (${requests.length})</button>` : ''}`;
+  return `<section class="stack chore-requests-board"><h2>Cover requests${covers.length ? ` (${covers.length})` : ''}</h2>${cards(covers.slice(0, limit)) || '<p class="hint">No chores need to be covered.</p>'}</section>${shownSwaps.length ? `<section class="stack chore-swap-board"><h3>Swap requests (${swaps.length})</h3>${cards(shownSwaps)}</section>` : ''}${requests.length > limit ? `<button class="btn s" data-action="all-chore-requests">View all requests (${requests.length})</button>` : ''}`;
 }
 actions['all-chores'] = () => openModal(`${mhead('All chores')}<div id="chore-rules">${chartView()}</div>`);
 const chorePrefsKey = () => `roomie.chores.display.${S.user.userId}.${hid()}`;
@@ -113,7 +114,7 @@ function workloadView() {
 function overdueItems() { return visibleAssignments().filter((a) => !a.isCompleted && ymdIn(a.dueAt) < ymdIn(Date.now())); }
 function overdueView(limit = attentionRequests().length ? 1 : 3) {
   const overdue = overdueItems();
-  return `<section class="stack"><h3>Overdue${overdue.length ? ` (${overdue.length})` : ''}</h3>${overdue.slice(0, limit).map((assignment) => `<article class="chore-board-item stack" data-item-kind="chore"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}<button class="btn s" data-action="chore-detail" data-id="${assignment.assignmentId}">View chore</button></article>`).join('') || '<p class="hint">No overdue chores.</p>'}${overdue.length > limit ? `<button class="btn s" data-action="all-overdue">View all overdue (${overdue.length})</button>` : ''}</section>`;
+  return `<section class="stack"><h2>Overdue chores${overdue.length ? ` (${overdue.length})` : ''}</h2>${overdue.slice(0, limit).map((assignment) => `<article class="chore-board-item stack" data-item-kind="chore"><h4>${esc(choreOf(assignment.choreId).choreName)}</h4>${choreIdentity(assignment)}<button class="btn s" data-action="chore-detail" data-id="${assignment.assignmentId}">View chore</button></article>`).join('') || '<p class="hint">No overdue chores.</p>'}${overdue.length > limit ? `<button class="btn s" data-action="all-overdue">View all overdue (${overdue.length})</button>` : ''}</section>`;
 }
 actions['all-overdue'] = () => openModal(`${mhead('Overdue chores')}<div class="chore-attention-board">${overdueView(Infinity)}</div>`);
 actions['all-chore-requests'] = () => openModal(`${mhead('Chore requests')}<div class="stack chore-attention-board">${choreRequestsBoard(Infinity)}</div>`);
@@ -168,7 +169,7 @@ actions['remind-chore'] = async (el) => { await api(`/households/${hid()}/assign
 export async function openChoreDetails(householdId, assignmentId) {
   const [{ members }, data] = await Promise.all([api(`/households/${householdId}/members`), api(`/households/${householdId}/chores`)]);
   if (hid() !== householdId) return;
-  D = { members, ...data };
+  D = { members, ...currentHouseholdData(members, data) };
   if (!asgOf(assignmentId)) throw new Error('This chore occurrence is no longer available.');
   actions['chore-detail']({ dataset: { id: assignmentId } });
 }
