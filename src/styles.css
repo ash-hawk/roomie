@@ -868,14 +868,10 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 
 .theme-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:14px}
 .theme-choice{display:flex;flex-direction:column;align-items:flex-start;position:relative;gap:8px;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--card);cursor:pointer;min-width:0}
-.theme-choice>input{position:absolute;right:16px;top:18px;accent-color:var(--ink);width:17px;height:17px}
+.theme-choice>input{position:absolute;right:16px;top:18px;accent-color:var(--accent);width:17px;height:17px}
 .theme-name{font-size:16px;font-weight:650;padding-right:24px}
-.theme-choice:has(input:checked){border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.theme-choice:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .theme-choice:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:3px}
-.theme-swatches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%;margin-top:8px}
-.theme-swatches>span{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mute);min-width:0}
-.theme-swatches i{display:block;flex:none;width:18px;height:18px;border-radius:50%;background:var(--swatch-light)}
-.dark .theme-swatches i{background:var(--swatch-dark)}
 
 /* Clean, opaque surfaces: palette colors are discrete markers, never a page wash. */
 body::before,body::after{display:none}
@@ -890,12 +886,8 @@ body::before,body::after{display:none}
 .home-finances-expanded .home-balance>span{background:var(--bg);border:1px solid var(--line)}
 .theme-palette{display:flex;width:100%;height:48px;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:22px}
 .theme-palette i{flex:1;min-width:0}
-.theme-swatches i,.home-day-dots i,.calendar-day-dots i,.schedule-color-key i{outline:1px solid var(--ink);outline-offset:1px}
 
-/* Home has mixed content; each primary action keeps its own section color. */
-.btn.p.home-make-announcement,.btn.p.home-make-announcement:hover{background:var(--color-announcement);border-color:var(--color-announcement);color:var(--on-announcement);box-shadow:none}
-.btn.p[data-accent-kind="finance"],.btn.p[data-accent-kind="finance"]:hover{background:var(--color-finance);border-color:var(--color-finance);color:var(--on-finance);box-shadow:none}
-/* Keep section-colored controls readable even with bright source colors. */
+/* Every primary action and selected control uses the personal theme accent. */
 .seg button.on,.methods label:has(input:checked){background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .methods label:has(input:checked) small{color:inherit}
 .seg button:hover:not(.on),.pillnav .nav-i:hover:not(.on){color:var(--ink)}
