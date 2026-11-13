@@ -1,3 +1,4 @@
+import { monthCalendar } from '../components/month-calendar.js';
 import { scheduleToolbar, filterChoices } from '../components/schedule-toolbar.js';
 // Slice (c): household events + sticky-note board. The server owns the rules (who may edit, who was
 // asked about hosting, who gets notified); this page shows data and sends intent.
@@ -106,18 +107,10 @@ function listView() {
 function monthView() {
   const today = ymdIn(Date.now());
   monthStart ??= `${today.slice(0, 7)}-01`;
-  const lead = new Date(`${monthStart}T12:00:00Z`).getUTCDay();
-  const gridStart = addDays(monthStart, -lead);
-  const all = items();
-  const cells = [];
-  for (let i = 0; i < 42; i++) {
-    const d = addDays(gridStart, i);
-    if (i >= 35 && d.slice(0, 7) !== monthStart.slice(0, 7)) break;
-    const todays = all.filter((x) => x.ymd === d);
-    cells.push(`<button class="day2 ${d.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${d === today ? 'today' : ''}" data-action="day-detail" data-day="${d}" aria-label="${esc(dayLabel(d))}, ${todays.length} items">
-      <span class="dn">${Number(d.slice(8))}</span>${todays.slice(0, 3).map((x) => { const state = approvalState(x.e.tags); return `<i class="dpill ${state.total && state.status !== 'confirmed' ? 'pending-event' : ''}" style="background:${esc(x.color)}" title="${esc(x.e.eventName)}${state.total ? ` · ${state.label} · ${state.approved} of ${state.total} approved` : ''}">${esc(x.e.eventName)}${state.total && state.status !== 'confirmed' ? ` · ${state.label}` : ''}</i>`; }).join('')}${todays.length > 3 ? `<small>+${todays.length - 3} more</small>` : ''}</button>`);
-  }
-  return `<div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => `<span>${d}</span>`).join('')}</div><div class="mgrid">${cells.join('')}</div>`;
+  return monthCalendar({ month: monthStart, today, action: 'day-detail', dayLabel, items: items().map(({e,ymd}) => {
+    const state = approvalState(e.tags);
+    return { day: ymd, kind: 'event', title: e.eventName, time: timeFmt(e.eventDate), person: first(e.createdByUserId), status: state.total ? `${state.label} · ${state.approved}/${state.total}` : '' };
+  }) });
 }
 actions['month-nav'] = (el) => { const t = new Date(`${monthStart}T12:00:00Z`); t.setUTCMonth(t.getUTCMonth() + Number(el.dataset.n)); monthStart = t.toISOString().slice(0, 7) + '-01'; refreshSchedule(); };
 actions['day-detail'] = (el) => {
@@ -149,7 +142,7 @@ export async function calendarView() {
   if (handoff?.type === 'event') setTimeout(() => actions['event-detail']({ dataset: { id: String(handoff.id) } }), 60);
   const linkedId = Number(location.hash.replace(/^#\/?/, '').split('/')[1]);
   if (Number.isSafeInteger(linkedId) && linkedId > 0) setTimeout(() => actions['event-detail']({ dataset: { id: String(linkedId) } }), 60);
-  return `${head}<div class="page-content split cal"><section class="card" id="cal-main">${scheduleContent()}</section><section class="card board" data-board>${boardInner()}</section></div>`;
+  return `${head}<div class="page-content split cal"><section class="card" id="cal-main">${scheduleContent()}</section><aside class="stack event-board-column">${composerHtml()}<section class="card board" data-board>${boardInner()}</section></aside></div>`;
 }
 inputs['cal-view'] = (el) => {
   if (!['list', 'month'].includes(el.value)) return;
@@ -282,17 +275,23 @@ function noteHtml(n) {
       ${r.canEdit ? `<button class="x" data-action="note-delete" data-id="${r.messageId}" aria-label="Delete reply">✕</button>` : ''}</div>`).join('')}
     <form class="row replyf" data-form="note-reply" data-id="${n.messageId}"><input class="input" name="messageText" maxlength="500" placeholder="Reply" aria-label="Reply" required><button class="btn s" type="submit">Send</button></form></article>`;
 }
+function composerHtml() {
+  const existing = document.querySelector(`[data-form="note-new"][data-household="${hid()}"][data-user="${S.user.userId}"]`);
+  const draft = existing ? new FormData(existing) : null;
+  const selected = String(draft?.get('eventId') ?? '');
+  const mode = selected || existing?.querySelector('[data-input=board-link-mode]')?.value === 'link' ? 'link' : 'none';
+  const upcoming = D.events.filter((e) => Date.parse(e.endDate ?? e.eventDate) >= Date.now());
+  return `<section class="card stack event-composer"><h2>Make announcement</h2>
+    <form class="stack" data-form="note-new" data-household="${hid()}" data-user="${S.user.userId}"><textarea class="input" name="messageText" rows="2" maxlength="500" placeholder="Share something with your household" aria-label="New announcement" required>${esc(draft?.get('messageText') ?? '')}</textarea>
+      <div class="row event-link-controls"><select class="input" data-input="board-link-mode" aria-label="Event link option"><option value="none" ${mode === 'none' ? 'selected' : ''}>No linked event</option><option value="link" ${mode === 'link' ? 'selected' : ''}>Link event</option><option value="add">Add and link event</option></select>
+      <select class="input" name="eventId" aria-label="Choose an event" ${mode === 'link' ? 'required' : 'hidden'}><option value="">Choose an event</option>${upcoming.map((e) => `<option value="${e.eventId}" ${String(e.eventId) === selected ? 'selected' : ''}>${esc(e.eventName)}</option>`).join('')}</select>
+      <button class="btn s" type="submit">Post</button></div><div class="err" role="alert"></div></form></section>`;
+}
 function boardInner() {
-  const upcoming = D.events.filter((e) => Date.parse(e.eventDate) > Date.now() - 86400000);
-  const resolvedCount = D.notes.filter((n) => n.isResolved).length;
   const visibleNotes = D.notes.filter((n) => Boolean(n.isResolved) === boardArchive);
-  return `<div class="row board-heading"><h2>Board</h2></div>
-    <div class="row home-board-filters" role="group" aria-label="Household board filter"><button type="button" class="btn s ${boardArchive ? '' : 'p'}" data-action="calendar-board-filter" data-archive="false" aria-pressed="${!boardArchive}">Open</button><button type="button" class="btn s ${boardArchive ? 'p' : ''}" data-action="calendar-board-filter" data-archive="true" aria-pressed="${boardArchive}">Resolved archive${resolvedCount ? ` (${resolvedCount})` : ''}</button></div>
-    <form class="stack" data-form="note-new"><textarea class="input" name="messageText" rows="2" maxlength="500" placeholder="Share a plan or check with everyone before hosting" aria-label="New note" required></textarea>
-      <div class="row" style="gap:8px;flex-wrap:wrap"><select class="input" data-input="board-link-mode" aria-label="Event link option" style="flex:1;min-width:0"><option value="none">No linked event</option><option value="link">Link event</option><option value="add">Add and link event</option></select>
-      <select class="input" name="eventId" aria-label="Choose an event" style="flex:1;min-width:0" hidden><option value="">Choose an event</option>${upcoming.map((e) => `<option value="${e.eventId}">${esc(e.eventName)}</option>`).join('')}</select>
-      <button class="btn s" type="submit">Post</button></div><div class="err" role="alert"></div></form>
-    <div class="notes">${visibleNotes.length ? visibleNotes.map(noteHtml).join('') : `<p class="board-empty">${boardArchive ? 'No resolved announcements in the archive.' : 'No open notes yet — share a plan or check with everyone before hosting.'}</p>`}</div>`;
+  return `<div class="row board-heading"><h2>Announcements</h2></div>
+    <div class="row home-board-filters" role="group" aria-label="Announcement messages"><button type="button" class="btn s ${boardArchive ? '' : 'p'}" data-action="calendar-board-filter" data-archive="false" aria-pressed="${!boardArchive}">Current messages</button><button type="button" class="btn s ${boardArchive ? 'p' : ''}" data-action="calendar-board-filter" data-archive="true" aria-pressed="${boardArchive}">Resolved messages</button></div>
+    <div class="notes">${visibleNotes.length ? visibleNotes.map(noteHtml).join('') : `<p class="board-empty">${boardArchive ? 'No resolved messages.' : 'No current messages.'}</p>`}</div>`;
 }
 inputs['board-link-mode'] = (el) => {
   const picker = el.form?.querySelector('[name="eventId"]'); if (!picker) return;
@@ -306,6 +305,9 @@ async function reloadBoard() { const [{ notes }, { events }] = await Promise.all
 forms['note-new'] = async (form) => {
   const f = new FormData(form), body = { messageText: f.get('messageText') }; if (f.get('eventId')) body.eventId = Number(f.get('eventId'));
   try { await api(path('/board'), { method: 'POST', body }); } catch (err) { return showError(form, err.message); }
+  form.reset(); form.elements.messageText.value = '';
+  form.querySelector('[data-input=board-link-mode]').value = 'none';
+  const picker = form.querySelector('[name=eventId]'); picker.value = ''; picker.hidden = true; picker.required = false;
   await reloadBoard();
 };
 forms['note-reply'] = async (form) => {
@@ -330,7 +332,7 @@ actions['note-resolve'] = async (el) => {
     buttons.forEach((button) => { button.disabled = false; });
     return;
   }
-  toast(el.dataset.resolved === 'true' ? 'Announcement moved to the resolved archive' : 'Announcement reopened');
+  toast(el.dataset.resolved === 'true' ? 'Announcement moved to resolved messages' : 'Announcement reopened');
   await reloadBoard();
 };
 actions['note-delete'] = async (el) => { if (!await confirmDialog('Delete this note?', 'Replies to this note will also be removed.')) return;

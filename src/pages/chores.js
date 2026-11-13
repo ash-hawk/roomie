@@ -6,7 +6,7 @@ import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
 import { avatar, badge, closeModal, confirmDialog, empty, esc, fullName, ico, mhead, openModal, phead, itemColor, showError, toast } from '../lib/dom.js';
-import { monthDays } from '../../shared/home-schedule.ts';
+import { monthCalendar } from '../components/month-calendar.js';
 import { dayName } from '../../shared/chore-dates.ts';
 
 let choreView = 'list', choreMonth = null, choreScope = null;
@@ -117,16 +117,15 @@ function scheduleView() {
   const filters = filterChoices('Show chores for', 'chore-filter', [['all', 'Everyone'], ['me', 'Just mine'], ...people.filter((m) => m.userId !== S.user.userId).map((m) => [String(m.userId), m.firstName])], filter);
   const toolbar = scheduleToolbar({ title, monthAction: 'chore-month', viewInput: 'chore-view', view: choreView, filters });
   const items = visibleAssignments();
-  if (!D.chores.length) return toolbar + empty('🧹', 'No chores yet', 'Add one yourself or start with a few common household chores.', '<button class="btn s" data-action="starter-chores">Add common chores</button>');
+  if (!D.chores.length && choreView === 'list') return toolbar + empty('🧹', 'No chores yet', 'Add one yourself or start with a few common household chores.', '<button class="btn s" data-action="starter-chores">Add common chores</button>');
   if (choreView === 'list') {
     const upcoming = items.filter((a) => ymdIn(a.dueAt) >= ymdIn(Date.now()) && ymdIn(a.dueAt).slice(0, 7) === choreMonth.slice(0, 7));
     return toolbar + (upcoming.length ? [...new Set(upcoming.map((a) => ymdIn(a.dueAt)))].map((day) => `<section class="stack home-day"><h3>${esc(choreDayLabel(day))}</h3>${upcoming.filter((a) => ymdIn(a.dueAt) === day).map(row).join('')}</section>`).join('') : '<p class="home-empty">No chores from today onward in this month.</p>');
   }
-  return `${toolbar}<div class="mgrid mhead">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => `<span>${day}</span>`).join('')}</div><div class="mgrid home-month">${monthDays(choreMonth).map((day) => {
-    const due = items.filter((a) => ymdIn(a.dueAt) === day);
-    return `<button class="day2 ${day.slice(0, 7) !== choreMonth.slice(0, 7) ? 'out' : ''} ${day === ymdIn(Date.now()) ? 'today' : ''}" data-action="chore-day" data-day="${day}" aria-label="${esc(choreDayLabel(day))}, ${due.length} chores" ${day === ymdIn(Date.now()) ? 'aria-current="date"' : ''}><span class="dn">${Number(day.slice(8))}</span>${due.slice(0, 3).map((a) => `<span class="home-calendar-item ${a.isCompleted ? 'completed' : ''}" style="--ev:${itemColor('chore')}"><span>${esc(first(a.assignedUserId))} · ${new Date(a.dueAt).toLocaleTimeString('en-US', { timeZone: tz(), hour: 'numeric', minute: '2-digit' })}</span><b>${esc(choreOf(a.choreId).choreName)}</b></span>`).join('')}${due.length > 3 ? `<span class="home-more">+${due.length - 3} more</span>` : ''}<span class="home-mobile-count" aria-hidden="true">${due.length || ''}</span></button>`;
-  }).join('')}</div>`;
+  return toolbar + monthCalendar({ month: choreMonth, today: ymdIn(Date.now()), action: 'chore-day', dayLabel: choreDayLabel,
+    items: items.map((a) => ({ day: ymdIn(a.dueAt), kind: 'chore', title: choreOf(a.choreId).choreName, person: first(a.assignedUserId), time: new Date(a.dueAt).toLocaleTimeString('en-US', { timeZone: tz(), hour: 'numeric', minute: '2-digit' }), completed: a.isCompleted })) });
 }
+
 actions['chore-day'] = (button) => {
   const day = button.dataset.day, items = visibleAssignments().filter((a) => ymdIn(a.dueAt) === day);
   openModal(`${mhead(esc(choreDayLabel(day)))}<div class="stack">${items.map(row).join('') || '<p class="mute">No chores on this day.</p>'}</div><div class="acts"><button class="btn p" data-action="add-chore" data-day="${esc(day)}">Add chore</button></div>`);

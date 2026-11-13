@@ -223,7 +223,7 @@ actions['home-board-resolve'] = async (button) => {
   }
   article.removeAttribute('aria-busy');
   buttons.forEach((el) => { el.disabled = false; });
-  toast(button.dataset.resolved === 'true' ? 'Announcement moved to the resolved archive' : 'Announcement reopened');
+  toast(button.dataset.resolved === 'true' ? 'Announcement moved to resolved messages' : 'Announcement reopened');
   try { await refreshHomeBoard(); } catch { toast('Saved. Refresh Home to see the updated board.'); }
 };
 function openAnnouncement(draft = {}) {

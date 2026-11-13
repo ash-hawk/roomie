@@ -9,6 +9,7 @@ import { settingsView } from "../src/pages/settings.js";
 import { connectHomeLayout } from "../src/components/home-layout.js";
 import { homeView } from "../src/pages/home.js";
 import { householdView } from "../src/pages/household.js";
+import { choresView } from '../src/pages/chores.js';
 const user = { userId: 1, firstName: "Alex", lastName: "Rivera", profilePhoto: null, phoneNumber: "", paymentMethods: [] };
 const members = [user, { userId: 2, firstName: "Jordan" }, { userId: 3, firstName: "Sam" }];
 const events = [{ eventId: 1, eventName: "Dinner", eventDate: "2026-11-05T20:00:00Z", endDate: null, createdByUserId: 1, category: "meeting", canEdit: true, tags: [{ userId: 2, response: "pending" }] }];
@@ -758,7 +759,7 @@ describe('Events schedule display', () => {
     expect(schedule.textContent).toContain('Dinner');
     expect(schedule.textContent).not.toContain('December plan');
     const board = document.querySelector('[data-board]');
-    const draft = board.querySelector('textarea'); draft.value = 'Keep this announcement';
+    const draft = document.querySelector('[data-form=note-new] textarea'); draft.value = 'Keep this announcement';
     dropdown().value = 'month'; inputs['cal-view'](dropdown());
     expect(schedule.querySelector('[data-action="calendar-today"]')).toBeNull();
     actions['month-nav'](schedule.querySelector('[data-n="1"]'));
@@ -771,7 +772,7 @@ describe('Events schedule display', () => {
     actions['month-nav'](schedule.querySelector('[data-n="1"]'));
     expect(schedule.textContent).toContain('January 2027');
     expect(schedule.textContent).toContain('January plan');
-    expect(board.querySelector('textarea').value).toBe('Keep this announcement');
+    expect(document.querySelector('[data-form=note-new] textarea').value).toBe('Keep this announcement');
     expect(mockedApi).toHaveBeenCalledTimes(3);
     expect(JSON.parse(localStorage.getItem('roomie.calendar.1.73')).view).toBe('list');
     S.user = { ...S.user, userId: 2 };
@@ -1006,5 +1007,38 @@ describe('Home announcement event creation', () => {
     expect(mockedApi.mock.calls.filter(([, options]) => options?.method)).toEqual([]);
     const { closeModal } = await import('../src/lib/dom.js'); closeModal();
     expect(document.querySelector('[data-form="home-note-new"]')).toBeNull();
+  });
+});
+
+
+describe('Parallel feature calendar structure', () => {
+  it('renders Events and Chores through the same month grid, including an empty chore calendar', async () => {
+    S.hid=301;S.households=[{...S.households[0],householdId:301}];
+    document.getElementById('page').innerHTML=await calendarView();
+    inputs['cal-view']({value:'month'});
+    const eventDays=[...document.querySelectorAll('.schedule-month-grid [data-day]')].map(el=>el.dataset.day);
+    const baseApi=mockedApi.getMockImplementation();
+    mockedApi.mockImplementation(path=>path.endsWith('/chores')?Promise.resolve({chores:[],assignments:[],swapRequests:[]}):baseApi(path));
+    document.getElementById('page').innerHTML=await choresView();
+    inputs['chore-view']({value:'calendar'});
+    expect([...document.querySelectorAll('.schedule-month-grid [data-day]')].map(el=>el.dataset.day)).toEqual(eventDays);
+    actions['chore-day'](document.querySelector('[data-day="2026-11-05"]'));
+    expect(document.querySelector('[role=dialog] [data-action=add-chore]').dataset.day).toBe('2026-11-05');
+  });
+  it('keeps announcement composition separate from message browsing and retains drafts while changing message filters', async () => {
+    document.getElementById('page').innerHTML=await calendarView();
+    const form=document.querySelector('[data-form=note-new]');
+    expect(form.closest('.event-composer')).not.toBeNull();
+    expect(form.closest('[data-board]')).toBeNull();
+    form.elements.messageText.value='Keep this draft while I browse';
+    actions['calendar-board-filter'](document.querySelector('[data-board] [data-archive=true]'));
+    expect(form.isConnected).toBe(true);
+    expect(form.elements.messageText.value).toBe('Keep this draft while I browse');
+    expect(document.querySelector('[data-board]').textContent).toContain('Current messages');
+    expect(document.querySelector('[data-board]').textContent).toContain('Resolved messages');
+    expect(document.querySelector('[data-board] form[data-form=note-new]')).toBeNull();
+    await forms['note-new'](form);
+    expect(form.elements.messageText.value).toBe('');
+    expect(form.elements.eventId.value).toBe('');
   });
 });
