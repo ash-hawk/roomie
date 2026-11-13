@@ -41,7 +41,7 @@ export async function choresView() {
   D = { members, ...data };
   loadChoreDisplay();
   choreMonth ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
-  return `${phead('Chores', 'A clear view of what needs doing, and whose turn it is.', `<button class="btn s" data-action="all-chores">All chores</button><button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
+  return `${phead('Chores', '', `<button class="btn s" data-action="all-chores">All chores</button><button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
     <div class="page-content split cal chores-content chore-dashboard-layout"><div class="stack chore-schedule-column"><section class="card" id="chore-schedule">${scheduleView()}</section>${workloadView()}</div><aside class="card stack chore-attention-board" aria-label="Chore board"><div class="row sp home-board-heading"><h2>Chore board</h2></div><div id="chore-overdue">${overdueView()}</div>${choreRequestsBoard()}</aside></div>`;
 
 }
