@@ -1,4 +1,4 @@
-import { themes } from './themes.js';
+import { themes, onColor } from './themes.js';
 import { S } from './state.js';
 import { inputs } from './events.js';
 
@@ -15,7 +15,14 @@ export function applyAppearance(mode = appearance(), preset = theme()) {
   document.documentElement.classList.toggle('dark', mode === 'dark');
   document.documentElement.style.colorScheme = mode;
   document.documentElement.dataset.theme = preset;
-  for (const [token, value] of Object.entries(themes[preset][mode])) document.documentElement.style.setProperty(`--${token}`, value);
+  const colors = themes[preset][mode];
+  for (const [token, value] of Object.entries(colors)) document.documentElement.style.setProperty(`--${token}`, value);
+  for (const kind of ['event', 'chore', 'finance', 'announcement']) document.documentElement.style.setProperty(`--on-${kind}`, onColor(colors[`color-${kind}`]));
+  const section = { calendar: 'event', chores: 'chore', finances: 'finance' }[location.hash.replace(/^#\/?/, '').split('/')[0]];
+  if (section) {
+    document.documentElement.style.setProperty('--accent', colors[`color-${section}`]);
+    document.documentElement.style.setProperty('--on-accent', onColor(colors[`color-${section}`]));
+  }
 }
 inputs.appearance = (el) => {
   if (!['light', 'dark'].includes(el.value) || !el.checked) return;

@@ -2,7 +2,7 @@ import { esc, money } from '../lib/dom.js';
 import { boardIdentity } from './board-profile.js';
 import { toCents } from '../../shared/money.ts';
 
-const financeLink = (label) => `<a class="btn s" href="#/finances" data-action="home-open-finances">${label}</a>`;
+const financeLink = (label) => `<a class="btn s ${label === 'Open finances' ? 'p' : ''}" ${label === 'Open finances' ? 'data-accent-kind="finance"' : ''} href="#/finances" data-action="home-open-finances">${label}</a>`;
 
 export function homeFinances({ balances, members, compact }) {
   const previewLimit = compact ? 1 : 3;
