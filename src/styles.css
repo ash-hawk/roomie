@@ -862,3 +862,8 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .home-widget.compact .home-finances.home-finances-expanded{justify-content:flex-start;gap:16px}
 .home-finances-narrow .home-finance-groups{grid-template-columns:minmax(0,1fr)}
 .home-finances-narrow .home-finance-heading{align-items:flex-start;flex-wrap:wrap;gap:10px}
+
+/* Board controls use neutral colors, leaving category colors on content. */
+.btn.p.home-make-announcement,.btn.p.home-make-announcement:hover{background:var(--ink);color:var(--card);border-color:var(--ink);box-shadow:none}
+.home-board-filters .btn.p,.home-board-filters .btn.p:hover{background:color-mix(in srgb,var(--ink) 7%,var(--card));color:var(--ink);border-color:var(--line);box-shadow:inset 0 -2px 0 var(--ink);filter:none}
+.home-layout-hint{margin:0;font-size:12px}
