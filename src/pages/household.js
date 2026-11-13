@@ -37,6 +37,7 @@ export async function householdView() {
 
   return `${phead('Household')}
     <div class="stack">
+      ${invite}
       <section class="card household-card">
         <h2>${esc(h.householdName)}</h2>
         <p class="mute">${current.length} ${current.length === 1 ? 'member' : 'members'} · ${esc(h.timezone)}</p>
@@ -50,7 +51,6 @@ export async function householdView() {
         ${owner ? `<hr class="hr"><div class="stack"><p class="mute">Deleting this household permanently removes its shared data for everyone.</p>
           <div><button class="btn d" data-action="delete-household">Delete household</button></div></div>` : ''}
       </section>
-      ${invite}
     </div>`;
 }
 
