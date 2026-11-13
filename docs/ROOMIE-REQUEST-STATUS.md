@@ -4,7 +4,7 @@ Use this checklist instead of repeatedly reconstructing the full chat. Distingui
 
 ## Latest decisions
 - Selected palettes set the overall vibe. Use all seven palette colors in interface roles (actions, navigation, hover highlights, focus, markers and decorative details), not one hue everywhere. No fixed Coastal category colors. Category meaning/design is paused.
-- Keep all five exact palette strips, personal preferences and light/dark modes. Keep neutral surfaces; no overall tinted wash.
+- Keep all five exact palette strips, personal preferences and light/dark modes. Use layered palette-colored backgrounds, cards, nested posts and balance tiles in all themes/modes. Use opaque fills and crisp contrasting text; no translucent overlay or blur.
 - Page titles are visually hidden; navigation labels remain. Home overview sentence has no exclamation mark.
 - Three independent cards in order: Invite roommates (code/Copy/Regenerate), current Roommates, Household details (rename/timezone/delete or leave). No former-roommate dropdown; management is inside profiles.
 

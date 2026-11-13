@@ -96,3 +96,19 @@ it('uses all seven source colors as interface roles with readable navigation and
     expect(contrastRatio(colors.card, colors.focus)).toBeGreaterThanOrEqual(3);
   }
 });
+
+it('gives all five themes layered opaque surfaces and readable text in both modes', () => {
+  const signatures = [];
+  for (const preset of Object.values(themes)) for (const mode of ['light', 'dark']) {
+    const colors = preset[mode];
+    const surfaces = ['bg', 'card', 'surface-raised', 'surface-alternate', 'surface-tile'];
+    expect(new Set(surfaces.map(key => colors[key])).size).toBe(5);
+    signatures.push(surfaces.map(key => colors[key]).join(':'));
+    for (const surface of surfaces) {
+      expect(colors[surface]).toMatch(/^#[0-9a-f]{6}$/i);
+      for (const text of ['ink', 'mute', 'text-accent']) expect(contrastRatio(colors[surface], colors[text]), `${preset.name} ${mode} ${surface}/${text}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(colors[surface], colors.focus)).toBeGreaterThanOrEqual(3);
+    }
+  }
+  expect(new Set(signatures).size).toBe(10);
+});
