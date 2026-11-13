@@ -137,7 +137,7 @@ export async function calendarView() {
   loadPrefs();
   await load();
   monthStart ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
-  const head = phead('Events', 'Meetings, hosting and other plans for your house.', `<button class="btn p" data-action="add-event">${ico('plus', 16)} Add event</button>`);
+  const head = phead('Events', '', `<button class="btn p" data-action="add-event">${ico('plus', 16)} Add event</button>`);
   const handoff = takeHandoff();
   if (handoff?.type === 'event') setTimeout(() => actions['event-detail']({ dataset: { id: String(handoff.id) } }), 60);
   const linkedId = Number(location.hash.replace(/^#\/?/, '').split('/')[1]);
