@@ -98,7 +98,10 @@ actions.expense = (el) => {
     <div class="tot">${$m(e.totalAmount)}</div><p class="mute">${fmtDay(e.purchaseDate, { weekday: 'long', month: 'long', day: 'numeric' })} · paid by ${(isCurrentMember(D.members,e.paidByUserId) ? esc(first(e.paidByUserId).toLowerCase() === 'you' ? 'you' : first(e.paidByUserId)) : 'a former roommate')}</p>
     <div>${e.shares.filter(s => isCurrentMember(D.members,s.userId)).map((s) => `<div class="item row">${profileLink(s.userId, null)}<span class="grow">${profileLink(s.userId, first(s.userId), false)}</span><b class="amount">${$m(s.amountOwed)}</b>${stChip(s.status)}</div>`).join('')}</div>
     <p class="hint">The buyer's own share is never owed. History means a previous household stay and is excluded from active balances; it does not mean paid.</p>
-    ${e.canDelete ? `<div class="acts"><button class="btn d" data-action="delete-expense" data-id="${e.expenseId}">Delete</button></div>` : ''}`);
+    ${e.canEdit || e.canDelete ? `<div class="acts">
+      ${e.canEdit ? `<button class="btn" data-action="edit-expense" data-id="${e.expenseId}">Edit</button>` : ''}
+      ${e.canDelete ? `<button class="btn d" data-action="delete-expense" data-id="${e.expenseId}">Delete</button>` : ''}
+    </div>` : ''}`);
 };
 actions['delete-expense'] = async (el) => {
   if (!await confirmDialog('Delete purchase?', 'This removes the purchase and its unpaid shares for everyone.')) return;
@@ -110,28 +113,37 @@ actions['delete-expense'] = async (el) => {
 actions['add-expense'] = async (_el, _e, preset = {}) => {
   const wish = (await api(`/households/${hid()}/wishlist`)).items.filter((w) => !w.isBought && isCurrentMember(D.members, w.createdByUserId));
   D.wish = wish;
+  openExpenseForm({ preset, wish });
+};
+actions['edit-expense'] = (el) => {
+  const expense = D.expenses.find((item) => item.expenseId === Number(el.dataset.id) && item.canEdit);
+  if (expense) openExpenseForm({ preset: expense, expense });
+};
+function openExpenseForm({ preset, wish = [], expense }) {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: household().timezone }).format(new Date());
-  const others = active().filter((m) => m.userId !== S.user.userId);
-  openModal(`${mhead('Log an expense')}
-    <form class="stack" data-form="expense" autocomplete="off">
+  const others = active().filter((m) => m.userId !== S.user.userId &&
+    (!expense || Date.parse(m.joinedDate) <= Date.parse(expense.createdAt)));
+  const selected = new Set(expense?.shares.map((share) => share.userId));
+  openModal(`${mhead(expense ? 'Edit expense' : 'Log an expense')}
+    <form class="stack" data-form="expense" data-expense-id="${expense?.expenseId ?? ''}" autocomplete="off">
       ${wish.length ? `<label class="fld"><span>From the wish list (optional)</span><select class="input" name="wishlistItemId" data-input="wish-pick"><option value="">Not from the wish list</option>${wish.map((w) => `<option value="${w.wishlistItemId}" data-name="${esc(w.itemName)}" data-price="${esc(w.estimatedPrice ?? '')}">${esc(w.itemName)}${w.estimatedPrice ? ' (about ' + $m(w.estimatedPrice) + ')' : ''}</option>`).join('')}</select></label>` : ''}
       <label class="fld"><span>What did you buy?</span><input class="input" name="itemName" required maxlength="120" placeholder="Paper towels" value="${esc(preset.itemName ?? '')}"></label>
       <div class="grid2" style="gap:12px">
         <label class="fld"><span>Total</span><input class="input" name="totalAmount" required inputmode="decimal" pattern="\\d{1,7}(\\.\\d{1,2})?" placeholder="24.99" data-input="split" value="${esc(preset.totalAmount ?? '')}"></label>
-        <label class="fld"><span>Date</span><input class="input" name="purchaseDate" type="date" value="${today}" max="${today}"></label>
+        ${expense ? '' : `<label class="fld"><span>Date</span><input class="input" name="purchaseDate" type="date" value="${today}" max="${today}"></label>`}
       </div>
       <div class="fld"><span>Split between</span>
         <div class="stack" style="gap:8px">
           <label class="chk off"><input type="checkbox" checked disabled> ${avatar(S.user, 'sm')} You (you paid)</label>
-          ${others.map((m) => `<label class="chk"><input type="checkbox" name="p" value="${m.userId}" checked data-input="split"> ${avatar(m, 'sm')} ${esc(fullName(m))}</label>`).join('')}
+          ${others.map((m) => `<label class="chk"><input type="checkbox" name="p" value="${m.userId}" ${!expense || selected.has(m.userId) ? 'checked' : ''} data-input="split"> ${avatar(m, 'sm')} ${esc(fullName(m))}</label>`).join('')}
         </div>
       </div>
       <div class="hint" id="split-preview"></div>
       <div class="err" role="alert"></div>
-      <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Log expense</button></div>
+      <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">${expense ? 'Save changes' : 'Log expense'}</button></div>
     </form>`);
   inputs.split();
-};
+}
 inputs['wish-pick'] = (el) => {
   const option = el.selectedOptions[0], form = el.form; if (!form) return;
   form.elements.namedItem('itemName').value = option?.value ? option.dataset.name || '' : '';
@@ -152,8 +164,12 @@ forms.expense = async (form) => {
   const f = new FormData(form);
   const body = { itemName: f.get('itemName'), totalAmount: String(f.get('totalAmount')).trim(), purchaseDate: f.get('purchaseDate'), participantUserIds: f.getAll('p').map(Number) };
   if (f.get('wishlistItemId')) body.wishlistItemId = Number(f.get('wishlistItemId'));
-  try { await api(`/households/${hid()}/expenses`, { method: 'POST', body }); } catch (e) { return showError(form, e.message); }
-  closeModal(); toast('Expense logged. Your roommates were notified.'); window.dispatchEvent(new Event('roomie:render'));
+  const expenseId = form.dataset.expenseId;
+  const path = `/households/${hid()}/expenses`;
+  try {
+    await api(expenseId ? `${path}/${expenseId}` : path, { method: expenseId ? 'PATCH' : 'POST', body });
+  } catch (e) { return showError(form, e.message); }
+  closeModal(); toast(expenseId ? 'Expense updated' : 'Expense logged. Your roommates were notified.'); window.dispatchEvent(new Event('roomie:render'));
 };
 
 // ---- pay back ---------------------------------------------------------------------------------
