@@ -44,7 +44,10 @@ function person(id, extra = '') { const m = who(id); return `<div class="row" st
 
 function settleView() {
   const { bal } = D;
-  const mine = bal.mine.filter(b => isCurrentMember(D.members, b.otherUserId)).map((b) => {
+  const mine = bal.mine
+    .filter(b => isCurrentMember(D.members, b.otherUserId))
+    .sort((a, b) => Number(toCents(b.signedAmount) < 0) - Number(toCents(a.signedAmount) < 0))
+    .map((b) => {
     const cents = toCents(b.signedAmount);
     const owe = cents < 0;
     const payable = bal.payable.some((p) => p.payeeUserId === b.otherUserId);
