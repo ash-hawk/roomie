@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { inputs } from '../src/lib/events.js';
+import { actions, inputs } from '../src/lib/events.js';
 import '../src/pages/finances.js';
 
 let form, picker;
@@ -28,4 +28,17 @@ describe('expense wish-list selection', () => {
     expect(form.elements.namedItem('totalAmount').value).toBe('');
     expect(document.getElementById('split-preview').textContent).not.toContain('$');
   });
+});
+
+it('clears the roommate checkboxes and refreshes the preview while keeping the buyer selected', () => {
+  form.insertAdjacentHTML('afterbegin', '<input id="buyer" type="checkbox" checked disabled><button type="button" data-action="expense-deselect-roommates">Deselect all roommates</button>');
+  picker.value = '1';
+  inputs['wish-pick'](picker);
+  actions['expense-deselect-roommates'](form.querySelector('[data-action="expense-deselect-roommates"]'));
+  expect(new FormData(form).getAll('p')).toEqual([]);
+  expect(form.querySelector('#buyer').checked).toBe(true);
+  expect(document.getElementById('split-preview').textContent).toBe('Pick at least one roommate to split with.');
+  form.querySelector('[name=p]').checked = true;
+  inputs.split();
+  expect(document.getElementById('split-preview').textContent).toContain('$6.75');
 });
