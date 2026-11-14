@@ -18,7 +18,7 @@ export type OnboardingChore = {
   dayOfWeek?: number;
   dayOfMonth?: number;
   dueTime: string;
-  effort: 'easy' | 'medium' | 'hard';
+  effort: 'Easy' | 'Medium' | 'Hard';
   assignment: { mode: 'person'; userId: number } | { mode: 'rotate'; userIds: number[] };
 };
 
@@ -54,7 +54,7 @@ export function validateOnboardingDraft(raw: unknown, members: OnboardingMember[
     if (!names.length || groups.some((group) => !group?.length)) continue;
     const assignees = [...new Set(groups.flatMap((group) => group!.map((member) => member.userId)))];
     if (!assignees.length || (repeats === 'none' && assignees.length !== 1)) continue;
-    const effort: OnboardingChore['effort'] = c.effort === 'easy' || c.effort === 'hard' ? c.effort : 'medium';
+    const effort: OnboardingChore['effort'] = c.effort === 'Easy' || c.effort === 'Hard' ? c.effort : 'Medium';
     const base = {
       choreName,
       description: text(c.description, 500) || null,
