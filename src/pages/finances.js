@@ -132,7 +132,11 @@ function openExpenseForm({ preset, wish = [], expense }) {
         <label class="fld"><span>Total</span><input class="input" name="totalAmount" required inputmode="decimal" pattern="\\d{1,7}(\\.\\d{1,2})?" placeholder="24.99" data-input="split" value="${esc(preset.totalAmount ?? '')}"></label>
         ${expense ? '' : `<label class="fld"><span>Date</span><input class="input" name="purchaseDate" type="date" value="${today}" max="${today}"></label>`}
       </div>
-      <div class="fld"><span>Split between</span>
+      <div class="fld">
+        <div class="row sp wrap">
+          <span>Split between</span>
+          ${others.length ? '<button type="button" class="btn s" data-action="expense-deselect-roommates">Deselect all roommates</button>' : ''}
+        </div>
         <div class="stack" style="gap:8px">
           <label class="chk off"><input type="checkbox" checked disabled> ${avatar(S.user, 'sm')} You (you paid)</label>
           ${others.map((m) => `<label class="chk"><input type="checkbox" name="p" value="${m.userId}" ${!expense || selected.has(m.userId) ? 'checked' : ''} data-input="split"> ${avatar(m, 'sm')} ${esc(fullName(m))}</label>`).join('')}
@@ -144,6 +148,12 @@ function openExpenseForm({ preset, wish = [], expense }) {
     </form>`);
   inputs.split();
 }
+actions['expense-deselect-roommates'] = (button) => {
+  for (const checkbox of button.form.querySelectorAll('input[name=p]:enabled')) {
+    checkbox.checked = false;
+  }
+  inputs.split();
+};
 inputs['wish-pick'] = (el) => {
   const option = el.selectedOptions[0], form = el.form; if (!form) return;
   form.elements.namedItem('itemName').value = option?.value ? option.dataset.name || '' : '';
