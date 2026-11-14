@@ -28,17 +28,17 @@ const base = `/api/households/${h.householdId}`;
 const ymd = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 const dowOf = (n: number) => new Date(`${ymd(n)}T12:00:00Z`).getUTCDay();
 const chore = async (token: string, body: unknown) => (await (await call(`${base}/chores`, { method: 'POST', token, body })).json());
-await chore(A.jwt, { choreName: 'Take out trash', description: 'Kitchen and bathroom bins to the curb', repeats: 'weekly', dayOfWeek: dowOf(1), dueTime: '19:00', effort: 'easy', assignment: { mode: 'rotate', userIds: [A.id, B.id] } });
-await chore(A.jwt, { choreName: 'Clean bathroom', description: 'Toilet, sink, shower, mirror, floor', repeats: 'weekly', dayOfWeek: dowOf(3), dueTime: '10:00', effort: 'hard', assignment: { mode: 'person', userId: B.id } });
-await chore(B.jwt, { choreName: 'Water the plants', repeats: 'none', date: ymd(2), dueTime: '18:00', effort: 'easy', assignment: { mode: 'person', userId: B.id } });
-await chore(A.jwt, { choreName: 'Pay the internet', repeats: 'monthly', dayOfMonth: 15, dueTime: '09:00', effort: 'medium', assignment: { mode: 'person', userId: A.id } });
+await chore(A.jwt, { choreName: 'Take out trash', description: 'Kitchen and bathroom bins to the curb', repeats: 'weekly', dayOfWeek: dowOf(1), dueTime: '19:00', effort: 'Easy', assignment: { mode: 'rotate', userIds: [A.id, B.id] } });
+await chore(A.jwt, { choreName: 'Clean bathroom', description: 'Toilet, sink, shower, mirror, floor', repeats: 'weekly', dayOfWeek: dowOf(3), dueTime: '10:00', effort: 'Hard', assignment: { mode: 'person', userId: B.id } });
+await chore(B.jwt, { choreName: 'Water the plants', repeats: 'none', date: ymd(2), dueTime: '18:00', effort: 'Easy', assignment: { mode: 'person', userId: B.id } });
+await chore(A.jwt, { choreName: 'Pay the internet', repeats: 'monthly', dayOfMonth: 15, dueTime: '09:00', effort: 'Medium', assignment: { mode: 'person', userId: A.id } });
 const list = await (await call(base + '/chores', { token: A.jwt })).json();
 const aTrash = list.assignments.find((x: any) => x.assignedUserId === A.id && list.chores.find((c: any) => c.choreId === x.choreId)?.choreName === 'Take out trash'); // eslint-disable-line @typescript-eslint/no-explicit-any
 const bBath = list.assignments.find((x: any) => x.assignedUserId === B.id && list.chores.find((c: any) => c.choreId === x.choreId)?.choreName === 'Clean bathroom'); // eslint-disable-line @typescript-eslint/no-explicit-any
 if (aTrash && bBath) await call(`${base}/swap-requests`, { method: 'POST', token: A.jwt, body: { type: 'swap', requesterAssignmentId: aTrash.assignmentId, targetAssignmentId: bBath.assignmentId, message: 'Visiting family this weekend' } });
 // B also does a few things so A has a notification in every section (chores, expense tracker, calendar) ...
 await call(`${base}/wishlist`, { method: 'POST', token: B.jwt, body: { itemName: 'Dish rack', needOrWant: 'need', estimatedPrice: '14.00' } });
-await chore(B.jwt, { choreName: 'Sweep the floor', repeats: 'none', date: ymd(4), dueTime: '17:00', effort: 'easy', assignment: { mode: 'person', userId: A.id } });
+await chore(B.jwt, { choreName: 'Sweep the floor', repeats: 'none', date: ymd(4), dueTime: '17:00', effort: 'Easy', assignment: { mode: 'person', userId: A.id } });
 await call(`${base}/events`, { method: 'POST', token: B.jwt, body: { eventName: 'Movie night', date: ymd(5), time: '20:00', category: 'hosting', taggedUserIds: [A.id] } });
 // ... and a system reminder (normally the daily cron sends these), plus "money" comes from B paying A back in the UI
 if (aTrash) {

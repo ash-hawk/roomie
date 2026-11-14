@@ -215,7 +215,7 @@ MODALS.addChore = d => {
 <div class="grid2">${field('c2t', 'Time', 'type="time"', c.time || '18:00')}${field('c2s', 'Start date', 'type="date"', TODAY)}</div>
 <label class="fld"><span>Frequency</span><select class="input"><option>Weekly</option><option>Every 2 weeks</option></select></label>
 <div id="rot" class="${c.rotate ? '' : 'hide'} fld"><span>Rotation order (at least one)</span><div class="row" style="flex-wrap:wrap">${S.order.map(i => `<label class="chip row" style="gap:5px"><input type="checkbox" class="ro" value="${i}" ${(c.rotation || S.order).includes(i) ? 'checked' : ''}>${name(i)}</label>`).join('')}</div></div></div>
-<div class="grid2"><label class="fld"><span>Effort (optional)</span><select id="cef" class="input">${['easy', 'medium', 'hard'].map(x => `<option ${c.effort === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>${field('cno', 'Notes (optional)', '', c.notes || '')}</div>
+<div class="grid2"><label class="fld"><span>Effort (optional)</span><select id="cef" class="input">${['Easy', 'Medium', 'Hard'].map(x => `<option ${c.effort === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>${field('cno', 'Notes (optional)', '', c.notes || '')}</div>
 <label class="row"><input type="checkbox" class="tog" id="ccal" ${c.cal === false ? '' : 'checked'}><span>Add to shared calendar</span></label>${errBox}
 <div class="acts"><button class="btn" onclick="A.close()">Cancel</button><button class="btn p" onclick="A.saveChore('${d.edit || ''}')">${d.edit ? 'Save' : 'Add chore'}</button></div>`;
 };

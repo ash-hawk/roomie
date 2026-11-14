@@ -78,9 +78,9 @@ async function main() {
 
     // ---- chores: the rule + generated occurrences ---------------------------------------------
     const [trash, bath, plants] = await tx.insert(s.chore).values([
-      { householdId: H, createdByUserId: A, choreName: 'Take out trash', description: 'Kitchen and bathroom bins to the curb.', repeats: 'weekly', dayOfWeek: 1, dueTime: '19:00', effort: 'easy', startDate: addDays(today, -21) },
-      { householdId: H, createdByUserId: P, choreName: 'Clean bathroom', description: 'Toilet, sink, shower, mirror, floor.', repeats: 'weekly', dayOfWeek: 6, dueTime: '10:00', effort: 'hard', startDate: addDays(today, -21) },
-      { householdId: H, createdByUserId: A, choreName: 'Water the plants', description: 'Living room and balcony.', repeats: 'none', dueTime: '18:00', effort: 'easy', startDate: addDays(today, 2) },
+      { householdId: H, createdByUserId: A, choreName: 'Take out trash', description: 'Kitchen and bathroom bins to the curb.', repeats: 'weekly', dayOfWeek: 1, dueTime: '19:00', effort: 'Easy', startDate: addDays(today, -21) },
+      { householdId: H, createdByUserId: P, choreName: 'Clean bathroom', description: 'Toilet, sink, shower, mirror, floor.', repeats: 'weekly', dayOfWeek: 6, dueTime: '10:00', effort: 'Hard', startDate: addDays(today, -21) },
+      { householdId: H, createdByUserId: A, choreName: 'Water the plants', description: 'Living room and balcony.', repeats: 'none', dueTime: '18:00', effort: 'Easy', startDate: addDays(today, 2) },
     ]).returning();
     // trash rotates through the three CURRENT roommates (never Sam)
     await tx.insert(s.choreRotation).values([{ choreId: trash!.choreId, userId: A, turnOrder: 1 }, { choreId: trash!.choreId, userId: P, turnOrder: 2 }, { choreId: trash!.choreId, userId: J, turnOrder: 3 }]);

@@ -25,7 +25,7 @@ const draftSchema = {
     chores: { type: 'array', maxItems: 10, items: { type: 'object', additionalProperties: false, required: ['name', 'description', 'repeats', 'dueTime', 'effort', 'assigneeNames'], properties: {
       name: { type: 'string', maxLength: 120 }, description: { type: 'string', maxLength: 500 }, repeats: { type: 'string', enum: ['weekly', 'monthly', 'once'] },
       dayOfWeek: { type: 'integer', minimum: 0, maximum: 6 }, dayOfMonth: { type: 'integer', minimum: 1, maximum: 31 }, date: { type: 'string' },
-      dueTime: { type: 'string' }, effort: { type: 'string', enum: ['easy', 'medium', 'hard'] }, assigneeNames: { type: 'array', minItems: 1, items: { type: 'string' } },
+      dueTime: { type: 'string' }, effort: { type: 'string', enum: ['Easy', 'Medium', 'Hard'] }, assigneeNames: { type: 'array', minItems: 1, items: { type: 'string' } },
     } } },
     rulesNote: { type: 'string', maxLength: 500 },
     wishlist: { type: 'array', maxItems: 10, items: { type: 'object', additionalProperties: false, required: ['name', 'needOrWant', 'description'], properties: {

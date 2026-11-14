@@ -27,12 +27,12 @@ function seed() {
     users: JSON.parse(JSON.stringify(PEOPLE)),
     order: ['u1', 'u2', 'u3', 'u4'],
     chores: [
-      { id: 'c1', name: 'Take out trash', desc: 'Kitchen + bathroom bins to the curb.', assignee: 'u1', by: 'u2', type: 'recurring', days: [1, 4], time: '19:00', date: '2026-10-01', effort: 'easy', notes: '', status: 'pending', lastDone: '2026-09-28', rotate: false, cal: true },
-      { id: 'c2', name: 'Clean bathroom', desc: 'Toilet, sink, shower, mirror, floor.', assignee: 'u2', by: 'u2', type: 'recurring', days: [6], time: '10:00', date: '2026-10-03', effort: 'hard', notes: 'Use the green spray.', status: 'pending', lastDone: '2026-09-26', rotate: false, cal: true, swap: { from: 'u2', toChore: 'c1', reason: 'Visiting family this weekend', status: 'pending' } },
-      { id: 'c3', name: 'Vacuum living room', desc: '', assignee: 'u3', by: 'u1', type: 'one-time', days: [], time: '18:00', date: '2026-09-29', effort: 'medium', notes: '', status: 'overdue', lastDone: null, rotate: false, cal: true },
-      { id: 'c4', name: 'Kitchen reset', desc: 'Dishes, counters, stovetop.', assignee: 'u4', by: 'u1', type: 'recurring', days: [0, 3], time: '20:00', date: '2026-10-04', effort: 'medium', notes: '', status: 'pending', lastDone: '2026-09-30', rotate: false, cal: true },
-      { id: 'c5', name: 'Wipe down counters', desc: '', assignee: 'u1', by: 'u1', type: 'one-time', days: [], time: '17:00', date: '2026-10-02', effort: 'easy', notes: '', status: 'pending', lastDone: null, rotate: false, cal: true },
-      { id: 'c6', name: 'Recycling run', desc: 'Rotates through the house.', assignee: 'u3', by: 'u1', type: 'recurring', days: [5], time: '09:00', date: '2026-10-02', effort: 'easy', notes: '', status: 'pending', lastDone: '2026-09-25', rotate: true, rotation: ['u1', 'u2', 'u3', 'u4'], cal: true },
+      { id: 'c1', name: 'Take out trash', desc: 'Kitchen + bathroom bins to the curb.', assignee: 'u1', by: 'u2', type: 'recurring', days: [1, 4], time: '19:00', date: '2026-10-01', effort: 'Easy', notes: '', status: 'pending', lastDone: '2026-09-28', rotate: false, cal: true },
+      { id: 'c2', name: 'Clean bathroom', desc: 'Toilet, sink, shower, mirror, floor.', assignee: 'u2', by: 'u2', type: 'recurring', days: [6], time: '10:00', date: '2026-10-03', effort: 'Hard', notes: 'Use the green spray.', status: 'pending', lastDone: '2026-09-26', rotate: false, cal: true, swap: { from: 'u2', toChore: 'c1', reason: 'Visiting family this weekend', status: 'pending' } },
+      { id: 'c3', name: 'Vacuum living room', desc: '', assignee: 'u3', by: 'u1', type: 'one-time', days: [], time: '18:00', date: '2026-09-29', effort: 'Medium', notes: '', status: 'overdue', lastDone: null, rotate: false, cal: true },
+      { id: 'c4', name: 'Kitchen reset', desc: 'Dishes, counters, stovetop.', assignee: 'u4', by: 'u1', type: 'recurring', days: [0, 3], time: '20:00', date: '2026-10-04', effort: 'Medium', notes: '', status: 'pending', lastDone: '2026-09-30', rotate: false, cal: true },
+      { id: 'c5', name: 'Wipe down counters', desc: '', assignee: 'u1', by: 'u1', type: 'one-time', days: [], time: '17:00', date: '2026-10-02', effort: 'Easy', notes: '', status: 'pending', lastDone: null, rotate: false, cal: true },
+      { id: 'c6', name: 'Recycling run', desc: 'Rotates through the house.', assignee: 'u3', by: 'u1', type: 'recurring', days: [5], time: '09:00', date: '2026-10-02', effort: 'Easy', notes: '', status: 'pending', lastDone: '2026-09-25', rotate: true, rotation: ['u1', 'u2', 'u3', 'u4'], cal: true },
     ],
     purchases: [
       mkPurchase('p1', 'Dish soap & sponges', 1250, 'u1', '2026-09-29', ['u1', 'u2', 'u3'], 'Venmo', { u2: { status: 'claimed' } }),

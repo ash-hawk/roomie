@@ -431,7 +431,7 @@ async function main() {
 
   console.log(' [9b] a weekly chore that rotates A -> B -> C');
   const wd = (dow(today) + 2) % 7;
-  const rot = await mk({ choreName: 'Take out trash', description: 'Bins to the curb', repeats: 'weekly', dayOfWeek: wd, dueTime: '19:00', effort: 'easy', assignment: { mode: 'rotate', userIds: [uA, uB, uC] }, createdByUserId: uB });
+  const rot = await mk({ choreName: 'Take out trash', description: 'Bins to the curb', repeats: 'weekly', dayOfWeek: wd, dueTime: '19:00', effort: 'Easy', assignment: { mode: 'rotate', userIds: [uA, uB, uC] }, createdByUserId: uB });
   check('created (201) with the first occurrences generated', rot.status === 201 && rot.body.occurrences === 4, JSON.stringify(rot.body));
   const rotId = rot.body.choreId as number;
   check('created_by is the caller, not the id in the body', Number((await sql('SELECT created_by_user_id c FROM chore WHERE chore_id=$1', [rotId]))[0].c) === uA);

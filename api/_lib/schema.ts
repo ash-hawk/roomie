@@ -119,7 +119,7 @@ export const chore = pgTable("chore", {
 	check("chore_check", sql`((repeats = 'none'::text) AND (day_of_week IS NULL) AND (day_of_month IS NULL)) OR ((repeats = 'weekly'::text) AND (day_of_week IS NOT NULL) AND (day_of_month IS NULL)) OR ((repeats = 'monthly'::text) AND (day_of_month IS NOT NULL) AND (day_of_week IS NULL))`),
 	check("chore_day_of_month_check", sql`(day_of_month >= 1) AND (day_of_month <= 31)`),
 	check("chore_day_of_week_check", sql`(day_of_week >= 0) AND (day_of_week <= 6)`),
-	check("chore_effort_check", sql`effort = ANY (ARRAY['easy'::text, 'medium'::text, 'hard'::text])`),
+	check("chore_effort_check", sql`effort = ANY (ARRAY['Easy'::text, 'Medium'::text, 'Hard'::text])`),
 	check("chore_repeats_check", sql`repeats = ANY (ARRAY['none'::text, 'weekly'::text, 'monthly'::text])`),
 ]);
 

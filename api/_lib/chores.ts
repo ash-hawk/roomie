@@ -15,7 +15,7 @@ import { activeIds, firstName, householdTz, optStr, str, todayIn } from './valid
 import { addDays, describeSchedule, nextInRotation, occurrenceDates } from '../../shared/chore-dates.js';
 
 const HORIZON_DAYS = 28;
-const EFFORTS = ['easy', 'medium', 'hard'] as const;
+const EFFORTS = ['Easy', 'Medium', 'Hard'] as const;
 const REMIND_AUTO_GAP = '20 hours';
 const REMIND_MANUAL_GAP_MS = 12 * 3600_000;
 type Chore = typeof s.chore.$inferSelect;
@@ -162,7 +162,7 @@ export async function listChores(householdId: number, viewerId: number) {
 export async function createChore(user: CurrentUser, householdId: number, b: Record<string, unknown>) {
   const choreName = str(b.choreName, 1, 120, 'Chore name');
   const description = optStr(b.description, 500, 'Description');
-  const effort = b.effort === undefined ? 'medium' : (EFFORTS as readonly string[]).includes(b.effort as string) ? (b.effort as (typeof EFFORTS)[number]) : (() => { throw new HttpError(400, 'Effort must be easy, medium or hard'); })();
+  const effort = b.effort === undefined ? 'medium' : (EFFORTS as readonly string[]).includes(b.effort as string) ? (b.effort as (typeof EFFORTS)[number]) : (() => { throw new HttpError(400, 'Effort must be Easy, Medium or Hard'); })();
   const repeats = b.repeats === 'none' || b.repeats === 'weekly' || b.repeats === 'monthly' ? b.repeats : (() => { throw new HttpError(400, 'Choose one time, weekly or monthly'); })();
   const dueTime = timeOf(b.dueTime);
   const tz = await householdTz(db, householdId);
@@ -209,7 +209,7 @@ export async function updateChore(user: CurrentUser, householdId: number, choreI
   const set: Partial<typeof s.chore.$inferInsert> = {};
   if (b.choreName !== undefined) set.choreName = str(b.choreName, 1, 120, 'Chore name');
   if (b.description !== undefined) set.description = optStr(b.description, 500, 'Description');
-  if (b.effort !== undefined) { if (!(EFFORTS as readonly string[]).includes(b.effort as string)) throw new HttpError(400, 'Effort must be easy, medium or hard'); set.effort = b.effort as string; }
+  if (b.effort !== undefined) { if (!(EFFORTS as readonly string[]).includes(b.effort as string)) throw new HttpError(400, 'Effort must be Easy, Medium or Hard'); set.effort = b.effort as string; }
   return db.transaction(async (tx) => {
     await assertActiveMembers(tx, householdId, [user.userId]);
     const [c] = await tx.select().from(s.chore).where(and(eq(s.chore.choreId, choreId), eq(s.chore.householdId, householdId))).for('update');
