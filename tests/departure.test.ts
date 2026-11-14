@@ -12,7 +12,7 @@ vi.mock('../api/_lib/context.js', () => ({ withHousehold: (fn: unknown) => fn, w
 import { DELETE as remove } from '../api/_lib/handlers/member-admin.js';
 import { POST as join } from '../api/_lib/handlers/join.js';
 import { GET as listMembers } from '../api/_lib/handlers/members.js';
-import { getBalances, listExpenses, createPayment, reviewPayment, createExpense } from '../api/_lib/finance.js';
+import { getBalances, listExpenses, createPayment, reviewPayment, createExpense, editExpense, deleteExpense } from '../api/_lib/finance.js';
 import { createEvent, postNote } from '../api/_lib/calendar.js';
 import { createChore } from '../api/_lib/chores.js';
 const pg = new PGlite();
@@ -89,5 +89,41 @@ describe('departure lifecycle', () => {
     await expect(createPayment(asUser(3),1,{payeeUserId:2,expenseIds:[2],paidWith:'venmo'})).rejects.toThrow('previous household stay');
     await pg.exec(`INSERT INTO expense(household_id,paid_by_user_id,item_name,total_amount) VALUES (1,1,'New purchase',10); INSERT INTO expense_share(expense_id,user_id,amount_owed) VALUES (4,2,5);`);
     expect((await balances()).mine.find((b)=>b.otherUserId===2)?.signedAmount).toBe('5.00');
+  });
+});
+
+describe('editing an unpaid expense', () => {
+  const input = { itemName: 'Updated split', totalAmount: '12.01', participantUserIds: [3] };
+
+  it('replaces the old shares, updates both balances, and remains deletable', async () => {
+    const { expenseId } = await createExpense(asUser(1), 1, {
+      itemName: 'Original split', totalAmount: '10.00', participantUserIds: [2],
+    });
+    expect((await listExpenses(1, 1)).expenses.find((e) => e.expenseId === expenseId)?.canEdit).toBe(true);
+    await editExpense(asUser(1), 1, expenseId, input);
+    const edited = (await listExpenses(1, 3)).expenses.find((e) => e.expenseId === expenseId);
+    expect(edited).toMatchObject({
+      itemName: 'Updated split', totalAmount: '12.01', canEdit: false,
+      shares: [{ userId: 1, amountOwed: '6.01' }, { userId: 3, amountOwed: '6.00' }],
+    });
+    expect((await getBalances(1, 2)).payable.some((share) => share.expenseId === expenseId)).toBe(false);
+    expect((await getBalances(1, 3)).payable.find((share) => share.expenseId === expenseId)?.amountOwed).toBe('6.00');
+    expect((await getBalances(1, 1)).mine.find((row) => row.otherUserId === 3)?.signedAmount).toBe('16.00');
+    await deleteExpense(asUser(1), 1, expenseId);
+    expect((await listExpenses(1, 1)).expenses.some((e) => e.expenseId === expenseId)).toBe(false);
+  });
+
+  it('rejects edits from other users and protects repayments and membership history', async () => {
+    await expect(editExpense(asUser(3), 1, 2, input)).rejects.toMatchObject({ status: 403 });
+    await expect(editExpense(asUser(1), 1, 1, input)).rejects.toMatchObject({ status: 409 });
+    expect((await listExpenses(1, 1)).expenses.find((e) => e.expenseId === 1)?.canEdit).toBe(false);
+    await (remove as any)(removeContext());
+    await (join as any)(asUser(2), new Request('http://localhost/api/households/join', {
+      method: 'POST', body: JSON.stringify({ joinCode: 'HERE' }),
+    }));
+    await expect(editExpense(asUser(2), 1, 2, input)).rejects.toMatchObject({ status: 400 });
+    expect((await listExpenses(1, 2)).expenses.find((e) => e.expenseId === 2)).toMatchObject({
+      itemName: 'Leaving purchase', totalAmount: '30.00', canEdit: false,
+    });
   });
 });
