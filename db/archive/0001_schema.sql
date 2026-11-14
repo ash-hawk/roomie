@@ -57,7 +57,7 @@ create table public.chores (
   days smallint[] not null default '{}',          -- 0 = Sunday
   due_time time,
   due_date date,
-  effort text not null default 'Easy' check (effort in ('Easy', 'Medium', 'Hard')),
+  effort text not null default 'easy' check (effort in ('easy', 'medium', 'hard')),
   notes text not null default '',
   status text not null default 'pending' check (status in ('pending', 'done', 'overdue')),
   last_done date,

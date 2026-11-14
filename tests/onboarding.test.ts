@@ -5,7 +5,7 @@ import { validateOnboardingDraft, type OnboardingAnswers } from '../shared/onboa
 const members = [{ userId: 7, firstName: 'Alex' }, { userId: 9, firstName: 'Priya' }];
 const chore = (over: Record<string, unknown> = {}) => ({
   name: 'Take out trash', description: 'Kitchen and bathroom bins', repeats: 'weekly', dayOfWeek: 1,
-  dueTime: '19:00', effort: 'Easy', assigneeNames: ['Alex', 'Priya'], ...over,
+  dueTime: '19:00', effort: 'easy', assigneeNames: ['Alex', 'Priya'], ...over,
 });
 
 describe('onboarding draft validation', () => {

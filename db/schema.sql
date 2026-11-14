@@ -104,7 +104,7 @@ CREATE TABLE chore (
     day_of_week        SMALLINT CHECK (day_of_week BETWEEN 0 AND 6),
     day_of_month       SMALLINT CHECK (day_of_month BETWEEN 1 AND 31),
     due_time           TIME,
-    effort             TEXT NOT NULL DEFAULT 'Medium' CHECK (effort IN ('Easy', 'Medium', 'Hard')),
+    effort             TEXT NOT NULL DEFAULT 'medium' CHECK (effort IN ('easy', 'medium', 'hard')),
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK (

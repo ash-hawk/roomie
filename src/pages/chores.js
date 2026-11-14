@@ -16,10 +16,10 @@ let filter = 'all';     // 'all' | 'me' | userId
 let sortBy = 'added';   // chart: 'added' | 'az' | 'assignee'
 let D = null;           // { members, chores, assignments, swapRequests }
 const STARTERS = [
-  { key: 'trash', name: 'Take out the trash', description: 'Empty the kitchen and bathroom bins.', dayOfWeek: 1, dueTime: '19:00', effort: 'Easy' },
-  { key: 'dishes', name: 'Kitchen reset', description: 'Load dishes and wipe the counters.', dayOfWeek: 3, dueTime: '20:00', effort: 'Medium' },
-  { key: 'bathroom', name: 'Clean the bathroom', description: 'Sink, toilet, mirror, shower, and floor.', dayOfWeek: 6, dueTime: '10:00', effort: 'Hard' },
-  { key: 'vacuum', name: 'Vacuum shared spaces', description: 'Living room, hallway, and entry.', dayOfWeek: 0, dueTime: '16:00', effort: 'Medium' },
+  { key: 'trash', name: 'Take out the trash', description: 'Empty the kitchen and bathroom bins.', dayOfWeek: 1, dueTime: '19:00', effort: 'easy' },
+  { key: 'dishes', name: 'Kitchen reset', description: 'Load dishes and wipe the counters.', dayOfWeek: 3, dueTime: '20:00', effort: 'medium' },
+  { key: 'bathroom', name: 'Clean the bathroom', description: 'Sink, toilet, mirror, shower, and floor.', dayOfWeek: 6, dueTime: '10:00', effort: 'hard' },
+  { key: 'vacuum', name: 'Vacuum shared spaces', description: 'Living room, hallway, and entry.', dayOfWeek: 0, dueTime: '16:00', effort: 'medium' },
 ];
 
 const hid = () => household().householdId;
@@ -33,7 +33,7 @@ const ymdIn = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: tz() }).format
 const daysFromToday = (iso) => Math.round((Date.parse(`${ymdIn(iso)}T12:00:00Z`) - Date.parse(`${ymdIn(Date.now())}T12:00:00Z`)) / 86400000);
 const whenFmt = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: tz(), weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '').replace(/(\d) (\d)/, '$1 · $2');
 const doneFmt = (iso) => new Date(iso).toLocaleDateString('en-US', { timeZone: tz(), month: 'short', day: 'numeric' });
-const effortChip = (e) => `<span class="st effort effort-${e}" title="${e[0].toUpperCase() + e.slice(1)} effort">${e[0].toUpperCase() + e.slice(1)} ${e === 'Easy' ? '·' : e === 'Medium' ? '··' : '···'}</span>`;
+const effortChip = (e) => `<span class="st effort effort-${e}" title="${e[0].toUpperCase() + e.slice(1)} effort">${e[0].toUpperCase() + e.slice(1)} ${e === 'easy' ? '·' : e === 'medium' ? '··' : '···'}</span>`;
 const openRequestOn = (aid) => D.swapRequests.find((r) => r.requesterAssignmentId === aid || r.targetAssignmentId === aid);
 
 export async function choresView() {
@@ -214,7 +214,7 @@ actions['add-chore'] = (el) => {
     <form class="stack" data-form="chore-add" autocomplete="off">
       <label class="fld"><span>What needs doing?</span><input class="input" name="choreName" required maxlength="120" placeholder="Take out the trash"></label>
       <label class="fld"><span>Details (optional)</span><textarea class="input" name="description" rows="2" maxlength="500" placeholder="Kitchen and bathroom bins to the curb"></textarea></label>
-      <div class="inline-grid"><label class="fld"><span>How hard?</span><select class="input" name="effort"><option value="Easy">Easy</option><option value="Medium" selected>Medium</option><option value="Hard">Hard</option></select></label>
+      <div class="inline-grid"><label class="fld"><span>How hard?</span><select class="input" name="effort"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
         <label class="fld"><span>Time</span><input class="input" name="dueTime" type="time" value="19:00" required></label></div>
       <div class="fld"><span>How often?</span><div class="methods" style="grid-template-columns:repeat(3,1fr)">
         <label><input type="radio" name="repeats" value="none" ${selectedDay ? 'checked' : ''} data-input="chore-type">One time</label>
@@ -329,7 +329,7 @@ actions['edit-chore'] = (el) => {
   openModal(`${mhead('Edit chore')}<form class="stack" data-form="chore-edit" data-id="${c.choreId}">
     <label class="fld"><span>Name</span><input class="input" name="choreName" required maxlength="120" value="${esc(c.choreName)}"></label>
     <label class="fld"><span>Details</span><textarea class="input" name="description" rows="2" maxlength="500">${esc(c.description ?? '')}</textarea></label>
-    <label class="fld"><span>How hard?</span><select class="input" name="effort">${['Easy', 'Medium', 'Hard'].map((e) => `<option value="${e}" ${c.effort === e ? 'selected' : ''}>${e[0].toUpperCase() + e.slice(1)}</option>`).join('')}</select></label>
+    <label class="fld"><span>How hard?</span><select class="input" name="effort">${['easy', 'medium', 'hard'].map((e) => `<option value="${e}" ${c.effort === e ? 'selected' : ''}>${e[0].toUpperCase() + e.slice(1)}</option>`).join('')}</select></label>
     <p class="hint">To change when it happens or who does it, delete it and add it again.</p>
     <div class="err" role="alert"></div><div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Save</button></div></form>`);
 };
