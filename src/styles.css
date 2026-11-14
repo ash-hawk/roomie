@@ -155,7 +155,7 @@ img.av::after{display:none}
 .onb::before{background:var(--accent);top:-120px;left:-100px}
 .onb::after{background:#ec4899;bottom:-140px;right:-100px;animation-delay:-7s;opacity:.35}
 .onb .box{width:100%;max-width:440px;display:flex;flex-direction:column;gap:18px}
-.onboarding-wizard{align-items:flex-start;padding-block:32px 56px;overflow:visible}
+.onboarding-wizard{align-items:flex-start;padding-block:32px 56px;overflow:clip}
 .onboarding-wizard .wizard-box{max-width:760px}
 .wizard-brand{display:flex;align-items:flex-start;gap:16px}.wizard-brand h1{font-size:28px;line-height:1.1;letter-spacing:-.035em;margin:4px 0 7px}.wizard-brand p{margin:0}
 .wizard-progress{height:6px;background:var(--line);border-radius:99px;overflow:hidden}.wizard-progress span{display:block;height:100%;background:var(--accent);border-radius:inherit;transition:width .25s var(--ease)}
