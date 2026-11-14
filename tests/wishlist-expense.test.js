@@ -30,15 +30,21 @@ describe('expense wish-list selection', () => {
   });
 });
 
-it('clears the roommate checkboxes and refreshes the preview while keeping the buyer selected', () => {
-  form.insertAdjacentHTML('afterbegin', '<input id="buyer" type="checkbox" checked disabled><button type="button" data-action="expense-deselect-roommates">Deselect all roommates</button>');
+it('toggles all roommate checkboxes and refreshes the preview while keeping the buyer selected', () => {
+  form.insertAdjacentHTML('afterbegin', '<input id="buyer" type="checkbox" checked disabled><button type="button" data-action="expense-toggle-roommates">Deselect all roommates</button>');
   picker.value = '1';
   inputs['wish-pick'](picker);
-  actions['expense-deselect-roommates'](form.querySelector('[data-action="expense-deselect-roommates"]'));
+  const toggle = form.querySelector('[data-action="expense-toggle-roommates"]');
+  actions['expense-toggle-roommates'](toggle);
   expect(new FormData(form).getAll('p')).toEqual([]);
   expect(form.querySelector('#buyer').checked).toBe(true);
   expect(document.getElementById('split-preview').textContent).toBe('Pick at least one roommate to split with.');
-  form.querySelector('[name=p]').checked = true;
+  expect(toggle.textContent).toBe('Select all roommates');
+  actions['expense-toggle-roommates'](toggle);
+  expect(new FormData(form).getAll('p')).toEqual(['2', '3']);
+  expect(toggle.textContent).toBe('Deselect all roommates');
+  expect(document.getElementById('split-preview').textContent).toContain('$4.50');
+  for (const checkbox of form.querySelectorAll('[name=p]')) checkbox.checked = false;
   inputs.split();
-  expect(document.getElementById('split-preview').textContent).toContain('$6.75');
+  expect(toggle.textContent).toBe('Select all roommates');
 });

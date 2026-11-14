@@ -138,7 +138,7 @@ function openExpenseForm({ preset, wish = [], expense }) {
       <div class="fld">
         <div class="row sp wrap">
           <span>Split between</span>
-          ${others.length ? '<button type="button" class="btn s" data-action="expense-deselect-roommates">Deselect all roommates</button>' : ''}
+          ${others.length ? '<button type="button" class="btn s" data-action="expense-toggle-roommates">Deselect all roommates</button>' : ''}
         </div>
         <div class="stack" style="gap:8px">
           <label class="chk off"><input type="checkbox" checked disabled> ${avatar(S.user, 'sm')} You (you paid)</label>
@@ -151,10 +151,10 @@ function openExpenseForm({ preset, wish = [], expense }) {
     </form>`);
   inputs.split();
 }
-actions['expense-deselect-roommates'] = (button) => {
-  for (const checkbox of button.form.querySelectorAll('input[name=p]:enabled')) {
-    checkbox.checked = false;
-  }
+actions['expense-toggle-roommates'] = (button) => {
+  const roommates = [...button.form.querySelectorAll('input[name=p]:enabled')];
+  const selectAll = !roommates.some((checkbox) => checkbox.checked);
+  for (const checkbox of roommates) checkbox.checked = selectAll;
   inputs.split();
 };
 inputs['wish-pick'] = (el) => {
@@ -165,7 +165,9 @@ inputs['wish-pick'] = (el) => {
 };
 inputs.split = () => {
   const f = document.querySelector('form[data-form=expense]'); const out = document.getElementById('split-preview'); if (!f || !out) return;
-  const picked = [...f.querySelectorAll('input[name=p]:checked')];
+  const picked = [...f.querySelectorAll('input[name=p]:enabled:checked')];
+  const toggle = f.querySelector('[data-action=expense-toggle-roommates]');
+  if (toggle) toggle.textContent = picked.length ? 'Deselect all roommates' : 'Select all roommates';
   let total; try { total = toCents(f.elements.namedItem('totalAmount').value.trim()); } catch { total = 0; }
   if (!picked.length) { out.textContent = 'Pick at least one roommate to split with.'; return; }
   if (total <= 0) { out.textContent = `Split ${picked.length + 1} ways.`; return; }
