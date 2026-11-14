@@ -226,9 +226,29 @@ body::before{background:radial-gradient(60% 60% at 80% 0,color-mix(in srgb,var(-
 .main{max-width:1180px;margin:0 auto;padding:16px 16px 100px}
 .top{position:static;margin-bottom:14px;padding:14px 18px;background:color-mix(in srgb,var(--card) 80%,transparent);backdrop-filter:saturate(1.6) blur(18px);-webkit-backdrop-filter:saturate(1.6) blur(18px);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
 .brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-home{display:flex;align-items:center;color:inherit;text-decoration:none;flex:none}
 .brand .mark{border-radius:9px;background:var(--accent);color:var(--on-accent);box-shadow:none}
 .brand b{display:block;font-size:17px;font-weight:700;letter-spacing:-.02em}
 .brand small{display:block;font-size:12.5px;color:var(--mute)}
+.household-switcher{position:relative;min-width:0}
+.household-switcher>summary{display:flex;align-items:center;max-width:min(38vw,260px);padding:0;border:0;background:transparent;cursor:pointer;list-style:none}
+.household-switcher>summary::-webkit-details-marker{display:none}
+.household-switcher>summary:focus-visible,.brand-home:focus-visible,.household-switcher-option:focus-visible,.household-switcher-add:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.household-switcher-title{display:block;min-width:0}
+.household-switcher-title b{color:var(--ink)}
+.household-switcher-title small{max-width:min(38vw,260px)}
+.household-switcher[open]>summary .household-switcher-title b{color:var(--accent)}
+.household-switcher-menu{position:absolute;top:calc(100% + 8px);left:0;z-index:40;width:260px;max-width:calc(100vw - 36px);padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:var(--shadow)}
+.household-switcher-option,.household-switcher-add{display:flex;width:100%;align-items:center;gap:10px;padding:10px;border:0;border-radius:8px;background:transparent;color:var(--ink);text-align:left;cursor:pointer}
+.household-switcher-option:hover,.household-switcher-add:hover,.household-switcher-option.selected{background:var(--soft)}
+.household-switcher-option b,.household-switcher-option small{display:block}
+.household-switcher-option b{font-size:14px}
+.household-switcher-option small{margin-top:2px;color:var(--mute);font-size:12px}
+.household-switcher-add{font:inherit;font-size:13px;font-weight:650}
+.household-switcher-divider{height:1px;margin:5px 4px;background:var(--line)}
+.household-add-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.household-add-options h3{margin:0;font-size:16px}
+@media(max-width:520px){.household-add-options{grid-template-columns:1fr}.household-switcher>summary{max-width:40vw}.household-switcher-title small{max-width:40vw}.brand{gap:8px}}
 .pillnav{display:none;gap:8px;flex-wrap:wrap;margin-bottom:18px}
 .pillnav .nav-i{padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px}
 .pillnav .nav-i:hover{border-color:var(--accent);background:var(--card);color:var(--accent)}

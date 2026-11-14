@@ -3,7 +3,7 @@ import './styles.css';
 import { api, getToken, signOut } from './auth-client.js';
 import { actions, forms, inputs } from './lib/events.js';
 import { $, ico, mark, closeModal, esc, showError, toast } from './lib/dom.js';
-import { S, household, needsOnboarding, resetState } from './lib/state.js';
+import { S, needsOnboarding, resetState } from './lib/state.js';
 import { authView, isPasswordReset } from './pages/auth.js';
 import { onboardingView } from './pages/onboarding.js';
 import { settingsView } from './pages/settings.js';
@@ -17,6 +17,7 @@ import { homeView } from './pages/home.js';
 import { openPendingCalendarCreate } from './lib/calendar-create.js';
 import { connectHomeLayout } from './components/home-layout.js';
 import { soonView } from './pages/soon.js';
+import { householdSwitcherHtml } from './components/household-switcher.js';
 
 const NAV = [
   ['home', 'home', 'Home'],
@@ -43,12 +44,11 @@ async function loadMe() {
 }
 
 function shell(page, body) {
-  const h = household();
   const items = NAV.map(([k, i, l]) => `<a href="#/${k}" class="nav-i ${k === page ? 'on' : ''}" ${k === page ? 'aria-current="page"' : ''}>${ico(i, 19)}<span>${l}</span></a>`).join('');
   applyAppearance();
   const account = S.user.profilePhoto ? `<img class="acct-photo" src="${esc(S.user.profilePhoto)}" alt="" referrerpolicy="no-referrer">` : esc(((S.user.firstName || '?')[0]).toUpperCase());
   return `<div class="shell"><div class="main">
-    <header class="top"><a href="/#/home"><div class="brand">${mark()}<div class="grow"><b>Roomie</b><small class="truncate">${esc(h.householdName)}</small></div></div></a>
+    <header class="top"><div class="brand"><a class="brand-home" href="/#/home" aria-label="Roomie home">${mark()}</a>${householdSwitcherHtml()}</div>
       <div class="row" style="gap:10px">${bellHtml()}
       <button class="iconbtn acct" data-action="account" aria-label="Your profile and household">${account}</button></div></header>
     <nav class="pillnav" aria-label="Main">${items}</nav>
