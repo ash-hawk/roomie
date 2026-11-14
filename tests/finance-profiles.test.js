@@ -17,12 +17,18 @@ beforeEach(async () => {
   vi.mocked(api).mockReset();
   vi.mocked(api).mockImplementation(async (path) => {
     if (path.endsWith('/members')) return { members };
-    if (path.endsWith('/balances')) return { mine: [{ otherUserId: 2, signedAmount: '-10', pendingAmount: '0', disputedAmount: '0' }, { otherUserId: 3, signedAmount: '5', pendingAmount: '0', disputedAmount: '0' }], payable: [{ payeeUserId: 2 }], pairs: [{ debtorUserId: 2, creditorUserId: 3, amount: '6' }], incoming: [], outgoing: [] };
+    if (path.endsWith('/balances')) return { mine: [{ otherUserId: 3, signedAmount: '5', pendingAmount: '0', disputedAmount: '0' }, { otherUserId: 2, signedAmount: '-10', pendingAmount: '0', disputedAmount: '0' }], payable: [{ payeeUserId: 2 }], pairs: [{ debtorUserId: 2, creditorUserId: 3, amount: '6' }], incoming: [], outgoing: [] };
     if (path.endsWith('/expenses')) return { expenses: [{ expenseId: 8, itemName: 'Paper towels', purchaseDate: '2026-11-06', totalAmount: '10', paidByUserId: 2, shares: [{ userId: 2, amountOwed: '5', status: 'buyer' }, { userId: 3, amountOwed: '5', status: 'unpaid' }] }] };
     throw new Error('Unexpected request ' + path);
   });
   document.getElementById('page').innerHTML = await financesView();
 });
+it('shows balances you owe first even when the API returns them last', () => {
+  const labels = [...document.querySelectorAll('.finance-summary .item')].map((row) => row.textContent);
+  expect(labels[0]).toContain('you owe');
+  expect(labels[1]).toContain('owes you');
+});
+
 describe('finance roommate profiles', () => {
   it('opens contact and preferred payment details from balance photos and names, without sending money', async () => {
     const balance = document.querySelector('.finance-summary');
