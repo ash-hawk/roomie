@@ -42,16 +42,19 @@ function startFinancePolling() {
     inFlight = true;
     const householdId = hid(), userId = S.user?.userId;
     const dataSequence = financeDataSequence;
+    const includeWish = tab === 'wish';
     try {
-      const [{ members }, bal, { expenses }] = await Promise.all([
+      const [{ members }, bal, { expenses }, wishlist] = await Promise.all([
         api(`/households/${householdId}/members`),
         api(`/households/${householdId}/balances`),
         api(`/households/${householdId}/expenses`),
+        includeWish ? api(`/households/${householdId}/wishlist`) : Promise.resolve(null),
       ]);
       if (generation !== financePollGeneration || dataSequence !== financeDataSequence || householdId !== hid() || userId !== S.user?.userId) return;
-      const changed = JSON.stringify([members, bal, expenses]) !== JSON.stringify([D.members, D.bal, D.expenses]);
+      const wish = includeWish ? wishlist.items.filter((item) => isCurrentMember(members, item.createdByUserId)) : D.wish;
+      const changed = JSON.stringify([members, bal, expenses, wish]) !== JSON.stringify([D.members, D.bal, D.expenses, D.wish]);
       if (!changed) return;
-      D = { ...D, members, bal, expenses };
+      D = { ...D, members, bal, expenses, wish };
       const content = document.querySelector('#page .finance-content');
       if (content) content.innerHTML = tab === 'settle' ? settleView() : wishView();
     } catch { /* Offline or signed out: retry on the next bounded poll. */ }
