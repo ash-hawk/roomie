@@ -27,6 +27,20 @@ Every active household member can participate in shared chores, expenses, events
 
 Every table also has `created_at` and `updated_at` columns, which are not shown in the diagram. The schema is in [db/schema.sql](db/schema.sql).
 
+## Data Flow Diagrams
+
+### Level 0 — System Context
+
+Roomie exchanges household activity and settings with roommates, uses Neon Auth for sign-in, sends AI prompts to OpenRouter, and sends confirmation and event emails through Brevo.
+
+![Level 0 data flow diagram showing Roomie and its exchanges with roommates, Neon Auth, OpenRouter, and Brevo](docs/data-flow-level-0.png)
+
+### Level 1 — Internal Data Flows
+
+Roomie verifies the roommate, records household activity, sends notifications, and displays the household dashboard. These processes read or update household records and notifications.
+
+![Level 1 data flow diagram showing how Roomie's four processes exchange data with household records, notifications, and external services](docs/data-flow-level-1.png)
+
 ## Tech Stack
 
 | Layer | What we use | Purpose |
