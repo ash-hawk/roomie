@@ -1,6 +1,11 @@
--- Roommate App schema (IS 401 Team 4-06) — v5
+-- Roommate App schema (IS 401 Team 4-06) — v6
 -- Target: PostgreSQL 15+ (Neon). Run once on an empty database.
 --
+-- v6 changes from v5:
+--   * app_event logs the first chore completion per user and assignment for weekly
+--     household activity (migration 0006)
+--   * payment.confirmed_at records when a payment became confirmed; a trigger keeps it
+--     in step with payment.status (migration 0007)
 -- v5 changes from v3:
 --   * bulletin_message.is_resolved keeps resolved announcements out of the open board feed
 --   * household_member.onboarded_at tracks completion of onboarding
@@ -238,7 +243,8 @@ CREATE TABLE expense (
 );
 
 -- Money sent from one roommate to another. Only status = 'confirmed'
--- counts toward balances.
+-- counts toward balances. confirmed_at is maintained by trg_payment_confirmed_at:
+-- set when status becomes 'confirmed', NULL for any other status.
 CREATE TABLE payment (
     payment_id      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     household_id    BIGINT NOT NULL REFERENCES household(household_id) ON DELETE CASCADE,
@@ -250,6 +256,7 @@ CREATE TABLE payment (
     paid_date       TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    confirmed_at    TIMESTAMPTZ,
     CHECK (payer_user_id <> payee_user_id)
 );
 
@@ -369,6 +376,21 @@ CREATE TABLE ai_usage (
         REFERENCES household_member(household_id, user_id) ON DELETE CASCADE
 );
 
+-- Weekly household activity. The chore-completion transaction records the first
+-- completion per user and assignment; demo and fixture accounts are excluded at
+-- write time. Append-only, so no updated_at.
+CREATE TABLE app_event (
+    event_id     BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    household_id BIGINT NOT NULL,
+    user_id      BIGINT NOT NULL,
+    action_type  TEXT NOT NULL,
+    entity_id    BIGINT NOT NULL,
+    occurred_at  TIMESTAMPTZ NOT NULL,
+    FOREIGN KEY (household_id, user_id)
+        REFERENCES household_member(household_id, user_id) ON DELETE CASCADE,
+    UNIQUE (household_id, user_id, action_type, entity_id)
+);
+
 -- =========================================================
 -- Attach the updated_at trigger to every table above
 -- =========================================================
@@ -386,6 +408,32 @@ BEGIN
     END LOOP;
 END;
 $$;
+
+-- Triggers only need EXECUTE when they are created (see migration 0002).
+REVOKE ALL ON FUNCTION set_updated_at() FROM PUBLIC;
+
+-- =========================================================
+-- payment.confirmed_at follows payment.status
+-- =========================================================
+
+CREATE FUNCTION set_payment_confirmed_at() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.status = 'confirmed' THEN
+        IF TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM 'confirmed' THEN
+            NEW.confirmed_at := now();
+        END IF;
+    ELSE
+        NEW.confirmed_at := NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION set_payment_confirmed_at() FROM PUBLIC;
+
+CREATE TRIGGER trg_payment_confirmed_at BEFORE INSERT OR UPDATE OF status ON payment
+    FOR EACH ROW EXECUTE FUNCTION set_payment_confirmed_at();
 
 -- =========================================================
 -- Indexes on the columns the app filters by most
@@ -405,6 +453,7 @@ CREATE INDEX idx_expense_share_payment   ON expense_share (settled_by_payment_id
 CREATE INDEX idx_payment_household       ON payment (household_id, paid_date);
 CREATE INDEX idx_payment_payer           ON payment (payer_user_id);
 CREATE INDEX idx_payment_payee           ON payment (payee_user_id);
+CREATE INDEX idx_payment_confirmed       ON payment (household_id, confirmed_at) WHERE status = 'confirmed';
 CREATE INDEX idx_bulletin_household      ON bulletin_message (household_id, posted_date DESC);
 CREATE INDEX idx_bulletin_event          ON bulletin_message (event_id);
 CREATE INDEX idx_bulletin_parent         ON bulletin_message (parent_message_id);
@@ -412,5 +461,6 @@ CREATE INDEX idx_notification_user       ON notification (user_id, is_read, crea
 CREATE INDEX idx_notification_source     ON notification (source_type, source_id);
 CREATE INDEX idx_email_outbox_retry      ON email_outbox (status, created_at) WHERE status IN ('pending', 'failed');
 CREATE INDEX idx_ai_usage_hourly         ON ai_usage (user_id, household_id, feature, created_at DESC);
+CREATE INDEX app_event_household_week_idx ON app_event (household_id, occurred_at, user_id);
 
 COMMIT;

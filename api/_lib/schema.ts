@@ -332,7 +332,9 @@ export const payment = pgTable("payment", {
 	paidDate: timestamp("paid_date", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	confirmedAt: timestamp("confirmed_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
+	index("idx_payment_confirmed").using("btree", table.householdId.asc().nullsLast().op("timestamptz_ops"), table.confirmedAt.asc().nullsLast().op("int8_ops")).where(sql`(status = 'confirmed'::text)`),
 	index("idx_payment_household").using("btree", table.householdId.asc().nullsLast().op("int8_ops"), table.paidDate.asc().nullsLast().op("int8_ops")),
 	index("idx_payment_payee").using("btree", table.payeeUserId.asc().nullsLast().op("int8_ops")),
 	index("idx_payment_payer").using("btree", table.payerUserId.asc().nullsLast().op("int8_ops")),

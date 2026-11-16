@@ -14,6 +14,7 @@
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
     "db:unseed": "tsx --env-file=.env.local scripts/unseed.ts",
     "test": "vitest run",
+    "test:watch": "vitest",
     "test:security": "tsx --env-file=.env.local scripts/security-tests.ts",
     "typecheck": "tsc --noEmit",
     "dev": "vite",
