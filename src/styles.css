@@ -999,3 +999,5 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .day2{background:var(--card)}
 .day2:hover{background:var(--surface-tile)}
 .home-widget-tools,.schedule-filter-panel{background:var(--surface-raised)}
+
+.home-recap { margin: 0 0 12px; font-size: 0.95rem; }

@@ -102,6 +102,20 @@ function compactUpcoming() {
   return `<div class="home-compact-upcoming"><h3>Coming up</h3>${monthItems.slice(0, layoutMode === 'equal' ? 2 : 1).map((item) => `<div><span class="hint">${esc(dayLabel(item.ymd))}</span>${row(item)}</div>`).join('') || '<p class="hint">Nothing else coming up this month.</p>'}${monthItems.length > (layoutMode === 'equal' ? 2 : 1) ? '<button class="btn s" data-action="home-month-list">View all upcoming</button>' : ''}</div>`;
 }
 
+// AI recap line: one call per sign-in and household (sessionStorage), hidden on any failure or when the server flag is off.
+const recapKey = () => `roomie.recap.${S.user?.userId ?? ''}.${hid()}`;
+const cachedRecap = () => { try { return sessionStorage.getItem(recapKey()) || ''; } catch { return ''; } };
+function loadRecap() {
+  if (cachedRecap()) return;
+  const id = hid(), key = recapKey();
+  api(`/households/${id}/home-summary`).then((r) => {
+    if (!r?.enabled || !r.text) return;
+    try { sessionStorage.setItem(key, r.text); } catch { /* Line still shows this visit. */ }
+    const el = document.getElementById('home-recap');
+    if (el && hid() === id) { el.textContent = r.text; el.hidden = false; }
+  }).catch(() => { /* A failed recap just stays hidden. */ });
+}
+
 export async function homeView() {
   const [{ members }, { events }, chores, balances, { notes }, wishlist] = await Promise.all([
     api(`/households/${hid()}/members`), api(`/households/${hid()}/events`), api(`/households/${hid()}/chores`), api(`/households/${hid()}/balances`), api(`/households/${hid()}/board`), api(`/households/${hid()}/wishlist`),
@@ -114,12 +128,15 @@ export async function homeView() {
   layoutMode = getPreset();
   layout = getLayout();
   const view = getView();
+  loadRecap();
+  const recap = cachedRecap();
   const widgets = {
     board: `<section class="card stack home-board" id="home-board" data-home-board-root>${householdBoard({ ...D, compact: widgetSize('board') === 'compact', archive: homeBoardArchive, limit: 3 })}</section>`,
     schedule: `<section class="card stack home-schedule" aria-label="Shared household schedule"><div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content" data-view="${view}">${view === 'calendar' ? calendarView() : listView()}</div></section>`,
     finances: homeFinances({ ...D, compact: widgetSize('finances') === 'compact' }),
   };
   return `${phead('Shared household schedule', 'Here you can see an overview of what’s happening in your household', `<button class="btn s" data-action="home-edit-layout">${editing ? 'Done' : 'Edit dashboard'}</button>`)}
+    <p class="home-recap hint" id="home-recap" aria-live="polite"${recap ? '' : ' hidden'}>${esc(recap)}</p>
     <div class="home-layout-status sr-only" role="status"></div>${presetChoices()}<div class="page-content home-dashboard" data-preset="${layoutMode}">${layout.map(({ id, size }) => `<div class="home-widget ${size}" data-widget="${id}" data-editing="${editing}">${widgets[id]}</div>`).join('')}</div>`;
 
 }
