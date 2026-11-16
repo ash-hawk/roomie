@@ -12,6 +12,10 @@ import { fromCents, splitCents, toCents } from '../../shared/money.ts';
 
 let tab = 'settle';
 let D = null; // { members, bal, expenses, wish } for the modals
+let financePoll = null;
+let financePollGeneration = 0;
+let financePollViewer = null;
+let financeDataSequence = 0;
 
 const APP_LABEL = { venmo: 'Venmo', zelle: 'Zelle', apple_cash: 'Apple Cash' };
 const $m = (str) => money(toCents(str));
@@ -25,7 +29,46 @@ const stChip = (status) => `<span class="st ${STATUS[status][0]}">${STATUS[statu
 
 export function prepareFinanceActivity(type) { tab = type === 'wishlist_item' ? 'wish' : 'settle'; }
 
+function startFinancePolling() {
+  const viewer = `${S.user?.userId}:${hid()}`;
+  if (financePoll && financePollViewer === viewer) return;
+  stopFinancePolling();
+  financePollViewer = viewer;
+  const generation = financePollGeneration;
+  let inFlight = false;
+  financePoll = setInterval(async () => {
+    if (inFlight || document.hidden || document.getElementById('root')?.dataset.page !== 'finances' ||
+        document.querySelector('#modal:not(.activity-overlay)') || !D) return;
+    inFlight = true;
+    const householdId = hid(), userId = S.user?.userId;
+    const dataSequence = financeDataSequence;
+    try {
+      const [{ members }, bal, { expenses }] = await Promise.all([
+        api(`/households/${householdId}/members`),
+        api(`/households/${householdId}/balances`),
+        api(`/households/${householdId}/expenses`),
+      ]);
+      if (generation !== financePollGeneration || dataSequence !== financeDataSequence || householdId !== hid() || userId !== S.user?.userId) return;
+      const changed = JSON.stringify([members, bal, expenses]) !== JSON.stringify([D.members, D.bal, D.expenses]);
+      if (!changed) return;
+      D = { ...D, members, bal, expenses };
+      const content = document.querySelector('#page .finance-content');
+      if (content) content.innerHTML = tab === 'settle' ? settleView() : wishView();
+    } catch { /* Offline or signed out: retry on the next bounded poll. */ }
+    finally { inFlight = false; }
+  }, 5000);
+}
+
+export function stopFinancePolling() {
+  financePollGeneration++;
+  if (financePoll) clearInterval(financePoll);
+  financePoll = null;
+  financePollViewer = null;
+}
+
 export async function financesView() {
+  startFinancePolling();
+  financeDataSequence++;
   const h = hid();
   const [{ members }, bal, { expenses }] = await Promise.all([api(`/households/${h}/members`), api(`/households/${h}/balances`), api(`/households/${h}/expenses`)]);
   D = { members, bal, expenses, wish: D?.wish ?? [] };

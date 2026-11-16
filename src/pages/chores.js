@@ -15,6 +15,7 @@ let choreView = 'list', choreMonth = null, choreScope = null;
 let filter = 'all';     // 'all' | 'me' | userId
 let sortBy = 'added';   // chart: 'added' | 'az' | 'assignee'
 let D = null;           // { members, chores, assignments, swapRequests }
+let chorePoll = null, chorePollGeneration = 0, chorePollViewer = null, choreDataSequence = 0;
 const STARTERS = [
   { key: 'trash', name: 'Take out the trash', description: 'Empty the kitchen and bathroom bins.', dayOfWeek: 1, dueTime: '19:00', effort: 'easy' },
   { key: 'dishes', name: 'Kitchen reset', description: 'Load dishes and wipe the counters.', dayOfWeek: 3, dueTime: '20:00', effort: 'medium' },
@@ -37,15 +38,58 @@ const effortChip = (e) => `<span class="st effort effort-${e}" title="${e[0].toU
 const openRequestOn = (aid) => D.swapRequests.find((r) => r.requesterAssignmentId === aid || r.targetAssignmentId === aid);
 
 export async function choresView() {
+  startChorePolling();
+  choreDataSequence++;
   const h = hid();
   const [{ members }, data] = await Promise.all([api(`/households/${h}/members`), api(`/households/${h}/chores`)]);
   D = { members, ...currentHouseholdData(members, data) };
   loadChoreDisplay();
+  return choresBody();
+}
+
+function choresBody() {
   choreMonth ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   return `${phead('Chores', '', `<button class="btn s" data-action="all-chores">All chores</button><button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
     <div class="page-content split cal chores-content chore-dashboard-layout"><div class="stack chore-schedule-column"><section class="card" id="chore-schedule">${scheduleView()}</section>${workloadView()}</div><aside class="stack chore-attention-board" aria-label="Chore activity"><section class="card" id="chore-overdue">${overdueView()}</section><section class="card stack">${choreRequestsBoard()}</section></aside></div>`;
 
 }
+function startChorePolling() {
+  const viewer = `${S.user?.userId}:${hid()}`;
+  if (chorePoll && chorePollViewer === viewer) return;
+  stopChorePolling();
+  chorePollViewer = viewer;
+  const generation = chorePollGeneration;
+  let inFlight = false;
+  chorePoll = setInterval(async () => {
+    if (inFlight || document.hidden || document.getElementById('root')?.dataset.page !== 'chores' ||
+        document.querySelector('#modal:not(.activity-overlay)') || !D ||
+        document.activeElement?.closest?.('form,input,textarea') || document.querySelector('.schedule-filter-menu[open]')) return;
+    inFlight = true;
+    const householdId = hid(), userId = S.user?.userId, dataSequence = choreDataSequence;
+    try {
+      const [{ members }, data] = await Promise.all([api(`/households/${householdId}/members`), api(`/households/${householdId}/chores`)]);
+      if (generation !== chorePollGeneration || dataSequence !== choreDataSequence || householdId !== hid() || userId !== S.user?.userId) return;
+      const next = { members, ...currentHouseholdData(members, data) };
+      if (JSON.stringify(next) === JSON.stringify(D)) return;
+      const focusInput = document.activeElement?.dataset?.input;
+      D = next;
+      const page = document.querySelector('#page');
+      if (page) {
+        page.innerHTML = choresBody();
+        if (focusInput) page.querySelector(`[data-input="${focusInput}"]`)?.focus({ preventScroll: true });
+      }
+    } catch { /* Offline or signed out: retry on the next bounded poll. */ }
+    finally { inFlight = false; }
+  }, 5000);
+}
+
+export function stopChorePolling() {
+  chorePollGeneration++;
+  if (chorePoll) clearInterval(chorePoll);
+  chorePoll = null;
+  chorePollViewer = null;
+}
+
 function choreIdentity(assignment) {
   return `<div class="row chore-occurrence" style="gap:8px">${avatar(who(assignment.assignedUserId), 'sm')}<div><b>${esc(fullName(who(assignment.assignedUserId)))}</b><div class="hint">${whenFmt(assignment.dueAt)}</div></div></div>`;
 }

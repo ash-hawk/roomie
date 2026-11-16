@@ -5,7 +5,7 @@ import { monthCalendar } from '../components/month-calendar.js';
 import { scheduleToolbar, filterChoices } from '../components/schedule-toolbar.js';
 // Slice (c): household events + sticky-note board. The server owns the rules (who may edit, who was
 // asked about hosting, who gets notified); this page shows data and sends intent.
-// Times are always shown in the household's timezone. The board and calendar poll every 15 seconds,
+// Times are always shown in the household's timezone. The board and calendar poll every five seconds,
 // so a roommate's note or answer shows up without a refresh.
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
@@ -30,6 +30,7 @@ function loadPrefs() {
 }
 let D = null;             // { members, events, notes }
 let seen = '';            // what the last poll saw, to repaint only on change
+let calendarPoll = null, calendarPollGeneration = 0, calendarPollViewer = null, calendarDataSequence = 0;
 let boardArchive = false, boardArchiveHousehold = null;
 
 const hid = () => household().householdId;
@@ -55,8 +56,48 @@ const refresh = () => window.dispatchEvent(new Event('roomie:render'));
 const path = (p) => `/households/${hid()}${p}`;
 const savePrefs = () => { try { localStorage.setItem(prefsKey(), JSON.stringify({ view, sortBy, eventType })); } catch { /* preferences are optional */ } };
 
+function startCalendarPolling() {
+  const viewer = `${S.user?.userId}:${hid()}`;
+  if (calendarPoll && calendarPollViewer === viewer) return;
+  stopCalendarPolling();
+  calendarPollViewer = viewer;
+  const generation = calendarPollGeneration;
+  let inFlight = false;
+  calendarPoll = setInterval(async () => {
+    if (inFlight || document.hidden || document.getElementById('root')?.dataset.page !== 'calendar' || !D ||
+        document.querySelector('#modal:not(.activity-overlay)') ||
+        document.activeElement?.closest?.('form,textarea,input') || document.querySelector('.schedule-filter-menu[open]')) return;
+    inFlight = true;
+    const householdId = hid(), userId = S.user?.userId, dataSequence = calendarDataSequence;
+    try {
+      const [{ members }, { events }, { notes }] = await Promise.all([
+        api(`/households/${householdId}/members`), api(`/households/${householdId}/events`), api(`/households/${householdId}/board`),
+      ]);
+      if (generation !== calendarPollGeneration || dataSequence !== calendarDataSequence || householdId !== hid() || userId !== S.user?.userId) return;
+      const signature = JSON.stringify([members, events, notes]);
+      if (signature === seen) return;
+      const focusInput = document.activeElement?.dataset?.input;
+      D = { members, ...currentHouseholdData(members, { events, notes }) };
+      seen = signature;
+      refreshSchedule(focusInput);
+      paintBoard();
+      const composer = document.querySelector('.event-composer');
+      if (composer) composer.outerHTML = composerHtml();
+    } catch { /* Offline or signed out: retry on the next bounded poll. */ }
+    finally { inFlight = false; }
+  }, 5000);
+}
+
+export function stopCalendarPolling() {
+  calendarPollGeneration++;
+  if (calendarPoll) clearInterval(calendarPoll);
+  calendarPoll = null;
+  calendarPollViewer = null;
+}
+
 // ---- data -------------------------------------------------------------------------------------
 async function load() {
+  calendarDataSequence++;
   const [{ members }, { events }, { notes }] = await Promise.all([api(path('/members')), api(path('/events')), api(path('/board'))]);
   if (boardArchiveHousehold !== hid()) { boardArchive = false; boardArchiveHousehold = hid(); }
   D = { members, ...currentHouseholdData(members, { events, notes }) };
@@ -136,6 +177,7 @@ function refreshSchedule(focusInput) {
   if (focusInput) (content.querySelector(`[data-input="${focusInput}"]:checked`) ?? content.querySelector(`[data-input="${focusInput}"]`))?.focus();
 }
 export async function calendarView() {
+  startCalendarPolling();
   loadPrefs();
   await load();
   monthStart ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
@@ -334,13 +376,3 @@ actions['note-resolve'] = async (el) => {
 };
 actions['note-delete'] = async (el) => { if (!await confirmDialog('Delete this note?', 'Replies to this note will also be removed.')) return;
   await api(path(`/board/${el.dataset.id}`), { method: 'DELETE' }); await reloadBoard(); };
-
-// ---- near-real-time: poll while the calendar is on screen and nobody is typing -------------------
-setInterval(async () => {
-  try {
-    if (document.hidden || document.getElementById('root')?.dataset.page !== 'calendar' || document.getElementById('modal') || !D) return;
-    if (document.activeElement?.closest?.('form,textarea,input,select') || document.querySelector('.schedule-filter-menu[open]')) return;
-    const [{ members }, { events }, { notes }] = await Promise.all([api(path('/members')), api(path('/events')), api(path('/board'))]);
-    if (JSON.stringify([members, events, notes]) !== seen) refresh();
-  } catch { /* offline or signed out: try again next tick */ }
-}, 15000);

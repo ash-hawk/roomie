@@ -9,10 +9,10 @@ import { onboardingView } from './pages/onboarding.js';
 import { settingsView } from './pages/settings.js';
 import { appearanceView } from './pages/appearance.js';
 import { householdView } from './pages/household.js';
-import { financesView } from './pages/finances.js';
-import { choresView } from './pages/chores.js';
-import { calendarView } from './pages/calendar.js';
-import { bellHtml, loadAlerts, openActivityPanel, openPendingActivity, paintBell } from './pages/notifications.js';
+import { financesView, stopFinancePolling } from './pages/finances.js';
+import { choresView, stopChorePolling } from './pages/chores.js';
+import { calendarView, stopCalendarPolling } from './pages/calendar.js';
+import { bellHtml, loadAlerts, openActivityPanel, openPendingActivity, paintBell, startAlertPolling, stopAlertPolling } from './pages/notifications.js';
 import { homeView } from './pages/home.js';
 import { openPendingCalendarCreate } from './lib/calendar-create.js';
 import { connectHomeLayout } from './components/home-layout.js';
@@ -60,15 +60,19 @@ let seq = 0;
 export async function render() {
   const mine = ++seq;
   try {
-    if (isPasswordReset()) { root.innerHTML = authView(); return; }
-    if (!(await getToken())) { resetState(); applyAppearance(); root.innerHTML = authView(); return; }
+    if (isPasswordReset()) { stopFinancePolling(); stopChorePolling(); stopCalendarPolling(); stopAlertPolling(); root.innerHTML = authView(); return; }
+    if (!(await getToken())) { stopFinancePolling(); stopChorePolling(); stopCalendarPolling(); stopAlertPolling(); resetState(); applyAppearance(); root.innerHTML = authView(); return; }
     if (!S.user) { root.innerHTML = loading; await loadMe(); }
     if (mine !== seq) return;
     applyAppearance();
     if (needsOnboarding()) { root.removeAttribute('data-page'); root.innerHTML = await onboardingView(); return; }
+    startAlertPolling();
     const legacyActivity = location.hash.replace(/^#\/?/, '').split('/')[0] === 'notifications';
     if (legacyActivity) history.replaceState(null, '', '#/home');
     const page = route();
+    if (page !== 'finances') stopFinancePolling();
+    if (page !== 'chores') stopChorePolling();
+    if (page !== 'calendar') stopCalendarPolling();
     await loadAlerts().catch(() => {});
     const keep = $('#page') && root.dataset.page === page && root.dataset.hid === String(S.hid); // soft refresh keeps the shell
     if (!keep) root.innerHTML = shell(page, loading);
@@ -82,7 +86,7 @@ export async function render() {
     if (legacyActivity) await openActivityPanel();
   } catch (e) {
     if (mine !== seq) return;
-    if (e.status === 401) { resetState(); root.innerHTML = authView(); return; }
+    if (e.status === 401) { stopFinancePolling(); stopChorePolling(); stopCalendarPolling(); stopAlertPolling(); resetState(); root.innerHTML = authView(); return; }
     root.innerHTML = `<div class="onb"><div class="box"><section class="card stack"><h2>Something went wrong</h2><p class="mute">${esc(e.message)}</p><button class="btn p" data-action="retry">Try again</button></section></div></div>`;
   }
 }
