@@ -2,6 +2,8 @@
 -- Target: PostgreSQL 15+ (Neon). Run once on an empty database.
 --
 -- v6 changes from v5:
+--   * app_event logs the first chore completion per user and assignment for weekly
+--     household activity (migration 0006)
 --   * payment.confirmed_at records when a payment became confirmed; a trigger keeps it
 --     in step with payment.status (migration 0007)
 -- v5 changes from v3:
@@ -374,6 +376,21 @@ CREATE TABLE ai_usage (
         REFERENCES household_member(household_id, user_id) ON DELETE CASCADE
 );
 
+-- Weekly household activity. The chore-completion transaction records the first
+-- completion per user and assignment; demo and fixture accounts are excluded at
+-- write time. Append-only, so no updated_at.
+CREATE TABLE app_event (
+    event_id     BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    household_id BIGINT NOT NULL,
+    user_id      BIGINT NOT NULL,
+    action_type  TEXT NOT NULL,
+    entity_id    BIGINT NOT NULL,
+    occurred_at  TIMESTAMPTZ NOT NULL,
+    FOREIGN KEY (household_id, user_id)
+        REFERENCES household_member(household_id, user_id) ON DELETE CASCADE,
+    UNIQUE (household_id, user_id, action_type, entity_id)
+);
+
 -- =========================================================
 -- Attach the updated_at trigger to every table above
 -- =========================================================
@@ -444,5 +461,6 @@ CREATE INDEX idx_notification_user       ON notification (user_id, is_read, crea
 CREATE INDEX idx_notification_source     ON notification (source_type, source_id);
 CREATE INDEX idx_email_outbox_retry      ON email_outbox (status, created_at) WHERE status IN ('pending', 'failed');
 CREATE INDEX idx_ai_usage_hourly         ON ai_usage (user_id, household_id, feature, created_at DESC);
+CREATE INDEX app_event_household_week_idx ON app_event (household_id, occurred_at, user_id);
 
 COMMIT;
