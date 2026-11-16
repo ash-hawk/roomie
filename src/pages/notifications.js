@@ -10,6 +10,7 @@ const TARGET = { chore_assignment: 'chores', chore_swap_request: 'chores', expen
 const LABEL = { chores: 'Chores', money: 'Payments', expense_tracker: 'Expenses', system: 'Reminder', calendar_board: 'Events & board' };
 let D = { notifications: [], unread: 0, swapPending: 0 };
 let viewer = null, loadSequence = 0, pendingTarget = null;
+let alertPoll = null, alertPollGeneration = 0, alertPollViewer = null;
 const isOpen = () => Boolean(document.querySelector('#modal.activity-overlay'));
 
 export function bellHtml() {
@@ -35,6 +36,37 @@ export async function loadAlerts() {
   }
   return response;
 }
+export function startAlertPolling() {
+  const userId = S.user?.userId;
+  if (!userId || (alertPoll && alertPollViewer === userId)) return;
+  stopAlertPolling();
+  alertPollViewer = userId;
+  const generation = alertPollGeneration;
+  let inFlight = false;
+  alertPoll = setInterval(async () => {
+    if (inFlight || document.hidden || S.user?.userId !== userId) return;
+    inFlight = true;
+    const previous = JSON.stringify([D.notifications, D.unread, D.swapPending]);
+    try {
+      await loadAlerts();
+      if (generation !== alertPollGeneration || S.user?.userId !== userId) return;
+      if (JSON.stringify([D.notifications, D.unread, D.swapPending]) !== previous) {
+        if (isOpen()) paintPanel({ preserveFocus: true });
+        else paintBell();
+      }
+    } catch (error) {
+      if (error.status === 401) stopAlertPolling();
+      /* Keep the last count while offline and retry on the next poll. */
+    }
+    finally { inFlight = false; }
+  }, 5000);
+}
+export function stopAlertPolling() {
+  alertPollGeneration++;
+  if (alertPoll) clearInterval(alertPoll);
+  alertPoll = null;
+  alertPollViewer = null;
+}
 function activityRow(n) {
   const available = !n.sourceGone && TARGET[n.sourceType] && n.sourceId != null;
   const house = S.households.find((h) => h.householdId === n.householdId);
@@ -47,9 +79,15 @@ function panelContent() {
   return `${mhead('Activity')}<div class="row sp activity-heading"><p class="hint">Updates for you</p>${D.unread ? '<button class="activity-read-all" data-action="activity-read-all">Mark all read</button>' : ''}</div>
     <div id="activity-error" class="err" role="alert"></div><div class="activity-list">${unread.length ? [...unread].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map(activityRow).join('') : '<p class="activity-empty">No unread updates.</p>'}</div>`;
 }
-function paintPanel() {
+function paintPanel({ preserveFocus = false } = {}) {
   const sheet = document.getElementById('activity-panel');
+  const focused = preserveFocus && sheet?.contains(document.activeElement) ? document.activeElement : null;
+  const action = focused?.dataset.action, id = focused?.dataset.id;
   if (sheet) sheet.innerHTML = panelContent();
+  if (action && sheet) {
+    const selector = id ? `[data-action="${action}"][data-id="${id}"]` : `[data-action="${action}"]`;
+    (sheet.querySelector(selector) ?? sheet.querySelector('.x'))?.focus({ preventScroll: true });
+  }
   paintBell();
 }
 export async function openActivityPanel() {
@@ -126,7 +164,3 @@ export function openPendingActivity(page) {
   }
 }
 window.addEventListener('roomie:modal-close', paintBell);
-setInterval(async () => {
-  if (document.hidden || !S.user) return;
-  try { await loadAlerts(); paintBell(); } catch { /* Keep the last count while offline. */ }
-}, 30000);
