@@ -48,6 +48,7 @@ export async function settingsView() {
           <div class="err" role="alert"></div><div class="acts"><button class="btn p" type="submit">Save email settings</button></div></form></section>
 
       <div class="acts" style="justify-content:flex-start">
+        <a class="btn" href="https://roomie-admin-gray.vercel.app/" target="_blank" rel="noopener noreferrer" aria-label="Admin Portal (opens in a new tab)">Admin Portal</a>
         <button class="btn d" data-action="signout">Sign out</button>
       </div>
     </div>`;
