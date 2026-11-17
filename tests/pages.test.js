@@ -29,6 +29,7 @@ beforeEach(() => {
     if (path.endsWith("/events")) return { events };
     if (path.endsWith("/chores")) return chores;
     if (path.endsWith("/board")) return { notes: [] };
+    if (path.endsWith("/home-summary")) return { enabled: false };
     if (path.endsWith("/wishlist")) return { items: [] };
     if (path.endsWith("/balances")) return { mine: [] };
     if (path.endsWith("/notification-settings")) return { settings: { event_hosting: false, event_other: false, approval_request: false } };
@@ -122,6 +123,7 @@ describe("Home views", () => {
       { ...events[0], eventId: 3, eventName: 'January plan', eventDate: '2027-01-01T20:00:00Z' },
     ] }) : baseApi(path));
     document.getElementById('page').innerHTML = await homeView();
+    const initialCalls = mockedApi.mock.calls.length;
     const content = document.getElementById('home-schedule-content');
     expect(content.textContent).toContain('November 2026');
     expect(content.textContent).toContain('Dinner');
@@ -147,11 +149,12 @@ describe("Home views", () => {
     expect(content.textContent).toContain('No events or chores from today onward in this month.');
     actions['home-month'](content.querySelector('[data-n="-1"]'));
     expect(content.textContent).toContain('January plan');
-    expect(mockedApi).toHaveBeenCalledTimes(6);
+    expect(mockedApi).toHaveBeenCalledTimes(initialCalls);
   });
 
   it("switches the same household-wide items between list and calendar, with pending approval visible", async () => {
     document.getElementById("page").innerHTML = await homeView();
+    const initialCalls = mockedApi.mock.calls.length;
     expect(document.body.textContent).not.toMatch(/Customize|My chores/);
     expect(document.body.textContent).toContain("Dishes");
     expect(document.body.textContent).toContain("Dinner");
@@ -173,7 +176,7 @@ describe("Home views", () => {
     picker.value = 'list';
     inputs['home-view'](picker);
     expect(document.getElementById("home-schedule-content").textContent.indexOf("Dishes")).toBeLessThan(document.getElementById("home-schedule-content").textContent.indexOf("Dinner"));
-    expect(mockedApi).toHaveBeenCalledTimes(6);
+    expect(mockedApi).toHaveBeenCalledTimes(initialCalls);
   });
 });
 
