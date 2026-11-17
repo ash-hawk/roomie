@@ -72,6 +72,7 @@ export function authView() {
       <div class="err" role="alert"></div>
       <button class="btn p" type="submit">${up ? 'Create account' : 'Sign in'}</button>
       <p class="mute" style="text-align:center;font-size:14px">${up ? 'Already have an account?' : 'New here?'} <button type="button" class="link-btn" data-action="auth-toggle">${up ? 'Sign in' : 'Create an account'}</button></p>
+      ${up ? '' : '<p class="mute" style="text-align:center;font-size:14px">Looking for the admin portal? <a class="link-btn" href="https://roomie-admin-gray.vercel.app/">Open Admin Portal</a></p>'}
     </form>`}
   </div></div>`;
 }

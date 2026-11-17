@@ -349,7 +349,7 @@ body::before{background:radial-gradient(60% 60% at 80% 0,color-mix(in srgb,var(-
 .sk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:16px}.sk-card{height:210px}
 @keyframes shimmer{to{background-position:-220% 0}}
 @media(max-width:767px){.sk-grid{grid-template-columns:1fr}.sk-card{height:145px}.sk-grid .sk-card:nth-child(n+3){display:none}}
-button.link-btn{background:none;border:0;padding:0;color:var(--accent);font-weight:600;cursor:pointer}
+.link-btn{background:none;border:0;padding:0;color:var(--accent);font-weight:600;cursor:pointer}
 .code{font-family:var(--mono,"JetBrains Mono",monospace);font-size:22px;font-weight:600;letter-spacing:.12em}
 .body-copy{font-size:14.5px;margin:6px 0 14px}
 .timezone-row{font-size:14px}
@@ -912,7 +912,7 @@ body::before,body::after{display:none}
 .methods label:has(input:checked) small{color:inherit}
 .seg button:hover:not(.on),.pillnav .nav-i:hover:not(.on){color:var(--ink)}
 .st.pending,.st.later,.badge,.tile{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
-.btn.link,button.link-btn{color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px}
+.btn.link,.link-btn{color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px}
 /* Contact cards are compact lists, with section headings attached to their rows. */
 .roommate-profile-list{display:flex;flex-direction:column;gap:20px}
 .roommate-profile-list .roommate-profile-head{margin:0}
