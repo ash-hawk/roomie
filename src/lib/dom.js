@@ -65,9 +65,24 @@ export function openModal(inner) {
   o._restoreFocus = restore;
   o.addEventListener('click', (e) => { if (e.target === o) closeModal(); });
   document.body.appendChild(o);
+  const viewport = window.visualViewport;
+  if (viewport) {
+    // The phone keyboard can shrink the visible viewport without resizing the page.
+    const fitSheet = () => {
+      o.style.setProperty('--modal-viewport-height', `${viewport.height}px`);
+      o.style.setProperty('--modal-viewport-top', `${viewport.offsetTop}px`);
+    };
+    fitSheet();
+    viewport.addEventListener('resize', fitSheet);
+    viewport.addEventListener('scroll', fitSheet);
+    o._stopViewportTracking = () => {
+      viewport.removeEventListener('resize', fitSheet);
+      viewport.removeEventListener('scroll', fitSheet);
+    };
+  }
   o.querySelector('input,select,textarea,button')?.focus();
 }
-export const closeModal = () => { const modal = document.getElementById('modal'); if (!modal) return; const restore = modal._restoreFocus; modal.remove(); window.dispatchEvent(new Event('roomie:modal-close')); restore?.focus?.(); };
+export const closeModal = () => { const modal = document.getElementById('modal'); if (!modal) return; const restore = modal._restoreFocus; modal._stopViewportTracking?.(); modal.remove(); window.dispatchEvent(new Event('roomie:modal-close')); restore?.focus?.(); };
 export const mhead = (title) => `<div class="mh"><h3 id="modal-title">${title}</h3><button class="x" data-action="close-modal" aria-label="Close">✕</button></div>`;
 document.addEventListener('keydown', (e) => {
   if (document.querySelector('.confirm-ovl')) return;
