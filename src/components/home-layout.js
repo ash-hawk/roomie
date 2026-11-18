@@ -8,9 +8,8 @@ export function fitHomeWidgets(target = document.querySelector('.home-dashboard'
   if (!target?.isConnected) return;
   for (const [index, widget] of [...target.children].entries()) {
     widget.style.removeProperty('grid-column');
-    const height = widget.querySelector(':scope > .card')?.getBoundingClientRect().height ?? 0;
-    if (window.innerWidth > 900 && height > 0) widget.style.gridRowEnd = `span ${Math.ceil((height + 18) / 8)}`;
-    else widget.style.removeProperty('grid-row-end');
+    widget.style.removeProperty('grid-row-end');
+    widget.querySelector(':scope > .card')?.setAttribute('tabindex', '0');
     widget.dataset.slot = ['primary', 'secondary', 'tertiary'][index];
     const heading = widget.querySelector('h2');
     if (!heading) continue;

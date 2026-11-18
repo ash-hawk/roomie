@@ -186,7 +186,7 @@ export async function calendarView() {
   if (handoff?.type === 'event') setTimeout(() => actions['event-detail']({ dataset: { id: String(handoff.id) } }), 60);
   const linkedId = Number(location.hash.replace(/^#\/?/, '').split('/')[1]);
   if (Number.isSafeInteger(linkedId) && linkedId > 0) setTimeout(() => actions['event-detail']({ dataset: { id: String(linkedId) } }), 60);
-  return `${head}<div class="page-content split cal"><section class="card" id="cal-main">${scheduleContent()}</section><aside class="stack event-board-column">${composerHtml()}<section class="card board" data-board>${boardInner()}</section></aside></div>`;
+  return `${head}<div class="page-content split cal"><section class="card" id="cal-main" tabindex="0" aria-label="Events schedule">${scheduleContent()}</section><aside class="stack event-board-column">${composerHtml()}<section class="card board" data-board tabindex="0" aria-label="Announcements">${boardInner()}</section></aside></div>`;
 }
 inputs['cal-view'] = (el) => {
   if (!['list', 'month'].includes(el.value)) return;

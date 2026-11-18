@@ -50,7 +50,7 @@ export async function choresView() {
 function choresBody() {
   choreMonth ??= `${ymdIn(Date.now()).slice(0, 7)}-01`;
   return `${phead('Chores', '', `<button class="btn s" data-action="all-chores">All chores</button><button class="btn p" data-action="add-chore">${ico('plus', 16)} Add chore</button>`)}
-    <div class="page-content split cal chores-content chore-dashboard-layout"><div class="stack chore-schedule-column"><section class="card" id="chore-schedule">${scheduleView()}</section>${workloadView()}</div><aside class="stack chore-attention-board" aria-label="Chore activity"><section class="card" id="chore-overdue">${overdueView()}</section><section class="card stack">${choreRequestsBoard()}</section></aside></div>`;
+    <div class="page-content split cal chores-content chore-dashboard-layout"><div class="stack chore-schedule-column"><section class="card" id="chore-schedule" tabindex="0" aria-label="Chore schedule">${scheduleView()}</section></div><aside class="stack chore-attention-board" aria-label="Chore activity"><section class="card" id="chore-overdue" tabindex="0" aria-label="Overdue chores">${overdueView()}</section><section class="card stack" tabindex="0" aria-label="Chore requests">${choreRequestsBoard()}</section></aside></div>`;
 
 }
 function startChorePolling() {
@@ -150,11 +150,6 @@ function row(a) {
 }
 function visibleAssignments() { return D.assignments.filter((a) => choreOf(a.choreId) && passes(a.assignedUserId)).sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt)); }
 const choreDayLabel = (day) => day === ymdIn(Date.now()) ? 'Today' : new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', month: 'short', day: 'numeric' });
-function workloadView() {
-  const counts = active().map((member) => [member, D.assignments.filter((a) => !a.isCompleted && a.assignedUserId === member.userId).length]);
-  const max = Math.max(1, ...counts.map(([, count]) => count));
-  return `<section class="card"><div class="row sp"><h2>Household workload</h2></div>${counts.map(([member, count]) => `<div class="row" style="padding:7px 0">${avatar(member, 'sm')}<span class="truncate" style="width:74px">${esc(first(member.userId))}</span><div class="bar grow" style="--w:${Math.round(count / max * 100)}%"><i></i></div><b class="mute" style="width:22px;text-align:right">${count}</b></div>`).join('')}</section>`;
-}
 function overdueItems() { return visibleAssignments().filter((a) => !a.isCompleted && ymdIn(a.dueAt) < ymdIn(Date.now())); }
 function overdueView(limit = attentionRequests().length ? 1 : 3) {
   const overdue = overdueItems();
