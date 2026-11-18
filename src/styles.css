@@ -999,6 +999,17 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .day2:hover{background:var(--surface-tile)}
 .home-widget-tools,.schedule-filter-panel{background:var(--surface-raised)}
 
+/* Desktop panels keep their outlines as content changes. */
+@media(min-width:901px){
+  .home-dashboard[data-preset],.split.cal{height:900px;grid-template-rows:minmax(0,1fr);min-height:0}
+  .home-dashboard[data-preset="focus-left"],.home-dashboard[data-preset="focus-right"]{grid-template-rows:repeat(2,minmax(0,1fr))}
+  .home-dashboard[data-preset]>.home-widget{min-height:0}
+  .home-dashboard[data-preset]>.home-widget>.card,.split.cal>#cal-main,.chore-schedule-column>#chore-schedule{min-height:0;overflow:auto}
+  .event-board-column,.chore-attention-board,.chore-schedule-column{min-height:0}
+  .event-board-column>.card:last-child,.chore-attention-board>.card:last-child,.chore-schedule-column>#chore-schedule{flex:1;min-height:0;overflow:auto}
+  .event-board-column>.card:first-child,.chore-attention-board>.card:first-child{flex:none;max-height:45%;overflow:auto}
+}
+
 .home-recap { margin: 0 0 12px; font-size: 0.95rem; }
 
 /* Keep form sheets inside the visible phone viewport, including with the keyboard open. */
