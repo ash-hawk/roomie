@@ -1018,3 +1018,35 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   #modal .sheet .fld {min-width:0}
   #modal .sheet .input {min-width:0;font-size:16px}
 }
+
+
+/* Account pages stay in the document flow so the keyboard cannot cover the last controls. */
+.auth-screen, .onboarding-wizard {min-height:100svh}
+.auth-screen>.box, .onboarding-wizard>.box {min-width:0;margin-inline:auto}
+.wizard-brand>div {min-width:0;overflow-wrap:anywhere}
+.onboarding-wizard fieldset, .payment-editor {min-inline-size:0}
+.chip-check input:focus-visible+span {outline:2px solid var(--accent);outline-offset:2px}
+form[data-form="pay"] .chk .grow, #modal .mh h3 {overflow-wrap:anywhere}
+form[data-form="pay"] .chk>input, form[data-form="pay"] .chk>.amount {flex:none}
+#modal .mh>.x {flex:none}
+
+@media (max-width:767px) {
+  .auth-screen {
+    padding-block:max(20px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-bottom));
+    align-items:safe center;
+  }
+  .onboarding-wizard {padding-bottom:max(24px, env(safe-area-inset-bottom))}
+  .onboarding-wizard .wizard-foot {position:static;background:none;padding:0}
+  .auth-screen .input, .onboarding-wizard .input, .profile-card .input, .household-admin .input {
+    min-width:0;
+    font-size:16px;
+  }
+  .auth-screen .link-btn, .wizard-foot .link-btn, .onboarding-wizard .card>.link-btn {
+    min-height:44px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .invite-card .rowline>.code {flex-basis:100%;min-width:0}
+  .tabbar .nav-i {min-width:0}
+}

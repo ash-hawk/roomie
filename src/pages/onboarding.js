@@ -10,31 +10,56 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 let draft = null, emailSettings = null, welcome = null, profilePhoto = null;
 let setupTasks = [], setupDone = 0, setupError = '';
 
-const currentStep = () => Math.min(6, Math.max(1, Number(sessionStorage.getItem(STEP_KEY)) || 1));
-const go = (step) => { sessionStorage.setItem(STEP_KEY, String(step)); window.dispatchEvent(new Event('roomie:render')); };
+// Keep the existing household-step IDs so an in-progress setup can resume.
+const PAYMENT_STEP = 1.5;
+const STEPS = [0, 1, PAYMENT_STEP, 2, 3, 4, 5, 6];
+const currentStep = () => {
+  const saved = Number(sessionStorage.getItem(STEP_KEY));
+  return STEPS.includes(saved) ? saved : 0;
+};
+const go = (step) => {
+  sessionStorage.setItem(STEP_KEY, String(step));
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  window.dispatchEvent(new Event('roomie:render'));
+};
 const owner = () => household()?.role === 'owner';
 const nextAfterHouseSetup = () => owner() ? 4 : 5;
 
 function frame(step, title, subtitle, body) {
-  const previous = step === 1 ? null : step === 5 && !owner() ? 3 : step - 1;
-  return `<div class="onb onboarding-wizard"><div class="box wizard-box">
-    <div class="wizard-brand">${mark('lg')}<div><span class="eyebrow">Step ${step} of 6</span><h1>${esc(title)}</h1><p class="mute">${esc(subtitle)}</p></div></div>
-    <div class="wizard-progress" aria-hidden="true"><span style="width:${step / 6 * 100}%"></span></div>
+  const steps = owner() || !household() ? STEPS : STEPS.filter((item) => item !== 4);
+  const index = steps.indexOf(step);
+  const previous = steps[index - 1];
+  return `<main class="onb onboarding-wizard"><div class="box wizard-box">
+    <div class="wizard-brand">${mark('lg')}<div><span class="eyebrow">Step ${index + 1} of ${steps.length}</span><h1>${esc(title)}</h1><p class="mute">${esc(subtitle)}</p></div></div>
+    <div class="wizard-progress" aria-hidden="true"><span style="width:${(index + 1) / steps.length * 100}%"></span></div>
     ${body}
-    <div class="row sp wizard-foot">${previous ? `<button class="btn" data-action="onboarding-back" data-step="${previous}">Back</button>` : '<span></span>'}<button class="link-btn" data-action="signout">Sign out</button></div>
-  </div></div>`;
+    <div class="row sp wizard-foot">${previous !== undefined ? `<button class="btn" data-action="onboarding-back" data-step="${previous}">Back</button>` : '<span></span>'}<button class="link-btn" data-action="signout">Sign out</button></div>
+  </div></main>`;
+}
+
+function introStep() {
+  return frame(0, 'Welcome to Roomie', 'A shared space for everyone you live with.', `<section class="card stack welcome-brief">
+    <p>Use Roomie to coordinate chores and events, share household updates, and split expenses with your roommates.</p>
+    <p class="hint">We’ll set up your profile, connect you to a household, and show you where everything lives.</p>
+    <button type="button" class="btn p" data-action="onboarding-next" data-step="1">Get started</button>
+  </section>`);
 }
 
 function profileStep() {
-  const methods = Object.fromEntries((S.user.paymentMethods ?? []).map((method) => [method.app, method]));
-  const preferred = (S.user.paymentMethods ?? []).find((method) => method.isPreferred)?.app ?? 'venmo';
   if (profilePhoto === null) profilePhoto = S.user.profilePhoto ?? '';
-  return frame(1, 'Make Roomie feel like yours', 'Your roommates use this information to recognize and pay you.', `<form class="card stack" data-form="onboarding-profile">
+  return frame(1, 'Make Roomie feel like yours', 'Help your roommates recognize you and get in touch.', `<form class="card stack" data-form="onboarding-profile">
     <div class="inline-grid"><label class="fld"><span>First name</span><input class="input" name="firstName" maxlength="80" required value="${esc(S.user.firstName)}"></label>
       <label class="fld"><span>Last name</span><input class="input" name="lastName" maxlength="80" value="${esc(S.user.lastName)}"></label></div>
     <label class="fld"><span>Phone (optional)</span><input class="input" name="phoneNumber" type="tel" maxlength="40" value="${esc(S.user.phoneNumber ?? '')}" placeholder="(801) 555-0123"></label>
     <div class="fld"><span>Profile photo (optional)</span><label class="btn s photo-pick">Choose photo<input type="file" accept="image/jpeg,image/png,image/webp" data-input="onboarding-photo"></label><span class="hint" id="onboarding-photo-status">${profilePhoto ? 'Photo ready' : 'You can add this later'}</span></div>
-    <fieldset class="payment-editor"><legend>Payment apps</legend><p class="hint">Add any handles your roommates can use.</p>
+    <div class="err" role="alert"></div><button class="btn p" type="submit">Save and continue</button></form>`);
+}
+
+function paymentStep() {
+  const methods = Object.fromEntries((S.user.paymentMethods ?? []).map((method) => [method.app, method]));
+  const preferred = (S.user.paymentMethods ?? []).find((method) => method.isPreferred)?.app ?? 'venmo';
+  return frame(PAYMENT_STEP, 'Payment preferences', 'This step is optional. Roomie does not charge you or move money.', `<form class="card stack" data-form="onboarding-payment">
+    <fieldset class="payment-editor"><legend>Payment apps</legend><p class="hint">If you share a handle, your roommates can use it to find you in their payment app. Leave every field blank to continue without sharing one.</p>
       <div class="payment-fields">${PAYMENT_APPS.map(([app, label]) => `<label class="fld"><span>${label}</span><input class="input" name="pay_${app}" maxlength="120" value="${esc(methods[app]?.username ?? '')}" placeholder="${app === 'venmo' ? '@username' : 'Phone or email'}"></label>`).join('')}</div>
       <label class="fld"><span>Preferred app</span><select class="input" name="preferred">${PAYMENT_APPS.map(([app, label]) => `<option value="${app}" ${preferred === app ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
     </fieldset><div class="err" role="alert"></div><button class="btn p" type="submit">Save and continue</button></form>`);
@@ -54,19 +79,20 @@ function householdStep() {
 function questionsStep() {
   return frame(3, 'Set up your house', 'Answer five quick questions. You can edit every suggestion before saving.', `<form class="card stack" data-form="onboarding-suggest">
     <fieldset><legend>Which chores matter here?</legend><div class="onboarding-chips">${CHORES.map(([key, label]) => `<label class="chip-check"><input type="checkbox" name="chores" value="${key}" checked><span>${label}</span></label>`).join('')}</div></fieldset>
+    <label class="fld"><span>Custom chores (optional)</span><textarea class="input" name="customChores" rows="2" maxlength="600" placeholder="Water the plants"></textarea><small class="hint">Enter one chore per line. Custom chores repeat weekly and start out assigned to you. Choose their day and time before saving.</small></label>
     <fieldset><legend>How clean is clean enough?</legend><div class="methods"><label><input type="radio" name="cleanLevel" value="relaxed">Relaxed</label><label><input type="radio" name="cleanLevel" value="balanced" checked>Balanced</label><label><input type="radio" name="cleanLevel" value="high">Very tidy</label></div></fieldset>
     <label class="fld"><span>Quiet hours</span><input class="input" name="quietHours" maxlength="300" placeholder="11 PM–7 AM on weeknights"></label>
     <label class="fld"><span>Guest policy</span><textarea class="input" name="guestPolicy" rows="2" maxlength="300" placeholder="Give the group a heads-up before overnight guests"></textarea></label>
     <label class="fld"><span>Shared supplies</span><textarea class="input" name="sharedSupplies" rows="2" maxlength="300" placeholder="Toilet paper, dish soap, paper towels"></textarea></label>
-    <div class="err" role="alert"></div><button class="btn p" type="submit">Suggest a setup</button><p class="hint">Roomie uses a template if AI is unavailable. Nothing is saved yet.</p></form>`);
+    <div class="err" role="alert"></div><button class="btn p" type="submit">Suggest a setup</button><button class="btn" type="submit" name="setupMode" value="manual">Skip AI and create chores manually</button><p class="hint">Roomie uses a template if AI is unavailable. Nothing is saved yet.</p></form>`);
 }
 
 function draftStep() {
   const progress = setupTasks.length ? `<div class="setup-run-status" role="status">${setupError ? esc(setupError) : `Added ${setupDone} of ${setupTasks.length}`}</div>` : '';
-  return frame(3, 'Review your starter setup', `${draft.source === 'ai' ? 'AI drafted this' : 'A starter template drafted this'}. Edit anything before it reaches your household.`, `<form class="card stack draft-editor" data-form="onboarding-confirm">
+  return frame(3, 'Review your starter setup', `${draft.source === 'manual' ? 'Choose when your chores are due' : draft.source === 'ai' ? 'AI drafted this' : 'A starter template drafted this'}. Review everything before saving.`, `<form class="card stack draft-editor" data-form="onboarding-confirm">
     <h2>Chores</h2>${draft.chores.length ? draft.chores.map((chore, index) => `<fieldset class="draft-item"><legend>Chore ${index + 1}</legend><label class="fld"><span>Name</span><input class="input" name="choreName_${index}" maxlength="120" value="${esc(chore.choreName)}" required></label><label class="fld"><span>Details</span><textarea class="input" name="choreDescription_${index}" maxlength="500" rows="2">${esc(chore.description ?? '')}</textarea></label><div class="inline-grid"><label class="fld"><span>Time</span><input class="input" type="time" name="choreTime_${index}" value="${esc(chore.dueTime)}" required></label><label class="fld"><span>Effort</span><select class="input" name="choreEffort_${index}">${['easy', 'medium', 'hard'].map((effort) => `<option value="${effort}" ${chore.effort === effort ? 'selected' : ''}>${effort[0].toUpperCase() + effort.slice(1)}</option>`).join('')}</select></label></div>${chore.repeats === 'weekly' ? `<label class="fld"><span>Every</span><select class="input" name="choreDay_${index}">${DAYS.map((day, dayIndex) => `<option value="${dayIndex}" ${chore.dayOfWeek === dayIndex ? 'selected' : ''}>${day}</option>`).join('')}</select></label>` : chore.repeats === 'monthly' ? `<label class="fld"><span>Day of month</span><input class="input" type="number" min="1" max="31" name="choreDay_${index}" value="${chore.dayOfMonth}"></label>` : `<label class="fld"><span>Date</span><input class="input" type="date" name="choreDate_${index}" value="${esc(chore.date)}"></label>`}<label class="chk"><input type="checkbox" name="includeChore" value="${index}" checked> Add this chore</label></fieldset>`).join('') : '<p class="mute">No valid chores were suggested.</p>'}
-    <h2>House rules note</h2><label class="fld"><span>Note</span><textarea class="input" name="rulesNote" rows="4" maxlength="500">${esc(draft.rulesNote)}</textarea></label><label class="chk"><input type="checkbox" name="includeRules" checked> Pin this note to the board</label>
-    <h2>Shared supplies</h2>${draft.wishlist.map((item, index) => `<div class="draft-item inline-grid"><label class="fld"><span>Item</span><input class="input" name="wishName_${index}" maxlength="120" value="${esc(item.itemName)}"></label><label class="chk"><input type="checkbox" name="includeWish" value="${index}" checked> Add</label></div>`).join('') || '<p class="mute">No shared supplies suggested.</p>'}
+    ${draft.source === 'manual' ? '' : `<h2>House rules note</h2><label class="fld"><span>Note</span><textarea class="input" name="rulesNote" rows="4" maxlength="500">${esc(draft.rulesNote)}</textarea></label><label class="chk"><input type="checkbox" name="includeRules" checked> Pin this note to the board</label>
+    <h2>Shared supplies</h2>${draft.wishlist.map((item, index) => `<div class="draft-item inline-grid"><label class="fld"><span>Item</span><input class="input" name="wishName_${index}" maxlength="120" value="${esc(item.itemName)}"></label><label class="chk"><input type="checkbox" name="includeWish" value="${index}" checked> Add</label></div>`).join('') || '<p class="mute">No shared supplies suggested.</p>'}`}
     ${progress}<div class="err" role="alert"></div><div class="acts"><button type="button" class="btn" data-action="onboarding-redraft">Start over</button><button class="btn p" type="submit">${setupError ? 'Retry remaining' : 'Add to my house'}</button></div></form>`);
 }
 
@@ -87,7 +113,7 @@ function inviteStep() {
 async function notificationsStep() {
   if (!emailSettings) emailSettings = (await api(`/households/${household().householdId}/notification-settings`)).settings;
   const choices = [['event_hosting', 'New parties and hosting', 'A roommate creates a hosting event.'], ['event_other', 'Other new events', 'A roommate adds a meeting or other event.'], ['approval_request', 'Approval requests', 'An event needs your response.']];
-  return frame(5, 'Choose your email updates', 'Everything starts off. Turn on only what would help you.', `<form class="card stack" data-form="onboarding-notifications">${choices.map(([key, title, detail]) => `<label class="toggle-row"><span class="grow"><b>${title}</b><span class="hint">${detail}</span></span><input type="checkbox" name="${key}" ${emailSettings[key] ? 'checked' : ''}></label>`).join('')}<p class="hint">After setup, confirm your notification address from Profile. This is separate from signing in.</p><div class="err" role="alert"></div><button class="btn p" type="submit">Save and continue</button></form>`);
+  return frame(5, 'Notification preferences', 'Choose which household updates you want by email.', `<form class="card stack" data-form="onboarding-notifications">${choices.map(([key, title, detail]) => `<label class="toggle-row"><span class="grow"><b>${title}</b><span class="hint">${detail}</span></span><input type="checkbox" name="${key}" ${emailSettings[key] ? 'checked' : ''}></label>`).join('')}<p class="hint">After setup, confirm your notification address from Profile. This is separate from signing in.</p><div class="err" role="alert"></div><button class="btn p" type="submit">Save and continue</button><button class="btn" type="submit" name="emailMode" value="off">Continue without email notifications</button></form>`);
 }
 
 function tourStep() {
@@ -98,7 +124,9 @@ function tourStep() {
 export async function onboardingView() {
   let step = currentStep();
   if (!household() && step > 2) { step = 2; sessionStorage.setItem(STEP_KEY, '2'); }
+  if (step === 0) return introStep();
   if (step === 1) return profileStep();
+  if (step === PAYMENT_STEP) return paymentStep();
   if (step === 2) return householdStep();
   if (step === 3) {
     if (draft) return draftStep();
@@ -108,8 +136,8 @@ export async function onboardingView() {
     }
     return questionsStep();
   }
-  if (step === 4) return owner() ? inviteStep() : notificationsStep();
-  if (step === 5) return notificationsStep();
+  if (step === 4 && owner()) return inviteStep();
+  if (step === 4 || step === 5) return notificationsStep();
   return tourStep();
 }
 
@@ -133,9 +161,18 @@ inputs['onboarding-photo'] = (el) => {
 };
 
 forms['onboarding-profile'] = async (form) => {
+  const data = new FormData(form);
+  try {
+    const saved = await api('/me', { method: 'PATCH', body: { firstName: data.get('firstName'), lastName: data.get('lastName'), phoneNumber: data.get('phoneNumber'), profilePhoto, paymentMethods: S.user.paymentMethods ?? [] } });
+    S.user = saved.user;
+    go(PAYMENT_STEP);
+  } catch (error) { showError(form, error.message); }
+};
+
+forms['onboarding-payment'] = async (form) => {
   const data = new FormData(form), preferred = String(data.get('preferred'));
   const paymentMethods = PAYMENT_APPS.flatMap(([app]) => { const username = String(data.get(`pay_${app}`) ?? '').trim(); return username ? [{ app, username, isPreferred: app === preferred }] : []; });
-  try { const saved = await api('/me', { method: 'PATCH', body: { firstName: data.get('firstName'), lastName: data.get('lastName'), phoneNumber: data.get('phoneNumber'), profilePhoto, paymentMethods } }); S.user = saved.user; go(2); }
+  try { const saved = await api('/me', { method: 'PATCH', body: { firstName: S.user.firstName, lastName: S.user.lastName, phoneNumber: S.user.phoneNumber, profilePhoto: S.user.profilePhoto, paymentMethods } }); S.user = saved.user; go(2); }
   catch (error) { showError(form, error.message); }
 };
 
@@ -143,9 +180,21 @@ async function joined(result) { S.hid = result.householdId; localStorage.setItem
 forms['onboarding-join'] = async (form) => { try { await joined(await api('/households/join', { method: 'POST', body: { joinCode: new FormData(form).get('joinCode') } })); } catch (error) { showError(form, error.message); } };
 forms['onboarding-create'] = async (form) => { const data = new FormData(form); try { await joined(await api('/households', { method: 'POST', body: { householdName: data.get('householdName'), address: data.get('address'), timezone: data.get('timezone') } })); } catch (error) { showError(form, error.message); } };
 
-forms['onboarding-suggest'] = async (form) => {
+forms['onboarding-suggest'] = async (form, event) => {
   const data = new FormData(form);
-  try { draft = await api(`/households/${household().householdId}/onboarding/suggest`, { method: 'POST', body: { chores: data.getAll('chores'), cleanLevel: data.get('cleanLevel'), quietHours: data.get('quietHours'), guestPolicy: data.get('guestPolicy'), sharedSupplies: data.get('sharedSupplies') } }); go(3); }
+  const names = String(data.get('customChores') ?? '').split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
+  if (names.length > 6 || names.some((name) => name.length > 120)) return showError(form, 'Enter up to six custom chores, with a maximum of 120 characters per name.');
+  const manual = event?.submitter?.value === 'manual';
+  const custom = (manual && !names.length ? [''] : names).map((choreName) => ({
+    choreName, repeats: 'weekly', dayOfWeek: 1, dueTime: '18:00', effort: 'medium',
+    assignment: { mode: 'person', userId: S.user.userId },
+  }));
+  if (manual) {
+    draft = { source: 'manual', chores: custom, rulesNote: '', wishlist: [] };
+    go(3);
+    return;
+  }
+  try { draft = await api(`/households/${household().householdId}/onboarding/suggest`, { method: 'POST', body: { chores: data.getAll('chores'), cleanLevel: data.get('cleanLevel'), quietHours: data.get('quietHours'), guestPolicy: data.get('guestPolicy'), sharedSupplies: data.get('sharedSupplies') } }); draft.chores.push(...custom); go(3); }
   catch (error) { showError(form, error.message); }
 };
 
@@ -172,9 +221,10 @@ async function runSetup() {
 }
 forms['onboarding-confirm'] = async (form) => { if (!setupTasks.length) setupTasks = collectSetup(form); if (!setupTasks.length) return showError(form, 'Keep at least one item to add.'); await runSetup(); };
 
-forms['onboarding-notifications'] = async (form) => {
+forms['onboarding-notifications'] = async (form, event) => {
   const data = new FormData(form);
-  try { const saved = await api(`/households/${household().householdId}/notification-settings`, { method: 'PUT', body: { event_hosting: data.has('event_hosting'), event_other: data.has('event_other'), approval_request: data.has('approval_request') } }); emailSettings = saved.settings; go(6); }
+  const enabled = (name) => event?.submitter?.value !== 'off' && data.has(name);
+  try { const saved = await api(`/households/${household().householdId}/notification-settings`, { method: 'PUT', body: { event_hosting: enabled('event_hosting'), event_other: enabled('event_other'), approval_request: enabled('approval_request') } }); emailSettings = saved.settings; go(6); }
   catch (error) { showError(form, error.message); }
 };
 
