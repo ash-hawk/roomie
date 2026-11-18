@@ -53,7 +53,7 @@ function recoveryForm() {
 
 export function authView() {
   const up = mode === 'signup';
-  return `<div class="onb"><div class="box">
+  return `<main class="onb auth-screen"><div class="box">
     <div style="text-align:center">${mark('lg')}<h1 style="font-size:30px;font-weight:700;letter-spacing:-.03em;margin-top:14px">Roomie</h1><p class="mute">Chores, costs, and plans for your house.</p></div>
     ${mode === 'forgot' || mode === 'reset' ? recoveryForm() : `<form class="card stack" data-form="auth" autocomplete="on">
       <h2>${up ? 'Create your account' : 'Sign in'}</h2>
@@ -74,7 +74,7 @@ export function authView() {
       <p class="mute" style="text-align:center;font-size:14px">${up ? 'Already have an account?' : 'New here?'} <button type="button" class="link-btn" data-action="auth-toggle">${up ? 'Sign in' : 'Create an account'}</button></p>
       ${up ? '' : '<p class="mute" style="text-align:center;font-size:14px">Looking for the admin portal? <a class="link-btn" href="https://roomie-admin-gray.vercel.app/">Open Admin Portal</a></p>'}
     </form>`}
-  </div></div>`;
+  </div></main>`;
 }
 
 actions['auth-toggle'] = () => { mode = mode === 'signup' ? 'signin' : 'signup'; renderAuth(); };
