@@ -197,8 +197,7 @@ describe("Home views", () => {
     expect(picker.value).toBe('calendar');
     const day = document.querySelector('[data-day="2026-11-05"]');
     expect(day.textContent).toContain("Dishes");
-    expect(day.textContent).toContain("Dinner");
-    expect(day.textContent).toContain("Pending approval");
+    expect(day.textContent).toContain("+1 more");
     actions["home-day"](day);
     expect(document.querySelector("[role=dialog]").textContent).toContain("Sam");
     expect(document.querySelector("[role=dialog]").textContent).toContain("Dinner");
@@ -671,9 +670,7 @@ describe('Home upcoming list dates', () => {
     let content = document.getElementById('home-schedule-content');
     expect(content.textContent).toContain('Dinner');
     expect(content.textContent).not.toContain('Yesterday meeting');
-    expect(content.querySelectorAll('.home-schedule-row')).toHaveLength(5);
-    const all = content.querySelector('[data-action="home-month-list"]');
-    expect(all.textContent).toBe('View all 8 items');
+    expect(content.querySelectorAll('.home-schedule-row')).toHaveLength(8);
     actions['home-month-list']();
     expect(document.querySelector('[role="dialog"]').textContent).not.toContain('Yesterday meeting');
     expect(document.querySelectorAll('[role="dialog"] .home-schedule-row')).toHaveLength(8);
@@ -681,9 +678,10 @@ describe('Home upcoming list dates', () => {
     localStorage.removeItem('roomie.home.layout.1.51');
     document.getElementById('page').innerHTML = await homeView();
     content = document.getElementById('home-schedule-content');
-    expect(content.querySelectorAll('.home-schedule-row')).toHaveLength(5);
+    expect(content.querySelectorAll('.home-schedule-row')).toHaveLength(8);
     const view = content.querySelector('[data-input="home-view"]'); view.value = 'calendar'; inputs['home-view'](view);
-    expect(content.querySelector('[data-day="2026-11-04"]').textContent).toContain('Yesterday meeting');
+    actions['home-day'](content.querySelector('[data-day="2026-11-04"]'));
+    expect(document.querySelector('[role="dialog"]').textContent).toContain('Yesterday meeting');
   });
 });
 
@@ -979,21 +977,21 @@ describe('Complete Home month grids', () => {
 });
 
 describe('Bounded dashboard previews', () => {
-  it('shows three Home updates with all remaining posts and reply drafts accessible in View all', async () => {
+  it('shows all Home updates and preserves reply drafts while changing layout', async () => {
     S.hid=202;S.households=[{...S.households[0],householdId:202}];
     const baseApi=mockedApi.getMockImplementation();
     const notes=Array.from({length:7},(_,i)=>({messageId:200+i,senderUserId:2,messageText:`Household update ${i}`,postedDate:`2026-11-0${7-i}T12:00:00Z`,replies:[]}));
     mockedApi.mockImplementation((path)=>path.endsWith('/board')?Promise.resolve({notes}):path.endsWith('/events')?Promise.resolve({events:[]}):baseApi(path));
     document.getElementById('page').innerHTML=await homeView();
-    expect(document.querySelector('.home-board-feed').children).toHaveLength(3);
+    expect(document.querySelector('.home-board-feed').children).toHaveLength(7);
     actions['home-board-all']();
     expect(document.querySelector('#home-board-all .home-board-feed').children).toHaveLength(7);
     const form=document.querySelector('#home-board-all form');form.elements.namedItem('messageText').value='Keep my reply';
     actions['home-layout-preset']({dataset:{layoutPreset:'equal'}});
     expect(document.querySelector('#home-board-all form').elements.namedItem('messageText').value).toBe('Keep my reply');
-    expect(document.querySelector('#home-board .home-board-feed').children).toHaveLength(3);
+    expect(document.querySelector('#home-board .home-board-feed').children).toHaveLength(7);
   });
-  it('keeps the Chores workload under its schedule and exposes every overdue/request behind bounded previews', async () => {
+  it('shows the schedule without the workload and exposes overdue chores and requests', async () => {
     const {choresView}=await import('../src/pages/chores.js');
     S.hid=203;S.households=[{...S.households[0],householdId:203}];
     const baseApi=mockedApi.getMockImplementation();
@@ -1003,7 +1001,7 @@ describe('Bounded dashboard previews', () => {
     mockedApi.mockImplementation((path)=>path.endsWith('/chores')?Promise.resolve({chores:[rule],assignments,swapRequests}):baseApi(path));
     document.getElementById('page').innerHTML=await choresView();
     expect(document.querySelector('.chore-schedule-column #chore-schedule')).not.toBeNull();
-    expect(document.querySelectorAll('.chore-schedule-column>section')).toHaveLength(2);
+    expect(document.querySelectorAll('.chore-schedule-column>section')).toHaveLength(1);
     expect(document.querySelector('#chore-overdue').closest('aside')).not.toBeNull();
     expect(document.querySelectorAll('#chore-overdue .chore-board-item')).toHaveLength(1);
     expect(document.querySelectorAll('.chore-requests-board .chore-board-item')).toHaveLength(2);

@@ -999,6 +999,16 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .day2:hover{background:var(--surface-tile)}
 .home-widget-tools,.schedule-filter-panel{background:var(--surface-raised)}
 
+/* Keep each week the same height and give wish list entries room to scan. */
+.home-widget.expanded .home-month{grid-auto-rows:120px}
+.home-widget.expanded .home-month .day2{height:100%;min-height:0;overflow:hidden}
+.home-widget.expanded .home-calendar-item{flex:none}
+.home-wish-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.home-wish-row{padding:10px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+.home-wish-row .hint{font-size:12px;margin-top:3px}
+.home-finances-narrow .home-wish-groups{grid-template-columns:minmax(0,1fr)}
+@media(max-width:600px){.home-wish-groups{grid-template-columns:minmax(0,1fr)}.home-widget.expanded .home-month{grid-auto-rows:64px}}
+
 /* Desktop panels keep their outlines as content changes. */
 @media(min-width:901px){
   .home-dashboard[data-preset],.split.cal{height:900px;grid-template-rows:minmax(0,1fr);min-height:0}
