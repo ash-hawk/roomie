@@ -4,6 +4,7 @@ vi.mock("../src/auth-client.js", () => ({ api: vi.fn() }));
 import { api } from "../src/auth-client.js";
 import { S } from "../src/lib/state.js";
 import { actions, forms, inputs } from "../src/lib/events.js";
+import { financesView } from "../src/pages/finances.js";
 import { calendarView } from "../src/pages/calendar.js";
 import { settingsView } from "../src/pages/settings.js";
 import { connectHomeLayout } from "../src/components/home-layout.js";
@@ -31,7 +32,7 @@ beforeEach(() => {
     if (path.endsWith("/board")) return { notes: [] };
     if (path.endsWith("/home-summary")) return { enabled: false };
     if (path.endsWith("/wishlist")) return { items: [] };
-    if (path.endsWith("/balances")) return { mine: [] };
+    if (path.endsWith("/balances")) return { mine: [], incoming: [], outgoing: [] };
     if (path.endsWith("/notification-settings")) return { settings: { event_hosting: false, event_other: false, approval_request: false } };
     if (path === "/notification-channel") return { channel: null };
     throw new Error("Unexpected test route " + path);
@@ -80,6 +81,34 @@ describe("event form", () => {
     expect(form.textContent).toContain("Pending approval");
   });
 });
+it("reveals a new event in a different month and category after saving", async () => {
+  const form = await eventForm();
+  inputs["cal-event-type"]({ value: "meeting" });
+  const saved = { ...events[0], eventId: 2, eventName: "December hosting", eventDate: "2026-12-05T20:00:00Z", category: "hosting" };
+  mockedApi.mockResolvedValueOnce(saved);
+  await forms["event-save"](form);
+  const load = mockedApi.getMockImplementation();
+  mockedApi.mockImplementation((path) => path.endsWith("/events") ? Promise.resolve({ events: [...events, saved] }) : load(path));
+  const html = await calendarView();
+  expect(html).toContain("December 2026");
+  expect(html).toContain("December hosting");
+});
+
+it("opens a manual expense immediately and preserves input if the wishlist fails", async () => {
+  const load = mockedApi.getMockImplementation();
+  mockedApi.mockImplementation((path) => path.endsWith("/expenses") ? Promise.resolve({ expenses: [] }) : load(path));
+  await financesView();
+  const wishlist = Promise.withResolvers();
+  mockedApi.mockReturnValueOnce(wishlist.promise);
+  const opening = actions["add-expense"]();
+  const form = document.querySelector('form[data-form="expense"]');
+  form.elements.namedItem("itemName").value = "Paper towels";
+  wishlist.reject(new Error("Offline"));
+  await opening;
+  expect(form.elements.namedItem("itemName").value).toBe("Paper towels");
+  expect(form.textContent).toContain("You can still log an expense");
+});
+
 describe("profile save", () => {
   it("refreshes canonical values and allows saving again without another edit", async () => {
     document.getElementById("page").innerHTML = await settingsView();
@@ -275,7 +304,7 @@ describe('Home household board', () => {
       if (path.endsWith('/events')) return { events: boardEvents };
       if (path.endsWith('/chores')) return boardChores;
       if (path.endsWith('/wishlist')) return { items: [] };
-      if (path.endsWith('/balances')) return { mine: [] };
+      if (path.endsWith('/balances')) return { mine: [], incoming: [], outgoing: [] };
       if (path.endsWith('/board')) return { notes };
       throw new Error('Unexpected path ' + path);
     });
@@ -319,7 +348,7 @@ describe('Home household board', () => {
       if (path.endsWith('/events')) return { events: boardEvents };
       if (path.endsWith('/chores')) return boardChores;
       if (path.endsWith('/wishlist')) return { items: [] };
-      if (path.endsWith('/balances')) return { mine: [] };
+      if (path.endsWith('/balances')) return { mine: [], incoming: [], outgoing: [] };
       if (path.endsWith('/board')) return { notes };
       throw new Error('Unexpected path ' + path);
     });
@@ -338,7 +367,7 @@ describe('Home household board', () => {
       if (path.endsWith('/events')) return { events: boardEvents };
       if (path.endsWith('/chores')) return boardChores;
       if (path.endsWith('/wishlist')) return { items: [] };
-      if (path.endsWith('/balances')) return { mine: [] };
+      if (path.endsWith('/balances')) return { mine: [], incoming: [], outgoing: [] };
       if (path.endsWith('/board')) return { notes };
       throw new Error('Unexpected path ' + path);
     });

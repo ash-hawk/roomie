@@ -159,23 +159,40 @@ actions['delete-expense'] = async (el) => {
 };
 
 // ---- log an expense ---------------------------------------------------------------------------
-actions['add-expense'] = async (_el, _e, preset = {}) => {
-  const wish = (await api(`/households/${hid()}/wishlist`)).items.filter((w) => !w.isBought && isCurrentMember(D.members, w.createdByUserId));
-  D.wish = wish;
-  openExpenseForm({ preset, wish });
+function wishlistOptions(items, selectedId) {
+  return items.map((item) => `<option value="${item.wishlistItemId}" data-name="${esc(item.itemName)}" data-price="${esc(item.estimatedPrice ?? '')}" ${item.wishlistItemId === selectedId ? 'selected' : ''}>${esc(item.itemName)}${item.estimatedPrice ? ' (about ' + $m(item.estimatedPrice) + ')' : ''}</option>`).join('');
+}
+
+actions['add-expense'] = async () => {
+  const householdId = hid();
+  const form = openExpenseForm({ preset: {} });
+  const field = form.querySelector('[data-expense-wishlist]');
+  try {
+    const { items } = await api(`/households/${householdId}/wishlist`);
+    if (!form.isConnected || householdId !== S.hid) return;
+    const wish = items.filter((item) => !item.isBought && isCurrentMember(D.members, item.createdByUserId));
+    if (!wish.length) { field.remove(); return; }
+    field.outerHTML = expenseWishlist(wish);
+  } catch {
+    if (form.isConnected) field.textContent = 'The wish list could not load. You can still log an expense.';
+  }
 };
+
+function expenseWishlist(wish, selectedId) {
+  return `<label class="fld"><span>From the wish list (optional)</span><select class="input" name="wishlistItemId" data-input="wish-pick"><option value="">Not from the wish list</option>${wishlistOptions(wish, selectedId)}</select></label>`;
+}
 actions['edit-expense'] = (el) => {
   const expense = D.expenses.find((item) => item.expenseId === Number(el.dataset.id) && item.canEdit);
   if (expense) openExpenseForm({ preset: expense, expense });
 };
-function openExpenseForm({ preset, wish = [], expense }) {
+function openExpenseForm({ preset, linkedItem, expense }) {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: household().timezone }).format(new Date());
   const others = active().filter((m) => m.userId !== S.user.userId &&
     (!expense || Date.parse(m.joinedDate) <= Date.parse(expense.createdAt)));
   const selected = new Set(expense?.shares.map((share) => share.userId));
   openModal(`${mhead(expense ? 'Edit expense' : 'Log an expense')}
     <form class="stack" data-form="expense" data-expense-id="${expense?.expenseId ?? ''}" autocomplete="off">
-      ${wish.length ? `<label class="fld"><span>From the wish list (optional)</span><select class="input" name="wishlistItemId" data-input="wish-pick"><option value="">Not from the wish list</option>${wish.map((w) => `<option value="${w.wishlistItemId}" data-name="${esc(w.itemName)}" data-price="${esc(w.estimatedPrice ?? '')}">${esc(w.itemName)}${w.estimatedPrice ? ' (about ' + $m(w.estimatedPrice) + ')' : ''}</option>`).join('')}</select></label>` : ''}
+      ${linkedItem ? expenseWishlist(D.wish.filter((item) => !item.isBought), linkedItem.wishlistItemId) : expense ? '' : '<div class="hint" data-expense-wishlist role="status">Loading optional wish list…</div>'}
       <label class="fld"><span>What did you buy?</span><input class="input" name="itemName" required maxlength="120" placeholder="Paper towels" value="${esc(preset.itemName ?? '')}"></label>
       <div class="grid2" style="gap:12px">
         <label class="fld"><span>Total</span><input class="input" name="totalAmount" required inputmode="decimal" pattern="\\d{1,7}(\\.\\d{1,2})?" placeholder="24.99" data-input="split" value="${esc(preset.totalAmount ?? '')}"></label>
@@ -196,6 +213,7 @@ function openExpenseForm({ preset, wish = [], expense }) {
       <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">${expense ? 'Save changes' : 'Log expense'}</button></div>
     </form>`);
   inputs.split();
+  return document.querySelector('form[data-form=expense]');
 }
 actions['expense-toggle-roommates'] = (button) => {
   const roommates = [...button.form.querySelectorAll('input[name=p]:enabled')];
@@ -230,7 +248,8 @@ forms.expense = async (form) => {
   try {
     await api(expenseId ? `${path}/${expenseId}` : path, { method: expenseId ? 'PATCH' : 'POST', body });
   } catch (e) { return showError(form, e.message); }
-  closeModal(); toast(expenseId ? 'Expense updated' : 'Expense logged. Your roommates were notified.'); window.dispatchEvent(new Event('roomie:render'));
+  if (form.isConnected) closeModal();
+  toast(expenseId ? 'Expense updated' : 'Expense logged. Your roommates were notified.'); window.dispatchEvent(new Event('roomie:render'));
 };
 
 // ---- pay back ---------------------------------------------------------------------------------
@@ -298,7 +317,7 @@ const wishForm = (w = {}) => `
   <label class="fld"><span>Why does the house need it? (optional)</span><textarea class="input" name="description" rows="2" maxlength="500">${esc(w.description ?? '')}</textarea></label>`;
 actions['add-wish'] = () => openModal(`${mhead('Add to the wish list')}<form class="stack" data-form="wish-add">${wishForm()}<div class="err" role="alert"></div><div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Add item</button></div></form>`);
 const wishBody = (form) => { const f = new FormData(form); return { itemName: f.get('itemName'), needOrWant: f.get('needOrWant'), estimatedPrice: String(f.get('estimatedPrice')).trim() || null, itemLink: String(f.get('itemLink')).trim() || null, description: String(f.get('description')).trim() || null }; };
-forms['wish-add'] = async (form) => { try { await api(`/households/${hid()}/wishlist`, { method: 'POST', body: wishBody(form) }); } catch (e) { return showError(form, e.message); } closeModal(); toast('Added. Your roommates were notified.'); window.dispatchEvent(new Event('roomie:render')); };
+forms['wish-add'] = async (form) => { try { await api(`/households/${hid()}/wishlist`, { method: 'POST', body: wishBody(form) }); } catch (e) { return showError(form, e.message); } if (form.isConnected) closeModal(); toast('Added. Your roommates were notified.'); window.dispatchEvent(new Event('roomie:render')); };
 
 actions.wish = (el) => {
   const w = D.wish.find((x) => x.wishlistItemId === Number(el.dataset.id)); if (!w) return;
@@ -311,10 +330,9 @@ actions.wish = (el) => {
       ${w.canEdit ? `<button class="btn" data-action="edit-wish" data-id="${w.wishlistItemId}">Edit</button><button class="btn d" data-action="delete-wish" data-id="${w.wishlistItemId}">Delete</button>` : ''}</div>
     ${w.canEdit ? '' : '<p class="hint">Only the person who added an item can edit or delete it.</p>'}`);
 };
-actions['buy-wish'] = async (el) => {
-  const w = D.wish.find((x) => x.wishlistItemId === Number(el.dataset.id));
-  await actions['add-expense'](el, null, { itemName: w.itemName, totalAmount: w.estimatedPrice ?? '' });
-  const sel = document.querySelector('select[name=wishlistItemId]'); if (sel) { sel.value = String(w.wishlistItemId); inputs.split(); }
+actions['buy-wish'] = (el) => {
+  const item = D.wish.find((entry) => entry.wishlistItemId === Number(el.dataset.id) && !entry.isBought);
+  if (item) openExpenseForm({ preset: { itemName: item.itemName, totalAmount: item.estimatedPrice ?? '' }, linkedItem: item });
 };
 actions['edit-wish'] = (el) => {
   const w = D.wish.find((x) => x.wishlistItemId === Number(el.dataset.id));

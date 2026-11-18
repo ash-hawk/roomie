@@ -59,6 +59,7 @@ function shell(page, body) {
 let seq = 0;
 export async function render() {
   const mine = ++seq;
+  let retainedPage;
   try {
     if (isPasswordReset()) { stopFinancePolling(); stopChorePolling(); stopCalendarPolling(); stopAlertPolling(); root.innerHTML = authView(); return; }
     if (!(await getToken())) { stopFinancePolling(); stopChorePolling(); stopCalendarPolling(); stopAlertPolling(); resetState(); applyAppearance(); root.innerHTML = authView(); return; }
@@ -75,7 +76,8 @@ export async function render() {
     if (page !== 'calendar') stopCalendarPolling();
     await loadAlerts().catch(() => {});
     const keep = $('#page') && root.dataset.page === page && root.dataset.hid === String(S.hid); // soft refresh keeps the shell
-    if (!keep) root.innerHTML = shell(page, loading);
+    if (keep) retainedPage = $('#page');
+    else root.innerHTML = shell(page, loading);
     const body = pages[page] ? await pages[page]() : soonView(page);
     if (mine !== seq) return;
     root.dataset.page = page; root.dataset.hid = String(S.hid);
@@ -87,6 +89,12 @@ export async function render() {
   } catch (e) {
     if (mine !== seq) return;
     if (e.status === 401) { stopFinancePolling(); stopChorePolling(); stopCalendarPolling(); stopAlertPolling(); resetState(); root.innerHTML = authView(); return; }
+    if (retainedPage?.isConnected) {
+      if (!retainedPage.querySelector('[data-refresh-error]')) {
+        retainedPage.insertAdjacentHTML('afterbegin', '<div class="card row wrap" data-refresh-error><p role="status">Could not refresh this page. The information below may be out of date.</p><button type="button" class="btn" data-action="retry">Refresh page</button></div>');
+      }
+      return;
+    }
     root.innerHTML = `<div class="onb"><div class="box"><section class="card stack"><h2>Something went wrong</h2><p class="mute">${esc(e.message)}</p><button class="btn p" data-action="retry">Try again</button></section></div></div>`;
   }
 }
@@ -111,6 +119,7 @@ document.addEventListener('submit', async (e) => {
   const fn = form && forms[form.dataset.form];
   if (!fn) return;
   e.preventDefault();
+  if (form.getAttribute('aria-busy') === 'true') return;
   const btn = form.querySelector('[type=submit]');
   form.setAttribute('aria-busy', 'true'); if (btn) btn.disabled = true;
   showError(form, '');

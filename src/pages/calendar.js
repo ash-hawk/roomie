@@ -301,7 +301,15 @@ forms['event-save'] = async (form) => {
     if (session?.userId === S.user?.userId && session.householdId === S.hid) session.onReturn(saved);
     return;
   }
-  closeModal(); toast(id ? 'Event saved' : 'Event added'); refresh();
+  if (!id && form.dataset.household === String(S.hid) && form.dataset.user === String(S.user?.userId)) {
+    const day = ymdIn(saved.eventDate);
+    monthStart = `${day.slice(0, 7)}-01`;
+    if (eventType !== 'all' && eventType !== saved.category) eventType = 'all';
+    if (day < ymdIn(Date.now())) view = 'month';
+  }
+  if (form.isConnected) closeModal();
+  toast(id ? 'Event saved' : 'Event added');
+  refresh();
 };
 
 // ---- the board ----------------------------------------------------------------------------------
