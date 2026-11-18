@@ -98,8 +98,10 @@ function calendarView() {
 }
 
 function compactUpcoming() {
-  const monthItems = D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7) && !item.completed && Date.parse(item.at) >= Date.now());
-  return `<div class="home-compact-upcoming"><h3>Coming up</h3>${monthItems.map((item) => `<div><span class="hint">${esc(dayLabel(item.ymd))}</span>${row(item)}</div>`).join('') || '<p class="hint">Nothing else coming up this month.</p>'}</div>`;
+  const today = ymdIn(Date.now());
+  const weekEnd = addDays(today, 6 - new Date(`${today}T12:00:00Z`).getUTCDay());
+  const weekItems = D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7) && item.ymd >= today && item.ymd <= weekEnd && !item.completed && Date.parse(item.at) >= Date.now());
+  return `<div class="home-compact-upcoming"><h3>Coming up this week</h3>${weekItems.map((item) => `<div><span class="hint">${esc(dayLabel(item.ymd))}</span>${row(item)}</div>`).join('') || '<p class="hint">Nothing else coming up this week.</p>'}</div>`;
 }
 
 // AI recap line: one call per sign-in and household (sessionStorage), hidden on any failure or when the server flag is off.
