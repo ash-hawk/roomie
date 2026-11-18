@@ -10,6 +10,7 @@ const ICONS = {
   money: '<circle cx="12" cy="12" r="9"/><path d="M14.6 9.3c-.5-.8-1.4-1.3-2.6-1.3-1.4 0-2.6.7-2.6 1.9 0 2.6 5.2 1.3 5.2 4 0 1.2-1.2 2-2.6 2-1.2 0-2.2-.5-2.8-1.4M12 6.5V8m0 8v1.5"/>',
   check: '<circle cx="12" cy="12" r="9"/><path d="m8.2 12.4 2.6 2.6 5-5.4"/>',
   settings: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+  users: '<path d="M16 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-5A4.5 4.5 0 0 0 2 18.5V20"/><circle cx="9" cy="7" r="4"/><path d="M18 8a3 3 0 0 1 0 6M22 20v-1.5a4.5 4.5 0 0 0-3-4.25"/>',
   bell: '<path d="M6 9a6 6 0 1 1 12 0c0 6 2 7.5 2 7.5H4S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
@@ -17,12 +18,12 @@ const ICONS = {
 export const ico = (n, s = 20) => `<svg class="i" viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] ?? ''}</svg>`;
 export const mark = (cls = '') => `<span class="mark ${cls}">${ico('home', cls ? 30 : 18)}</span>`;
 
-const PALETTE = ['#4338ca', '#db2777', '#0d9488', '#d97706', '#7c3aed', '#0284c7'];
+export const itemColor = (kind) => `var(--color-${['event', 'chore', 'finance', 'announcement'].includes(kind) ? kind : 'announcement'})`;
 export function avatar(u, sz = '') {
   if (!u) return '';
   const first = (u.firstName || '?')[0];
   const photo = u.profilePhoto ? `<img src="${esc(u.profilePhoto)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc(first.toUpperCase());
-  return `<span class="av ${sz}" style="background:${PALETTE[(u.userId ?? 0) % PALETTE.length]}" title="${esc(`${u.firstName ?? ''} ${u.lastName ?? ''}`.trim())}">${photo}</span>`;
+  return `<span class="av ${sz}"  title="${esc(`${u.firstName ?? ''} ${u.lastName ?? ''}`.trim())}">${photo}</span>`;
 }
 export const fullName = (u) => (u ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() : 'Someone');
 
@@ -45,8 +46,10 @@ export function toast(msg) {
   $('#toast').appendChild(t); setTimeout(() => t.remove(), 3200);
 }
 
-export const phead = (eyebrow, title, sub = '', actions = '') =>
-  `<header class="ph page-header"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<p class="mute">${sub}</p>` : ''}</div>${actions ? `<div class="row page-actions">${actions}</div>` : ''}</header>`;
+// Navigation already names the page. Keep its heading for screen readers without
+// reserving a visible title row; descriptions and page actions retain their space.
+export const phead = (title, sub = '', actions = '') =>
+  `<h1 class="sr-only">${title}</h1>${sub || actions ? `<header class="ph page-header page-header-compact">${sub ? `<p class="mute">${sub}</p>` : ''}${actions ? `<div class="row page-actions">${actions}</div>` : ''}</header>` : ''}`;
 export const badge = (text, kind = '') => `<span class="badge ${kind}">${text}</span>`;
 export const empty = (icon, title, sub, action = '') => `<div class="empty"><div style="font-size:34px">${icon}</div><b>${title}</b><p class="mute" style="font-size:14px">${sub}</p>${action}</div>`;
 export const seg = (options, current, action) =>
@@ -62,9 +65,24 @@ export function openModal(inner) {
   o._restoreFocus = restore;
   o.addEventListener('click', (e) => { if (e.target === o) closeModal(); });
   document.body.appendChild(o);
+  const viewport = window.visualViewport;
+  if (viewport) {
+    // The phone keyboard can shrink the visible viewport without resizing the page.
+    const fitSheet = () => {
+      o.style.setProperty('--modal-viewport-height', `${viewport.height}px`);
+      o.style.setProperty('--modal-viewport-top', `${viewport.offsetTop}px`);
+    };
+    fitSheet();
+    viewport.addEventListener('resize', fitSheet);
+    viewport.addEventListener('scroll', fitSheet);
+    o._stopViewportTracking = () => {
+      viewport.removeEventListener('resize', fitSheet);
+      viewport.removeEventListener('scroll', fitSheet);
+    };
+  }
   o.querySelector('input,select,textarea,button')?.focus();
 }
-export const closeModal = () => { const modal = document.getElementById('modal'); if (!modal) return; const restore = modal._restoreFocus; modal.remove(); window.dispatchEvent(new Event('roomie:modal-close')); restore?.focus?.(); };
+export const closeModal = () => { const modal = document.getElementById('modal'); if (!modal) return; const restore = modal._restoreFocus; modal._stopViewportTracking?.(); modal.remove(); window.dispatchEvent(new Event('roomie:modal-close')); restore?.focus?.(); };
 export const mhead = (title) => `<div class="mh"><h3 id="modal-title">${title}</h3><button class="x" data-action="close-modal" aria-label="Close">✕</button></div>`;
 document.addEventListener('keydown', (e) => {
   if (document.querySelector('.confirm-ovl')) return;

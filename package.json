@@ -14,6 +14,7 @@
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
     "db:unseed": "tsx --env-file=.env.local scripts/unseed.ts",
     "test": "vitest run",
+    "test:watch": "vitest",
     "test:security": "tsx --env-file=.env.local scripts/security-tests.ts",
     "typecheck": "tsc --noEmit",
     "dev": "vite",
@@ -28,14 +29,17 @@
     "db:migrate:prod": "tsx --env-file=.env.production.local scripts/migrate.ts --production"
   },
   "dependencies": {
+    "@vercel/functions": "^3.11.0",
     "drizzle-orm": "^0.45.3",
     "jose": "^6.2.12",
     "pg": "^8.23.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "@types/node": "^26.6.4",
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
+    "jsdom": "^29.1.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.3",

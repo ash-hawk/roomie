@@ -16,11 +16,11 @@ Each branch has its own Neon Auth instance (its own users and its own `NEON_AUTH
 - Vercel: **Preview** env vars point at dev, **Production** env vars point at main.
 
 ## Roles
-- `neondb_owner` owns all 18 tables and is the role in every `DATABASE_URL` (both branches). `/api` uses it. It bypasses RLS, and there is no RLS.
+- `neondb_owner` owns all 21 tables and is the role in every `DATABASE_URL` (both branches). `/api` uses it. It bypasses RLS, and there is no RLS.
 - `authenticated` and `anonymous` (the Data API roles) have zero privileges on every table. The Neon Data API is OFF on both branches.
 
 ## Files
-- `schema.sql` is the source of truth (v3, 18 tables). `migrations/` holds numbered changes since. `archive/` is the old RLS prototype, never run. `branches.json` holds the branch and endpoint ids (no secrets).
+- `schema.sql` is the source of truth (v6, 22 tables). `migrations/` holds numbered changes since; migration `0003_onboarding_email_ai.sql` adds onboarding, email and AI usage tables, `0004_verified_notification_channels.sql` adds verified notification channels, `0005_add_bulletin_message_resolution.sql` adds resolved-announcement status, `0006_household_activity.sql` adds `app_event` (see below), and `0007_payment_confirmed_at.sql` adds `payment.confirmed_at`, kept in step with `status` by a trigger, for counting payments confirmed in a time window. `archive/` is the old RLS prototype, never run. `branches.json` holds the branch and endpoint ids (no secrets).
 
 ## Changing the schema
 1. Write the next numbered file in `migrations/` and get it reviewed.
@@ -38,3 +38,27 @@ Each branch has its own Neon Auth instance (its own users and its own `NEON_AUTH
 
 ## Vercel
 - Auth is proxied through our own domain by `api/auth-proxy.ts`. Every origin that serves the app must be a trusted origin of the matching Neon Auth branch. Today: `https://roomie-is401-preview.vercel.app` on both. See `docs/demo-access.md`.
+
+## Weekly household activity
+
+Migration `0006_household_activity.sql` adds `app_event`. The chore-completion
+transaction records the first successful completion per user and assignment.
+An undo followed by another completion of the same assignment by the same user
+keeps the original event. Demo household and fixture accounts are excluded at
+write time. For a development smoke test, use a regular account in a separate
+development household.
+
+Run this query in the database console with your household ID and the first
+local date of the reporting week. The bounds use the household's timezone.
+
+```sql
+WITH report AS (
+    SELECT 123::bigint AS household_id, DATE '2026-11-09' AS week_start
+)
+SELECT count(DISTINCT e.user_id) AS active_users
+FROM report r
+JOIN household h ON h.household_id = r.household_id
+LEFT JOIN app_event e ON e.household_id = h.household_id
+    AND e.occurred_at >= (r.week_start::timestamp AT TIME ZONE h.timezone)
+    AND e.occurred_at < ((r.week_start + 7)::timestamp AT TIME ZONE h.timezone);
+```

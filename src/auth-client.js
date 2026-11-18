@@ -21,6 +21,8 @@ async function authPost(path, body) {
 
 export const signUp = (email, password, name) => authPost('/sign-up/email', { email, password, name });
 export const signIn = (email, password) => authPost('/sign-in/email', { email, password });
+export const requestPasswordReset = (email, redirectTo) => authPost('/request-password-reset', { email, redirectTo });
+export const resetPassword = (token, newPassword) => authPost('/reset-password', { token, newPassword });
 export async function signOut() { cached = null; await fetch(`${AUTH}/sign-out`, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' }); }
 
 /** A valid JWT, or null when signed out. Refreshes when under 60 seconds remain. */

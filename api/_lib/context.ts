@@ -3,6 +3,7 @@ import { requireUser, type CurrentUser } from './auth.js';
 import { db } from './db.js';
 import { requireActiveMember } from './household.js';
 import { HttpError, id, route, segments } from './http.js';
+import { verifyEmailLinkToken, type EmailLinkClaims } from './email-links.js';
 
 export type HouseholdCtx = { user: CurrentUser; householdId: number; role: string; req: Request };
 
@@ -25,6 +26,24 @@ export function withHousehold(fn: (ctx: HouseholdCtx) => Promise<Response>) {
 /** Wrapper for routes that need a signed-in user but no household. */
 export function withUser(fn: (user: CurrentUser, req: Request) => Promise<Response>) {
   return route(async (req) => fn(await requireUser(req), req));
+}
+
+/** Public email actions authenticate with a short, signed capability token rather than a session cookie. */
+export function withSignedLink(fn: (ctx: { claims: EmailLinkClaims; token: string; req: Request }) => Promise<Response>) {
+  return route(async (req) => {
+    const token = new URL(req.url).searchParams.get('t') ?? '';
+    if (!token) throw new HttpError(400, 'Missing email link');
+    return fn({ claims: await verifyEmailLinkToken(token), token, req });
+  });
+}
+
+/** Public channel-confirmation pages authenticate with a random, hashed, single-use token. */
+export function withConfirmationLink(fn: (ctx: { token: string; req: Request }) => Promise<Response>) {
+  return route(async (req) => {
+    const token = new URL(req.url).searchParams.get('t') ?? '';
+    if (!token) throw new HttpError(400, 'Missing confirmation link');
+    return fn({ token, req });
+  });
 }
 
 /**

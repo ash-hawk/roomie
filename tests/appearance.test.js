@@ -1,0 +1,148 @@
+// @vitest-environment jsdom
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { themes, onColor, contrastRatio } from '../src/lib/themes.js';
+import { appearanceView } from '../src/pages/appearance.js';
+import { S } from '../src/lib/state.js';
+import { inputs } from '../src/lib/events.js';
+import { applyAppearance, appearance, theme } from '../src/lib/appearance.js';
+const system = vi.hoisted(() => {
+  const media = new EventTarget();
+  media.matches = false;
+  vi.stubGlobal('matchMedia', vi.fn(() => media));
+  return media;
+});
+const setSystemDark = (matches) => {
+  system.matches = matches;
+  system.dispatchEvent(new Event('change'));
+};
+
+beforeEach(() => { localStorage.clear(); system.matches = false; S.user = {userId:1}; document.documentElement.className='';history.replaceState(null,'','#/appearance'); });
+describe('personal light and dark appearance', () => {
+  it('defaults to Orchid and follows the OS live until a manual mode is selected', () => {
+    S.user = null;
+    applyAppearance();
+    expect(document.documentElement.dataset.theme).toBe('orchid');
+    expect(document.documentElement.style.colorScheme).toBe('light');
+    setSystemDark(true);
+    expect(document.documentElement.style.colorScheme).toBe('dark');
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.orchid.dark.accent);
+
+    S.user = { userId: 1 };
+    inputs.appearance({ value: 'light', checked: true });
+    setSystemDark(false);
+    setSystemDark(true);
+    expect(document.documentElement.style.colorScheme).toBe('light');
+
+    inputs.appearance({ value: 'system', checked: true });
+    expect(document.documentElement.style.colorScheme).toBe('dark');
+    document.body.innerHTML = appearanceView();
+    expect(document.querySelector('[data-input=appearance]:checked').value).toBe('system');
+    setSystemDark(false);
+    expect(document.documentElement.style.colorScheme).toBe('light');
+  });
+
+  it('persists on reload and keeps other users independent', () => {
+    inputs.appearance({value:'dark',checked:true});
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    applyAppearance(); expect(appearance()).toBe('dark');
+    S.user = {userId:2}; applyAppearance();
+    expect(appearance()).toBe('system');
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    S.user = {userId:1}; applyAppearance();
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+  });
+  it('ignores invalid values and clears the former household accent override', () => {
+    inputs.appearance({value:'red',checked:true});
+    document.documentElement.style.setProperty('--accent','#ff0000');
+    applyAppearance();
+    expect(appearance()).toBe('system');
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.orchid.light.accent);
+  });
+});
+
+describe('personal theme presets', () => {
+  it('keeps theme and mode independent, persists them, and isolates accounts', () => {
+    inputs.theme({value:'berry',checked:true});
+    inputs.appearance({value:'dark',checked:true});
+    applyAppearance();
+    expect(theme()).toBe('berry');
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.berry.dark.accent);
+    S.user={userId:2};applyAppearance();
+    expect(theme()).toBe('orchid');expect(appearance()).toBe('system');
+    S.user={userId:1};applyAppearance();
+    expect(theme()).toBe('berry');expect(appearance()).toBe('dark');
+    inputs.appearance({value:'light',checked:true});
+    expect(theme()).toBe('berry');
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.berry.light.accent);
+  });
+  it('falls back safely for invalid stored themes and ignores invalid selections', () => {
+    localStorage.setItem('roomie.theme.1','bad-theme');
+    inputs.theme({value:'__proto__',checked:true});applyAppearance();
+    expect(theme()).toBe('orchid');
+    document.body.innerHTML=appearanceView();
+    expect(document.querySelectorAll('[data-input=theme]')).toHaveLength(5);
+    expect(document.querySelector('[data-input=theme]:checked').value).toBe('orchid');
+    expect(document.querySelector('.theme-swatches')).toBeNull();
+    expect(document.querySelectorAll('.theme-palette i')).toHaveLength(35);
+    expect([...document.querySelectorAll('.theme-palette i')].map(el=>el.title)).toContain('#CC87D4');
+  });
+  it('provides readable theme controls in all ten combinations', () => {
+    const luminance=hex=>{
+      const channels=hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4);
+      return channels[0]*0.2126+channels[1]*0.7152+channels[2]*0.0722;
+    };
+    const contrast=(a,b)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);};
+    for(const preset of Object.values(themes)) for(const mode of ['light','dark']) {
+      const colors=preset[mode];
+      for(const surface of ['card','bg']) for(const text of ['ink','mute']) expect(contrast(colors[surface],colors[text]),`${preset.name} ${mode} ${surface}/${text}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(colors.accent,colors['on-accent'])).toBeGreaterThanOrEqual(4.5);
+      expect(preset.palette).toHaveLength(7);
+      // Pale source swatches have readable adjacent labels and contrasting outlines.
+      expect(preset.palette.every(color=>/^#[0-9a-f]{6}$/i.test(color))).toBe(true);
+    }
+  });
+});
+
+it('uses only the chosen theme across pages, markers and statuses', () => {
+  for (const [preset, colors] of Object.entries(themes)) for (const mode of ['light', 'dark']) {
+    for (const page of ['home', 'calendar', 'chores', 'finances', 'household', 'appearance']) {
+      history.replaceState(null, '', `#/${page}`);
+      applyAppearance(mode, preset);
+      expect(document.documentElement.style.getPropertyValue('--accent')).toBe(colors[mode].accent);
+      expect(document.documentElement.style.getPropertyValue('--on-accent')).toBe(onColor(colors[mode].accent));
+      for (const kind of ['event', 'chore', 'finance', 'announcement']) {
+        expect(document.documentElement.style.getPropertyValue(`--color-${kind}`)).toBe(colors[mode].detail);
+      }
+      for (const status of ['good', 'bad', 'warn']) {
+        expect(document.documentElement.style.getPropertyValue(`--${status}`)).toBe(document.documentElement.style.getPropertyValue('--good'));
+      }
+    }
+  }
+});
+
+it('uses all seven source colors as interface roles with readable navigation and actions', () => {
+  for (const preset of Object.values(themes)) for (const mode of ['light', 'dark']) {
+    const colors = preset[mode];
+    expect(new Set(['accent','nav-accent','highlight','detail','secondary','decoration','outline'].map(role => colors[role]))).toEqual(new Set(preset.palette));
+    expect(contrastRatio(colors['nav-accent'], colors['on-nav'])).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.highlight, colors['on-highlight'])).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.card, colors['text-accent'])).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.card, colors.focus)).toBeGreaterThanOrEqual(3);
+  }
+});
+
+it('gives all five themes layered opaque surfaces and readable text in both modes', () => {
+  const signatures = [];
+  for (const preset of Object.values(themes)) for (const mode of ['light', 'dark']) {
+    const colors = preset[mode];
+    const surfaces = ['bg', 'card', 'surface-raised', 'surface-alternate', 'surface-tile'];
+    expect(new Set(surfaces.map(key => colors[key])).size).toBe(5);
+    signatures.push(surfaces.map(key => colors[key]).join(':'));
+    for (const surface of surfaces) {
+      expect(colors[surface]).toMatch(/^#[0-9a-f]{6}$/i);
+      for (const text of ['ink', 'mute', 'text-accent']) expect(contrastRatio(colors[surface], colors[text]), `${preset.name} ${mode} ${surface}/${text}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(colors[surface], colors.focus)).toBeGreaterThanOrEqual(3);
+    }
+  }
+  expect(new Set(signatures).size).toBe(10);
+});

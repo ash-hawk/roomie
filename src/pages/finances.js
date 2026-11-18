@@ -1,6 +1,9 @@
+import { isCurrentMember } from '../lib/current-household.js';
 // Slice (a): Expense tracker. Balances are CALCULATED on the server from expenses, shares and payments;
 // this page only displays them. Amounts arrive as strings ("12.34") and are converted to integer cents
 // with the same shared money helpers the API uses.
+import '../components/finance-profiles.css';
+import { boardIdentity as roommateIdentity } from '../components/board-profile.js';
 import { actions, forms, inputs } from '../lib/events.js';
 import { api } from '../auth-client.js';
 import { S, household } from '../lib/state.js';
@@ -9,6 +12,10 @@ import { fromCents, splitCents, toCents } from '../../shared/money.ts';
 
 let tab = 'settle';
 let D = null; // { members, bal, expenses, wish } for the modals
+let financePoll = null;
+let financePollGeneration = 0;
+let financePollViewer = null;
+let financeDataSequence = 0;
 
 const APP_LABEL = { venmo: 'Venmo', zelle: 'Zelle', apple_cash: 'Apple Cash' };
 const $m = (str) => money(toCents(str));
@@ -17,27 +24,76 @@ const who = (id) => D.members.find((m) => m.userId === id);
 const first = (id) => (id === S.user.userId ? 'You' : who(id)?.firstName ?? 'Someone');
 const nm = (id) => (id === S.user.userId ? 'you' : who(id)?.firstName ?? 'someone');
 const active = () => D.members.filter((m) => !m.leftDate);
-const STATUS = { buyer: ['buyer', 'Bought it'], unpaid: ['unpaid', 'Owes'], pending: ['pending', 'Sent, waiting'], paid: ['paid', 'Paid back'], disputed: ['disputed', 'Disputed'] };
+const STATUS = { archived: ['later', 'History'], buyer: ['buyer', 'Bought it'], unpaid: ['unpaid', 'Owes'], pending: ['pending', 'Sent, waiting'], paid: ['paid', 'Paid back'], disputed: ['disputed', 'Disputed'] };
 const stChip = (status) => `<span class="st ${STATUS[status][0]}">${STATUS[status][1]}</span>`;
 
+export function prepareFinanceActivity(type) { tab = type === 'wishlist_item' ? 'wish' : 'settle'; }
+
+function startFinancePolling() {
+  const viewer = `${S.user?.userId}:${hid()}`;
+  if (financePoll && financePollViewer === viewer) return;
+  stopFinancePolling();
+  financePollViewer = viewer;
+  const generation = financePollGeneration;
+  let inFlight = false;
+  financePoll = setInterval(async () => {
+    if (inFlight || document.hidden || document.getElementById('root')?.dataset.page !== 'finances' ||
+        document.querySelector('#modal:not(.activity-overlay)') || !D) return;
+    inFlight = true;
+    const householdId = hid(), userId = S.user?.userId;
+    const dataSequence = financeDataSequence;
+    const includeWish = tab === 'wish';
+    try {
+      const [{ members }, bal, { expenses }, wishlist] = await Promise.all([
+        api(`/households/${householdId}/members`),
+        api(`/households/${householdId}/balances`),
+        api(`/households/${householdId}/expenses`),
+        includeWish ? api(`/households/${householdId}/wishlist`) : Promise.resolve(null),
+      ]);
+      if (generation !== financePollGeneration || dataSequence !== financeDataSequence || householdId !== hid() || userId !== S.user?.userId) return;
+      const wish = includeWish ? wishlist.items.filter((item) => isCurrentMember(members, item.createdByUserId)) : D.wish;
+      const changed = JSON.stringify([members, bal, expenses, wish]) !== JSON.stringify([D.members, D.bal, D.expenses, D.wish]);
+      if (!changed) return;
+      D = { ...D, members, bal, expenses, wish };
+      const content = document.querySelector('#page .finance-content');
+      if (content) content.innerHTML = tab === 'settle' ? settleView() : wishView();
+    } catch { /* Offline or signed out: retry on the next bounded poll. */ }
+    finally { inFlight = false; }
+  }, 5000);
+}
+
+export function stopFinancePolling() {
+  financePollGeneration++;
+  if (financePoll) clearInterval(financePoll);
+  financePoll = null;
+  financePollViewer = null;
+}
+
 export async function financesView() {
+  startFinancePolling();
+  financeDataSequence++;
   const h = hid();
   const [{ members }, bal, { expenses }] = await Promise.all([api(`/households/${h}/members`), api(`/households/${h}/balances`), api(`/households/${h}/expenses`)]);
   D = { members, bal, expenses, wish: D?.wish ?? [] };
-  if (tab === 'wish') D.wish = (await api(`/households/${h}/wishlist`)).items;
+  if (tab === 'wish') D.wish = (await api(`/households/${h}/wishlist`)).items.filter(w => isCurrentMember(members, w.createdByUserId));
   const action = tab === 'settle' ? `<button class="btn p" data-action="add-expense">${ico('plus', 16)} Log expense</button>` : `<button class="btn p" data-action="add-wish">${ico('plus', 16)} Add item</button>`;
-  return `${phead('Shared money', 'Finances', 'Keep every shared cost clear and accounted for.', action)}
+  return `${phead('Finances', '', action)}
   <div class="page-controls">${seg([['settle', 'Settle payments'], ['wish', 'Wish list']], tab, 'fin-tab')}</div>
-  <div class="page-content stack">${tab === 'settle' ? settleView() : wishView()}</div>`;
+  <div class="page-content stack finance-content" data-item-kind="finance">${tab === 'settle' ? settleView() : wishView()}</div>`;
 }
 actions['fin-tab'] = (el) => { tab = el.dataset.value; window.dispatchEvent(new Event('roomie:render')); };
 
+const profileLink = (id, label = first(id), withAvatar = true) => isCurrentMember(D.members, id) ? roommateIdentity(who(id), label, withAvatar).replace('class="board-profile-link"', 'class="board-profile-link finance-profile-link"') : '<span class="mute">Former roommate</span>';
+
 // ---- settle tab -------------------------------------------------------------------------------
-function person(id, extra = '') { const m = who(id); return `<div class="row" style="gap:10px;min-width:0">${avatar(m)}<div style="min-width:0"><b class="truncate">${esc(first(id))}</b>${m?.leftDate ? ' <span class="mute" style="font-size:12px">(moved out)</span>' : ''}${extra}</div></div>`; }
+function person(id, extra = '') { const m = who(id); return `<div class="row" style="gap:10px;min-width:0">${profileLink(id, null)}<div style="min-width:0">${profileLink(id, first(id), false)}${m?.leftDate ? ' <span class="mute" style="font-size:12px">(moved out)</span>' : ''}${extra}</div></div>`; }
 
 function settleView() {
   const { bal } = D;
-  const mine = bal.mine.map((b) => {
+  const mine = bal.mine
+    .filter(b => isCurrentMember(D.members, b.otherUserId))
+    .sort((a, b) => Number(toCents(b.signedAmount) < 0) - Number(toCents(a.signedAmount) < 0))
+    .map((b) => {
     const cents = toCents(b.signedAmount);
     const owe = cents < 0;
     const payable = bal.payable.some((p) => p.payeeUserId === b.otherUserId);
@@ -47,32 +103,33 @@ function settleView() {
       <div class="grow"></div>${owe && payable ? `<button class="btn s" data-action="pay" data-payee="${b.otherUserId}">Pay back</button>` : ''}</div>`;
   }).join('');
 
-  const incoming = bal.incoming.map((p) => `<div class="item"><div class="row t">${avatar(who(p.payerUserId))}<div class="grow"><b>${esc(first(p.payerUserId))}</b> says they paid you <b class="amount">${$m(p.amount)}</b> via ${APP_LABEL[p.paidWith]}
+  const incoming = bal.incoming.filter(p => isCurrentMember(D.members,p.payerUserId)).map((p) => `<div class="item" data-activity-payment="${p.paymentId}"><div class="row t">${profileLink(p.payerUserId, null)}<div class="grow">${profileLink(p.payerUserId, first(p.payerUserId), false)} says they paid you <b class="amount">${$m(p.amount)}</b> via ${APP_LABEL[p.paidWith]}
+
       <div class="hint">${p.items.map((i) => esc(i.itemName)).join(', ')}</div>
       ${p.status === 'disputed' ? '<div style="margin-top:2px">' + stChip('disputed') + '</div>' : ''}
       <div class="acts" style="justify-content:flex-start;margin-top:8px"><button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="confirmed">${p.status === 'disputed' ? 'Mark received' : 'Got it'}</button>${p.status === 'sent' ? `<button class="btn s" data-action="review" data-payment="${p.paymentId}" data-status="disputed">Did not get it</button>` : ''}</div></div></div></div>`).join('');
-  const outgoing = bal.outgoing.map((p) => `<div class="item row">${person(p.payeeUserId, `<div class="hint">You sent ${$m(p.amount)} via ${APP_LABEL[p.paidWith]}</div>`)}<div class="grow"></div>${stChip(p.status === 'sent' ? 'pending' : 'disputed')}</div>`).join('');
+  const outgoing = bal.outgoing.filter(p => isCurrentMember(D.members,p.payeeUserId)).map((p) => `<div class="item row" data-activity-payment="${p.paymentId}">${person(p.payeeUserId, `<div class="hint">You sent ${$m(p.amount)} via ${APP_LABEL[p.paidWith]}</div>`)}<div class="grow"></div>${stChip(p.status === 'sent' ? 'pending' : 'disputed')}</div>`).join('');
 
-  const pairs = bal.pairs.map((p) => `<div class="item row">${avatar(who(p.debtorUserId), 'sm')}<span class="grow"><b>${esc(first(p.debtorUserId))}</b> ${p.debtorUserId === S.user.userId ? 'owe' : 'owes'} <b>${esc(first(p.creditorUserId))}</b></span><b class="amount">${$m(p.amount)}</b></div>`).join('');
 
-  return `<div class="grid2">
-    <section class="card"><div class="row sp"><h2>Your balances</h2>${badge(mine ? 'Open' : 'All square', mine ? 'warn' : 'good')}</div>
+  return `<div class="stack finance-summary">
+    <section class="card"><div class="row sp"><h2>Your balances</h2></div>
+      <p class="section-description">What you owe or should receive.</p>
       ${mine || `<p class="mute" style="padding:10px 0">You don't owe anyone, and no one owes you. Log an expense when you buy something for the house.</p>`}</section>
-    <section class="card"><div class="row sp"><h2>Who owes who</h2>${badge(`${bal.pairs.length}`, 'gray')}</div>
-      ${pairs || `<p class="mute" style="padding:10px 0">Everyone in the house is square.</p>`}</section>
+
   </div>
   ${incoming || outgoing ? `<div class="grid2">
     ${incoming ? `<section class="card"><h2>Waiting on you</h2>${incoming}</section>` : ''}
     ${outgoing ? `<section class="card"><h2>You sent</h2>${outgoing}</section>` : ''}</div>` : ''}
-  <section class="card"><div class="row sp"><h2>Past purchases</h2>${badge(`${D.expenses.length}`, 'gray')}</div>
+  <section class="card finance-history"><div class="row sp"><h2>Past purchases</h2></div>
+    <p class="section-description">Shared expense history and how each purchase was split.</p>
     ${D.expenses.length ? D.expenses.map(expenseRow).join('') : empty('🧾', 'No purchases yet', 'Use Log expense above and the split is figured out for you.')}</section>`;
 }
 
 function expenseRow(e) {
-  const others = e.shares.filter((s) => s.userId !== e.paidByUserId);
+  const others = e.shares.filter((s) => s.userId !== e.paidByUserId && isCurrentMember(D.members, s.userId));
   return `<div class="item exp click click-row" data-action="expense" data-id="${e.expenseId}" tabindex="0"><div class="grow"><b class="truncate">${esc(e.itemName)}</b>
-    <div class="hint expense-detail">${fmtDay(e.purchaseDate)} · ${esc(first(e.paidByUserId))} paid</div>
-    <div class="chips">${others.map((s) => `<span class="sharechip">${avatar(who(s.userId), 'sm')}${$m(s.amountOwed)} ${stChip(s.status)}</span>`).join('')}</div></div>
+    <div class="hint expense-detail">${fmtDay(e.purchaseDate)} · ${profileLink(e.paidByUserId, first(e.paidByUserId), false)} paid</div>
+    <div class="chips">${others.map((s) => `<span class="sharechip">${profileLink(s.userId, null)}${$m(s.amountOwed)} ${stChip(s.status)}</span>`).join('')}</div></div>
     <div class="amt">${$m(e.totalAmount)}</div><span class="row-chevron">${ico('chevron', 16)}</span></div>`;
 }
 
@@ -87,10 +144,13 @@ actions.review = async (el) => {
 actions.expense = (el) => {
   const e = D.expenses.find((x) => x.expenseId === Number(el.dataset.id)); if (!e) return;
   openModal(`${mhead(esc(e.itemName))}
-    <div class="tot">${$m(e.totalAmount)}</div><p class="mute">${fmtDay(e.purchaseDate, { weekday: 'long', month: 'long', day: 'numeric' })} · paid by ${esc(first(e.paidByUserId).toLowerCase() === 'you' ? 'you' : first(e.paidByUserId))}</p>
-    <div>${e.shares.map((s) => `<div class="item row">${avatar(who(s.userId), 'sm')}<span class="grow">${esc(first(s.userId))}</span><b class="amount">${$m(s.amountOwed)}</b>${stChip(s.status)}</div>`).join('')}</div>
-    <p class="hint">The buyer's own share is never owed. A share counts as paid back only after the buyer confirms the payment.</p>
-    ${e.canDelete ? `<div class="acts"><button class="btn d" data-action="delete-expense" data-id="${e.expenseId}">Delete</button></div>` : ''}`);
+    <div class="tot">${$m(e.totalAmount)}</div><p class="mute">${fmtDay(e.purchaseDate, { weekday: 'long', month: 'long', day: 'numeric' })} · paid by ${(isCurrentMember(D.members,e.paidByUserId) ? esc(first(e.paidByUserId).toLowerCase() === 'you' ? 'you' : first(e.paidByUserId)) : 'a former roommate')}</p>
+    <div>${e.shares.filter(s => isCurrentMember(D.members,s.userId)).map((s) => `<div class="item row">${profileLink(s.userId, null)}<span class="grow">${profileLink(s.userId, first(s.userId), false)}</span><b class="amount">${$m(s.amountOwed)}</b>${stChip(s.status)}</div>`).join('')}</div>
+    <p class="hint">The buyer's own share is never owed. History means a previous household stay and is excluded from active balances; it does not mean paid.</p>
+    ${e.canEdit || e.canDelete ? `<div class="acts">
+      ${e.canEdit ? `<button class="btn" data-action="edit-expense" data-id="${e.expenseId}">Edit</button>` : ''}
+      ${e.canDelete ? `<button class="btn d" data-action="delete-expense" data-id="${e.expenseId}">Delete</button>` : ''}
+    </div>` : ''}`);
 };
 actions['delete-expense'] = async (el) => {
   if (!await confirmDialog('Delete purchase?', 'This removes the purchase and its unpaid shares for everyone.')) return;
@@ -99,40 +159,80 @@ actions['delete-expense'] = async (el) => {
 };
 
 // ---- log an expense ---------------------------------------------------------------------------
-actions['add-expense'] = async (_el, _e, preset = {}) => {
-  const wish = (await api(`/households/${hid()}/wishlist`)).items.filter((w) => !w.isBought);
-  D.wish = wish;
+function wishlistOptions(items, selectedId) {
+  return items.map((item) => `<option value="${item.wishlistItemId}" data-name="${esc(item.itemName)}" data-price="${esc(item.estimatedPrice ?? '')}" ${item.wishlistItemId === selectedId ? 'selected' : ''}>${esc(item.itemName)}${item.estimatedPrice ? ' (about ' + $m(item.estimatedPrice) + ')' : ''}</option>`).join('');
+}
+
+actions['add-expense'] = async () => {
+  const householdId = hid();
+  const form = openExpenseForm({ preset: {} });
+  const field = form.querySelector('[data-expense-wishlist]');
+  try {
+    const { items } = await api(`/households/${householdId}/wishlist`);
+    if (!form.isConnected || householdId !== S.hid) return;
+    const wish = items.filter((item) => !item.isBought && isCurrentMember(D.members, item.createdByUserId));
+    if (!wish.length) { field.remove(); return; }
+    field.outerHTML = expenseWishlist(wish);
+  } catch {
+    if (form.isConnected) field.textContent = 'The wish list could not load. You can still log an expense.';
+  }
+};
+
+function expenseWishlist(wish, selectedId) {
+  return `<label class="fld"><span>From the wish list (optional)</span><select class="input" name="wishlistItemId" data-input="wish-pick"><option value="">Not from the wish list</option>${wishlistOptions(wish, selectedId)}</select></label>`;
+}
+actions['edit-expense'] = (el) => {
+  const expense = D.expenses.find((item) => item.expenseId === Number(el.dataset.id) && item.canEdit);
+  if (expense) openExpenseForm({ preset: expense, expense });
+};
+function openExpenseForm({ preset, linkedItem, expense }) {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: household().timezone }).format(new Date());
-  const others = active().filter((m) => m.userId !== S.user.userId);
-  openModal(`${mhead('Log an expense')}
-    <form class="stack" data-form="expense" autocomplete="off">
-      ${wish.length ? `<label class="fld"><span>From the wish list (optional)</span><select class="input" name="wishlistItemId" data-input="wish-pick"><option value="">Not from the wish list</option>${wish.map((w) => `<option value="${w.wishlistItemId}" data-name="${esc(w.itemName)}" data-price="${esc(w.estimatedPrice ?? '')}">${esc(w.itemName)}${w.estimatedPrice ? ' (about ' + $m(w.estimatedPrice) + ')' : ''}</option>`).join('')}</select></label>` : ''}
+  const others = active().filter((m) => m.userId !== S.user.userId &&
+    (!expense || Date.parse(m.joinedDate) <= Date.parse(expense.createdAt)));
+  const selected = new Set(expense?.shares.map((share) => share.userId));
+  openModal(`${mhead(expense ? 'Edit expense' : 'Log an expense')}
+    <form class="stack" data-form="expense" data-expense-id="${expense?.expenseId ?? ''}" autocomplete="off">
+      ${linkedItem ? expenseWishlist(D.wish.filter((item) => !item.isBought), linkedItem.wishlistItemId) : expense ? '' : '<div class="hint" data-expense-wishlist role="status">Loading optional wish list…</div>'}
       <label class="fld"><span>What did you buy?</span><input class="input" name="itemName" required maxlength="120" placeholder="Paper towels" value="${esc(preset.itemName ?? '')}"></label>
       <div class="grid2" style="gap:12px">
         <label class="fld"><span>Total</span><input class="input" name="totalAmount" required inputmode="decimal" pattern="\\d{1,7}(\\.\\d{1,2})?" placeholder="24.99" data-input="split" value="${esc(preset.totalAmount ?? '')}"></label>
-        <label class="fld"><span>Date</span><input class="input" name="purchaseDate" type="date" value="${today}" max="${today}"></label>
+        ${expense ? '' : `<label class="fld"><span>Date</span><input class="input" name="purchaseDate" type="date" value="${today}" max="${today}"></label>`}
       </div>
-      <div class="fld"><span>Split between</span>
+      <div class="fld">
+        <div class="row sp wrap">
+          <span>Split between</span>
+          ${others.length ? '<button type="button" class="btn s" data-action="expense-toggle-roommates">Deselect all roommates</button>' : ''}
+        </div>
         <div class="stack" style="gap:8px">
           <label class="chk off"><input type="checkbox" checked disabled> ${avatar(S.user, 'sm')} You (you paid)</label>
-          ${others.map((m) => `<label class="chk"><input type="checkbox" name="p" value="${m.userId}" checked data-input="split"> ${avatar(m, 'sm')} ${esc(fullName(m))}</label>`).join('')}
+          ${others.map((m) => `<label class="chk"><input type="checkbox" name="p" value="${m.userId}" ${!expense || selected.has(m.userId) ? 'checked' : ''} data-input="split"> ${avatar(m, 'sm')} ${esc(fullName(m))}</label>`).join('')}
         </div>
       </div>
       <div class="hint" id="split-preview"></div>
       <div class="err" role="alert"></div>
-      <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Log expense</button></div>
+      <div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">${expense ? 'Save changes' : 'Log expense'}</button></div>
     </form>`);
+  inputs.split();
+  return document.querySelector('form[data-form=expense]');
+}
+actions['expense-toggle-roommates'] = (button) => {
+  const roommates = [...button.form.querySelectorAll('input[name=p]:enabled')];
+  const selectAll = !roommates.some((checkbox) => checkbox.checked);
+  for (const checkbox of roommates) checkbox.checked = selectAll;
   inputs.split();
 };
 inputs['wish-pick'] = (el) => {
-  const o = el.selectedOptions[0]; const f = el.form;
-  if (!o?.value) return;
-  f.itemName.value = o.dataset.name || ''; if (o.dataset.price) f.totalAmount.value = o.dataset.price; inputs.split();
+  const option = el.selectedOptions[0], form = el.form; if (!form) return;
+  form.elements.namedItem('itemName').value = option?.value ? option.dataset.name || '' : '';
+  form.elements.namedItem('totalAmount').value = option?.value ? option.dataset.price || '' : '';
+  inputs.split();
 };
 inputs.split = () => {
   const f = document.querySelector('form[data-form=expense]'); const out = document.getElementById('split-preview'); if (!f || !out) return;
-  const picked = [...f.querySelectorAll('input[name=p]:checked')];
-  let total; try { total = toCents(f.totalAmount.value.trim()); } catch { total = 0; }
+  const picked = [...f.querySelectorAll('input[name=p]:enabled:checked')];
+  const toggle = f.querySelector('[data-action=expense-toggle-roommates]');
+  if (toggle) toggle.textContent = picked.length ? 'Deselect all roommates' : 'Select all roommates';
+  let total; try { total = toCents(f.elements.namedItem('totalAmount').value.trim()); } catch { total = 0; }
   if (!picked.length) { out.textContent = 'Pick at least one roommate to split with.'; return; }
   if (total <= 0) { out.textContent = `Split ${picked.length + 1} ways.`; return; }
   if (total < picked.length + 1) { out.textContent = 'That total is too small to split that many ways.'; return; }
@@ -143,8 +243,13 @@ forms.expense = async (form) => {
   const f = new FormData(form);
   const body = { itemName: f.get('itemName'), totalAmount: String(f.get('totalAmount')).trim(), purchaseDate: f.get('purchaseDate'), participantUserIds: f.getAll('p').map(Number) };
   if (f.get('wishlistItemId')) body.wishlistItemId = Number(f.get('wishlistItemId'));
-  try { await api(`/households/${hid()}/expenses`, { method: 'POST', body }); } catch (e) { return showError(form, e.message); }
-  closeModal(); toast('Expense logged. Your roommates were notified.'); window.dispatchEvent(new Event('roomie:render'));
+  const expenseId = form.dataset.expenseId;
+  const path = `/households/${hid()}/expenses`;
+  try {
+    await api(expenseId ? `${path}/${expenseId}` : path, { method: expenseId ? 'PATCH' : 'POST', body });
+  } catch (e) { return showError(form, e.message); }
+  if (form.isConnected) closeModal();
+  toast(expenseId ? 'Expense updated' : 'Expense logged. Your roommates were notified.'); window.dispatchEvent(new Event('roomie:render'));
 };
 
 // ---- pay back ---------------------------------------------------------------------------------
@@ -194,12 +299,15 @@ forms.pay = async (form) => {
 // ---- wish list --------------------------------------------------------------------------------
 function wishView() {
   const open = D.wish.filter((w) => !w.isBought), done = D.wish.filter((w) => w.isBought);
-  const row = (w) => `<div class="item exp" data-action="wish" data-id="${w.wishlistItemId}"><div class="grow"><b class="truncate">${esc(w.itemName)}</b>
+  const row = (w) => `<div class="item exp" data-action="wish" data-id="${w.wishlistItemId}"><div class="grow"><b class="truncate">${w.isBought ? `<s>${esc(w.itemName)}</s>` : esc(w.itemName)}</b>
     <div class="hint">${esc(first(w.createdByUserId))} added it${w.estimatedPrice ? ' · about ' + $m(w.estimatedPrice) : ''}</div></div>
-    ${badge(w.needOrWant === 'need' ? 'Need' : 'Want', w.needOrWant === 'need' ? 'warn' : '')}${w.isBought ? badge('Bought', 'good') : ''}</div>`;
-  return `<section class="card"><div class="row sp"><h2>Wish list</h2>${badge(`${open.length} to buy`, 'gray')}</div>
-    ${open.length ? open.map(row).join('') : empty('🛒', 'Nothing on the list', 'Add things the house needs or wants. Anyone can buy them and split the cost.', '<button class="btn p" data-action="add-wish">Add an item</button>')}</section>
-    ${done.length ? `<section class="card"><h2>Already bought</h2>${done.map(row).join('')}</section>` : ''}`;
+    ${w.isBought ? '' : badge(w.needOrWant === 'need' ? 'Need' : 'Want', w.needOrWant === 'need' ? 'warn' : '')}</div>`;
+  const groups = [['need', 'Needs'], ['want', 'Wants']].map(([kind, title]) => {
+    const items = open.filter((item) => kind === 'need' ? item.needOrWant === 'need' : item.needOrWant !== 'need');
+    return `<section class="stack" aria-labelledby="wishlist-${kind}"><h3 id="wishlist-${kind}">${title}</h3>${items.map(row).join('') || `<p class="hint">No ${title.toLowerCase()} yet.</p>`}</section>`;
+  }).join('');
+  return `<section class="card stack"><div class="row sp"><h2>Wish list</h2>${badge(`${open.length} to buy`, 'gray')}</div>${groups}</section>
+    ${done.length ? `<section class="card"><h2>Purchase history</h2>${done.map(row).join('')}</section>` : ''}`;
 }
 const wishForm = (w = {}) => `
   <label class="fld"><span>Item</span><input class="input" name="itemName" required maxlength="120" value="${esc(w.itemName ?? '')}" placeholder="Air fryer"></label>
@@ -209,7 +317,7 @@ const wishForm = (w = {}) => `
   <label class="fld"><span>Why does the house need it? (optional)</span><textarea class="input" name="description" rows="2" maxlength="500">${esc(w.description ?? '')}</textarea></label>`;
 actions['add-wish'] = () => openModal(`${mhead('Add to the wish list')}<form class="stack" data-form="wish-add">${wishForm()}<div class="err" role="alert"></div><div class="acts"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn p" type="submit">Add item</button></div></form>`);
 const wishBody = (form) => { const f = new FormData(form); return { itemName: f.get('itemName'), needOrWant: f.get('needOrWant'), estimatedPrice: String(f.get('estimatedPrice')).trim() || null, itemLink: String(f.get('itemLink')).trim() || null, description: String(f.get('description')).trim() || null }; };
-forms['wish-add'] = async (form) => { try { await api(`/households/${hid()}/wishlist`, { method: 'POST', body: wishBody(form) }); } catch (e) { return showError(form, e.message); } closeModal(); toast('Added. Your roommates were notified.'); window.dispatchEvent(new Event('roomie:render')); };
+forms['wish-add'] = async (form) => { try { await api(`/households/${hid()}/wishlist`, { method: 'POST', body: wishBody(form) }); } catch (e) { return showError(form, e.message); } if (form.isConnected) closeModal(); toast('Added. Your roommates were notified.'); window.dispatchEvent(new Event('roomie:render')); };
 
 actions.wish = (el) => {
   const w = D.wish.find((x) => x.wishlistItemId === Number(el.dataset.id)); if (!w) return;
@@ -222,10 +330,9 @@ actions.wish = (el) => {
       ${w.canEdit ? `<button class="btn" data-action="edit-wish" data-id="${w.wishlistItemId}">Edit</button><button class="btn d" data-action="delete-wish" data-id="${w.wishlistItemId}">Delete</button>` : ''}</div>
     ${w.canEdit ? '' : '<p class="hint">Only the person who added an item can edit or delete it.</p>'}`);
 };
-actions['buy-wish'] = async (el) => {
-  const w = D.wish.find((x) => x.wishlistItemId === Number(el.dataset.id));
-  await actions['add-expense'](el, null, { itemName: w.itemName, totalAmount: w.estimatedPrice ?? '' });
-  const sel = document.querySelector('select[name=wishlistItemId]'); if (sel) { sel.value = String(w.wishlistItemId); inputs.split(); }
+actions['buy-wish'] = (el) => {
+  const item = D.wish.find((entry) => entry.wishlistItemId === Number(el.dataset.id) && !entry.isBought);
+  if (item) openExpenseForm({ preset: { itemName: item.itemName, totalAmount: item.estimatedPrice ?? '' }, linkedItem: item });
 };
 actions['edit-wish'] = (el) => {
   const w = D.wish.find((x) => x.wishlistItemId === Number(el.dataset.id));

@@ -41,15 +41,24 @@ function webUrl(v: unknown): string | null {
 async function loadLedger(householdId: number) {
   const shares = await db.select({
     expenseId: s.expenseShare.expenseId, userId: s.expenseShare.userId, amountOwed: s.expenseShare.amountOwed,
-    settledByPaymentId: s.expenseShare.settledByPaymentId, paidByUserId: s.expense.paidByUserId, itemName: s.expense.itemName, purchaseDate: s.expense.purchaseDate,
+    createdAt: s.expense.createdAt, settledByPaymentId: s.expenseShare.settledByPaymentId, paidByUserId: s.expense.paidByUserId, itemName: s.expense.itemName, purchaseDate: s.expense.purchaseDate,
   }).from(s.expenseShare).innerJoin(s.expense, eq(s.expense.expenseId, s.expenseShare.expenseId)).where(eq(s.expense.householdId, householdId));
   const payments = await db.select().from(s.payment).where(eq(s.payment.householdId, householdId));
   return { shares, payments };
 }
 
+// Membership periods keep former balances in history, including after a person rejoins.
+async function currentPeriods(ex: typeof db | Tx, householdId: number) {
+  const members = await ex.select({ userId: s.householdMember.userId, joined: s.householdMember.joinedDate }).from(s.householdMember)
+    .where(and(eq(s.householdMember.householdId, householdId), isNull(s.householdMember.leftDate)));
+  return new Map(members.map((m) => [m.userId, Date.parse(m.joined)]));
+}
+const inCurrentStay = (periods: Map<number, number>, at: string, ...people: number[]) => people.every((person) => periods.has(person) && Date.parse(at) >= periods.get(person)!);
+
 export async function listExpenses(householdId: number, viewerId: number) {
   const exps = await db.select().from(s.expense).where(eq(s.expense.householdId, householdId)).orderBy(desc(s.expense.purchaseDate), desc(s.expense.expenseId)).limit(200);
   const { shares, payments } = await loadLedger(householdId);
+  const periods = await currentPeriods(db, householdId);
   const payMap = new Map(payments.map((p) => [p.paymentId, { status: p.status as PaymentStatus }]));
   const byExpense = new Map<number, typeof shares>();
   for (const sh of shares) (byExpense.get(sh.expenseId) ?? byExpense.set(sh.expenseId, []).get(sh.expenseId)!).push(sh);
@@ -57,8 +66,10 @@ export async function listExpenses(householdId: number, viewerId: number) {
     expenses: exps.map((e) => {
       const mine = (byExpense.get(e.expenseId) ?? []).sort((a, b) => Number(b.userId === e.paidByUserId) - Number(a.userId === e.paidByUserId) || a.userId - b.userId);
       return {
-        expenseId: e.expenseId, itemName: e.itemName, totalAmount: e.totalAmount, purchaseDate: e.purchaseDate, paidByUserId: e.paidByUserId, wishlistItemId: e.wishlistItemId,
-        shares: mine.map((sh) => ({ userId: sh.userId, amountOwed: sh.amountOwed, status: shareStatus(sh, payMap), paymentId: sh.settledByPaymentId })),
+        expenseId: e.expenseId, createdAt: e.createdAt, itemName: e.itemName, totalAmount: e.totalAmount, purchaseDate: e.purchaseDate, paidByUserId: e.paidByUserId, wishlistItemId: e.wishlistItemId,
+        shares: mine.map((sh) => ({ userId: sh.userId, amountOwed: sh.amountOwed, status: !inCurrentStay(periods, sh.createdAt, sh.userId, sh.paidByUserId) && !['buyer', 'paid'].includes(shareStatus(sh, payMap)) ? 'archived' : shareStatus(sh, payMap), paymentId: sh.settledByPaymentId })),
+        canEdit: e.paidByUserId === viewerId && inCurrentStay(periods, e.createdAt, viewerId) && mine.every((sh) =>
+          sh.settledByPaymentId == null && inCurrentStay(periods, e.createdAt, sh.userId)),
         canDelete: e.paidByUserId === viewerId && mine.every((sh) => sh.settledByPaymentId == null),
       };
     }),
@@ -67,41 +78,50 @@ export async function listExpenses(householdId: number, viewerId: number) {
 
 export async function getBalances(householdId: number, viewerId: number) {
   const { shares, payments } = await loadLedger(householdId);
-  const rows: ShareRow[] = shares.map((x) => ({ expenseId: x.expenseId, userId: x.userId, paidByUserId: x.paidByUserId, amountOwed: x.amountOwed, settledByPaymentId: x.settledByPaymentId }));
-  const pays: PaymentRow[] = payments.map((p) => ({ paymentId: p.paymentId, payerUserId: p.payerUserId, payeeUserId: p.payeeUserId, amount: p.amount, status: p.status as PaymentRow['status'] }));
+  const periods = await currentPeriods(db, householdId);
+  const activeShares = shares.filter((x) => inCurrentStay(periods, x.createdAt, x.userId, x.paidByUserId));
+  const activePayments = payments.filter((p) => inCurrentStay(periods, p.createdAt, p.payerUserId, p.payeeUserId));
+  const rows: ShareRow[] = activeShares.map((x) => ({ expenseId: x.expenseId, userId: x.userId, paidByUserId: x.paidByUserId, amountOwed: x.amountOwed, settledByPaymentId: x.settledByPaymentId }));
+  const pays: PaymentRow[] = activePayments.map((p) => ({ paymentId: p.paymentId, payerUserId: p.payerUserId, payeeUserId: p.payeeUserId, amount: p.amount, status: p.status as PaymentRow['status'] }));
   const pairs = computeBalances(rows, pays);
-  const itemsOf = (paymentId: number) => shares.filter((x) => x.settledByPaymentId === paymentId).map((x) => ({ expenseId: x.expenseId, itemName: x.itemName, amountOwed: x.amountOwed }));
+  const itemsOf = (paymentId: number) => activeShares.filter((x) => x.settledByPaymentId === paymentId).map((x) => ({ expenseId: x.expenseId, itemName: x.itemName, amountOwed: x.amountOwed }));
   const payment = (p: (typeof payments)[number]) => ({ paymentId: p.paymentId, payerUserId: p.payerUserId, payeeUserId: p.payeeUserId, amount: p.amount, paidWith: p.paidWith, status: p.status, paidDate: p.paidDate, items: itemsOf(p.paymentId) });
   const methods = await db.select({ userId: s.paymentMethod.userId, app: s.paymentMethod.app, username: s.paymentMethod.username, isPreferred: s.paymentMethod.isPreferred })
-    .from(s.paymentMethod).innerJoin(s.householdMember, and(eq(s.householdMember.userId, s.paymentMethod.userId), eq(s.householdMember.householdId, householdId)));
+    .from(s.paymentMethod).innerJoin(s.householdMember, and(eq(s.householdMember.userId, s.paymentMethod.userId), eq(s.householdMember.householdId, householdId), isNull(s.householdMember.leftDate)));
   const paymentMethods: Record<number, { app: string; username: string; isPreferred: boolean }[]> = {};
   for (const m of methods) (paymentMethods[m.userId] ??= []).push({ app: m.app, username: m.username, isPreferred: m.isPreferred });
   return {
     pairs: pairs.map((p) => ({ debtorUserId: p.debtorUserId, creditorUserId: p.creditorUserId, amount: fromCents(p.cents), pendingAmount: fromCents(p.pendingCents), disputedAmount: fromCents(p.disputedCents) })),
     mine: balancesFor(viewerId, pairs).map((b) => ({ otherUserId: b.otherUserId, signedAmount: fromCents(b.signedCents), pendingAmount: fromCents(b.pendingCents), disputedAmount: fromCents(b.disputedCents) })),
     // my shares on other people's purchases that nobody has paid back or sent money for yet
-    payable: shares.filter((x) => x.userId === viewerId && x.paidByUserId !== viewerId && x.settledByPaymentId == null)
+    payable: activeShares.filter((x) => x.userId === viewerId && x.paidByUserId !== viewerId && x.settledByPaymentId == null)
       .sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate)).map((x) => ({ expenseId: x.expenseId, itemName: x.itemName, purchaseDate: x.purchaseDate, payeeUserId: x.paidByUserId, amountOwed: x.amountOwed })),
-    incoming: payments.filter((p) => p.payeeUserId === viewerId && p.status !== 'confirmed').map(payment),
-    outgoing: payments.filter((p) => p.payerUserId === viewerId && p.status !== 'confirmed').map(payment),
+    incoming: activePayments.filter((p) => p.payeeUserId === viewerId && p.status !== 'confirmed').map(payment),
+    outgoing: activePayments.filter((p) => p.payerUserId === viewerId && p.status !== 'confirmed').map(payment),
     paymentMethods,
   };
 }
 
 // ---- expenses ---------------------------------------------------------------------------------
-export async function createExpense(user: CurrentUser, householdId: number, b: Record<string, unknown>) {
+function expenseSplit(userId: number, b: Record<string, unknown>) {
   const itemName = str(b.itemName, 1, 120, 'Item name');
   const total = moneyOf(b.totalAmount, 'Total');
-  const tz = await householdTz(db, householdId);
-  const date = b.purchaseDate === undefined || b.purchaseDate === '' ? todayIn(tz) : ymd(b.purchaseDate, tz);
   const raw = Array.isArray(b.participantUserIds) ? b.participantUserIds : [];
   if (raw.length > 12) throw new HttpError(400, 'Too many roommates');
-  const others = [...new Set(raw.map((x) => id(x, 'roommate')))].filter((x) => x !== user.userId).sort((a, c) => a - c);
+  const others = [...new Set(raw.map((x) => id(x, 'roommate')))].filter((x) => x !== userId).sort((a, c) => a - c);
   if (!others.length) throw new HttpError(400, 'Pick at least one other roommate to split with');
-  const wishId = b.wishlistItemId == null || b.wishlistItemId === '' ? null : id(b.wishlistItemId, 'wish list item');
-  const order = [user.userId, ...others]; // the buyer comes first, so leftover cents land on the first shares
+  const order = [userId, ...others]; // the buyer comes first, so leftover cents land on the first shares
   if (total < order.length) throw new HttpError(400, 'That total is too small to split that many ways');
   const parts = splitCents(total, order.length);
+  return { itemName, totalAmount: fromCents(total), order, parts, others };
+}
+
+export async function createExpense(user: CurrentUser, householdId: number, b: Record<string, unknown>) {
+  const { itemName, totalAmount, order, parts, others } = expenseSplit(user.userId, b);
+  const tz = await householdTz(db, householdId);
+  const date = b.purchaseDate === undefined || b.purchaseDate === '' ? todayIn(tz) : ymd(b.purchaseDate, tz);
+  const wishId = b.wishlistItemId == null || b.wishlistItemId === '' ? null : id(b.wishlistItemId, 'wish list item');
+
 
   try {
     return await db.transaction(async (tx) => {
@@ -113,7 +133,7 @@ export async function createExpense(user: CurrentUser, householdId: number, b: R
         await tx.update(s.wishlistItem).set({ isBought: true }).where(eq(s.wishlistItem.wishlistItemId, wishId));
       }
       // paid_by is ALWAYS the caller. Nobody can log a purchase as someone else.
-      const [e] = await tx.insert(s.expense).values({ householdId, paidByUserId: user.userId, wishlistItemId: wishId, itemName, totalAmount: fromCents(total), purchaseDate: date }).returning();
+      const [e] = await tx.insert(s.expense).values({ householdId, paidByUserId: user.userId, wishlistItemId: wishId, itemName, totalAmount, purchaseDate: date }).returning();
       await tx.insert(s.expenseShare).values(order.map((u, i) => ({ expenseId: e!.expenseId, userId: u, amountOwed: fromCents(parts[i]!) })));
       const me = await firstName(tx, user.userId);
       await tx.insert(s.notification).values(others.map((u, i) => ({
@@ -128,8 +148,44 @@ export async function createExpense(user: CurrentUser, householdId: number, b: R
   }
 }
 
+export async function editExpense(user: CurrentUser, householdId: number, expenseId: number, b: Record<string, unknown>) {
+  return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
+    const [expense] = await tx.select().from(s.expense)
+      .where(and(eq(s.expense.expenseId, expenseId), eq(s.expense.householdId, householdId))).for('update');
+    if (!expense) throw new HttpError(404, 'Expense not found');
+    assertCreator(expense.paidByUserId, user.userId);
+
+    // Repayments lock the same rows before linking a payment.
+    const shares = await tx.select().from(s.expenseShare)
+      .where(eq(s.expenseShare.expenseId, expenseId)).orderBy(asc(s.expenseShare.userId)).for('update');
+    if (shares.some((share) => share.settledByPaymentId != null)) {
+      throw new HttpError(409, 'An expense linked to a repayment can no longer be edited');
+    }
+    const { itemName, totalAmount, order, parts, others } = expenseSplit(user.userId, b);
+    const periods = await currentPeriods(tx, householdId);
+    if (!inCurrentStay(periods, expense.createdAt, ...order, ...shares.map((share) => share.userId))) {
+      throw new HttpError(400, 'Expenses can only be split with roommates who lived here when the purchase was logged and still live here');
+    }
+
+    await tx.update(s.expense).set({ itemName, totalAmount }).where(eq(s.expense.expenseId, expenseId));
+    await tx.delete(s.expenseShare).where(eq(s.expenseShare.expenseId, expenseId));
+    await tx.insert(s.expenseShare).values(order.map((userId, i) => ({
+      expenseId, userId, amountOwed: fromCents(parts[i]!),
+    })));
+    await tx.delete(s.notification).where(and(eq(s.notification.householdId, householdId), eq(s.notification.sourceType, 'expense'), eq(s.notification.sourceId, expenseId)));
+    const me = await firstName(tx, user.userId);
+    await tx.insert(s.notification).values(others.map((userId, i) => ({
+      userId, householdId, actorUserId: user.userId, section: 'expense_tracker', sourceType: 'expense', sourceId: expenseId,
+      message: `${me} updated ${itemName}: you owe ${usd(parts[i + 1]!)}.`,
+    })));
+    return { expenseId };
+  });
+}
+
 export async function deleteExpense(user: CurrentUser, householdId: number, expenseId: number) {
   await db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const [e] = await tx.select().from(s.expense).where(and(eq(s.expense.expenseId, expenseId), eq(s.expense.householdId, householdId))).for('update');
     if (!e) throw new HttpError(404, 'Expense not found');
     assertCreator(e.paidByUserId, user.userId);
@@ -152,26 +208,25 @@ export async function createPayment(user: CurrentUser, householdId: number, b: R
   if (payeeUserId === user.userId) throw new HttpError(400, 'You cannot pay yourself');
 
   return db.transaction(async (tx) => {
-    // the payee may have moved out (they are still owed), but must belong to this household
-    const [pm] = await tx.select({ left: s.householdMember.leftDate }).from(s.householdMember).where(and(eq(s.householdMember.householdId, householdId), eq(s.householdMember.userId, payeeUserId)));
-    if (!pm) throw new HttpError(400, 'That person is not in this household');
+    await assertActiveMembers(tx, householdId, [user.userId]);
+    const periods = await currentPeriods(tx, householdId);
+    if (!periods.has(user.userId) || !periods.has(payeeUserId)) throw new HttpError(400, 'Payments are only available between current roommates');
     // lock the caller's own shares: two taps cannot create two payments for the same item
-    const rows = await tx.select({ expenseId: s.expenseShare.expenseId, amountOwed: s.expenseShare.amountOwed, settled: s.expenseShare.settledByPaymentId, itemName: s.expense.itemName })
+    const rows = await tx.select({ expenseId: s.expenseShare.expenseId, amountOwed: s.expenseShare.amountOwed, createdAt: s.expense.createdAt, settled: s.expenseShare.settledByPaymentId, itemName: s.expense.itemName })
       .from(s.expenseShare).innerJoin(s.expense, eq(s.expense.expenseId, s.expenseShare.expenseId))
       .where(and(eq(s.expenseShare.userId, user.userId), inArray(s.expenseShare.expenseId, ids), eq(s.expense.householdId, householdId), eq(s.expense.paidByUserId, payeeUserId)))
-      .for('update', { of: s.expenseShare });
+      .orderBy(asc(s.expenseShare.expenseId)).for('update', { of: s.expenseShare });
     if (rows.length !== ids.length) throw new HttpError(400, 'Some of those items are not yours to pay back to that person');
+    if (rows.some((r) => !inCurrentStay(periods, r.createdAt, user.userId, payeeUserId))) throw new HttpError(400, 'Those purchases belong to a previous household stay');
     if (rows.some((r) => r.settled != null)) throw new HttpError(400, 'One of those items is already paid or waiting for confirmation');
     // the amount is computed here, never taken from the request: it must equal the sum of the shares it settles
     const amount = sumCents(rows.map((r) => r.amountOwed));
     if (amount <= 0) throw new HttpError(400, 'Nothing to pay back');
     const [p] = await tx.insert(s.payment).values({ householdId, payerUserId: user.userId, payeeUserId, amount: fromCents(amount), paidWith, status: 'sent' }).returning();
     await tx.update(s.expenseShare).set({ settledByPaymentId: p!.paymentId }).where(and(eq(s.expenseShare.userId, user.userId), inArray(s.expenseShare.expenseId, ids)));
-    if (!pm.left) { // roommates who moved out get no new notifications
-      const me = await firstName(tx, user.userId);
-      await tx.insert(s.notification).values({ userId: payeeUserId, householdId, actorUserId: user.userId, section: 'money', sourceType: 'payment', sourceId: p!.paymentId,
-        message: `${me} says they paid you ${usd(amount)} via ${paidWith === 'apple_cash' ? 'Apple Cash' : paidWith[0]!.toUpperCase() + paidWith.slice(1)}. Did you get it?` });
-    }
+    const me = await firstName(tx, user.userId);
+    await tx.insert(s.notification).values({ userId: payeeUserId, householdId, actorUserId: user.userId, section: 'money', sourceType: 'payment', sourceId: p!.paymentId,
+      message: `${me} says they paid you ${usd(amount)} via ${paidWith === 'apple_cash' ? 'Apple Cash' : paidWith[0]!.toUpperCase() + paidWith.slice(1)}. Did you get it?` });
     return { paymentId: p!.paymentId, amount: fromCents(amount), status: 'sent' };
   });
 }
@@ -182,8 +237,11 @@ export async function reviewPayment(user: CurrentUser, householdId: number, paym
   if (!status) throw new HttpError(400, 'Status must be confirmed or disputed');
   const from = status === 'confirmed' ? ['sent', 'disputed'] : ['sent'];
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
+    const periods = await currentPeriods(tx, householdId);
     const [p] = await tx.select().from(s.payment).where(and(eq(s.payment.paymentId, paymentId), eq(s.payment.householdId, householdId), eq(s.payment.payeeUserId, user.userId))).for('update');
     if (!p) throw new HttpError(404, 'Payment not found'); // also what the payer sees if they try to confirm their own payment
+    if (!inCurrentStay(periods, p.createdAt, p.payerUserId, p.payeeUserId)) throw new HttpError(400, 'This payment belongs to a previous household stay');
     if (!from.includes(p.status)) throw new HttpError(400, `This payment is already ${p.status}`);
     await tx.update(s.payment).set({ status }).where(eq(s.payment.paymentId, paymentId));
     const [payer] = await tx.select({ left: s.householdMember.leftDate }).from(s.householdMember).where(and(eq(s.householdMember.householdId, householdId), eq(s.householdMember.userId, p.payerUserId)));
@@ -217,6 +275,7 @@ function wishFields(b: Record<string, unknown>, partial: boolean) {
 export async function createWishlistItem(user: CurrentUser, householdId: number, b: Record<string, unknown>) {
   const f = wishFields(b, false);
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const [w] = await tx.insert(s.wishlistItem).values({ ...(f as { itemName: string; needOrWant: string }), householdId, createdByUserId: user.userId, estimatedPrice: f.estimatedPrice ?? null, itemLink: f.itemLink ?? null, description: f.description ?? null }).returning();
     const me = await firstName(tx, user.userId);
     const others = (await activeIds(tx, householdId)).filter((u) => u !== user.userId);
@@ -227,6 +286,7 @@ export async function createWishlistItem(user: CurrentUser, householdId: number,
 export async function updateWishlistItem(user: CurrentUser, householdId: number, itemId: number, b: Record<string, unknown>) {
   const f = wishFields(b, true);
   return db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const [w] = await tx.select().from(s.wishlistItem).where(and(eq(s.wishlistItem.wishlistItemId, itemId), eq(s.wishlistItem.householdId, householdId))).for('update');
     if (!w) throw new HttpError(404, 'Wish list item not found');
     assertCreator(w.createdByUserId, user.userId);
@@ -237,6 +297,7 @@ export async function updateWishlistItem(user: CurrentUser, householdId: number,
 }
 export async function deleteWishlistItem(user: CurrentUser, householdId: number, itemId: number) {
   await db.transaction(async (tx) => {
+    await assertActiveMembers(tx, householdId, [user.userId]);
     const [w] = await tx.select().from(s.wishlistItem).where(and(eq(s.wishlistItem.wishlistItemId, itemId), eq(s.wishlistItem.householdId, householdId))).for('update');
     if (!w) throw new HttpError(404, 'Wish list item not found');
     assertCreator(w.createdByUserId, user.userId);

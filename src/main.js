@@ -1,25 +1,37 @@
+import { applyAppearance } from './lib/appearance.js';
 import './styles.css';
 import { api, getToken, signOut } from './auth-client.js';
 import { actions, forms, inputs } from './lib/events.js';
-import { $, ico, mark, avatar, closeModal, esc, fullName, mhead, openModal, showError, toast } from './lib/dom.js';
-import { S, household, resetState } from './lib/state.js';
-import { authView } from './pages/auth.js';
+import { $, ico, mark, closeModal, esc, showError, toast } from './lib/dom.js';
+import { S, needsOnboarding, resetState } from './lib/state.js';
+import { authView, isPasswordReset } from './pages/auth.js';
 import { onboardingView } from './pages/onboarding.js';
 import { settingsView } from './pages/settings.js';
-import { financesView } from './pages/finances.js';
-import { choresView } from './pages/chores.js';
-import { calendarView } from './pages/calendar.js';
-import { bellHtml, loadAlerts, notificationsView, paintBell } from './pages/notifications.js';
+import { appearanceView } from './pages/appearance.js';
+import { householdView } from './pages/household.js';
+import { financesView, stopFinancePolling } from './pages/finances.js';
+import { choresView, stopChorePolling } from './pages/chores.js';
+import { calendarView, stopCalendarPolling } from './pages/calendar.js';
+import { bellHtml, loadAlerts, openActivityPanel, openPendingActivity, paintBell, startAlertPolling, stopAlertPolling } from './pages/notifications.js';
 import { homeView } from './pages/home.js';
+import { openPendingCalendarCreate } from './lib/calendar-create.js';
+import { connectHomeLayout } from './components/home-layout.js';
 import { soonView } from './pages/soon.js';
-import { toCents } from '../shared/money.ts';
+import { householdSwitcherHtml } from './components/household-switcher.js';
 
-const NAV = [['home', 'home', 'Home'], ['calendar', 'calendar', 'Calendar'], ['finances', 'money', 'Finances'], ['chores', 'check', 'Chores'], ['settings', 'settings', 'Settings']];
+const NAV = [
+  ['home', 'home', 'Home'],
+  ['calendar', 'calendar', 'Events'],
+  ['chores', 'check', 'Chores'],
+  ['finances', 'money', 'Finances'],
+  ['household', 'users', 'Household'],
+  ['appearance', 'settings', 'Appearance']
+];
 // Real pages register here as each slice lands; everything else shows the "coming next" card.
-export const pages = { settings: settingsView, finances: financesView, chores: choresView, calendar: calendarView, notifications: notificationsView, home: homeView };
+export const pages = { appearance: appearanceView, settings: settingsView, household: householdView, finances: financesView, chores: choresView, calendar: calendarView, home: homeView };
 
 const root = $('#root');
-const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/')[0]; return r === 'notifications' || NAV.some(([k]) => k === r) ? r : 'home'; };
+const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/')[0]; return r === 'settings' || NAV.some(([k]) => k === r) ? r : 'home'; };
 const loading = `<div class="page-skeleton" aria-label="Loading page" aria-busy="true"><div class="sk sk-title"></div><div class="sk sk-sub"></div>
   <div class="sk-grid"><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div></div></div>`;
 
@@ -31,31 +43,14 @@ async function loadMe() {
   if (S.hid) localStorage.setItem('roomie.hid', String(S.hid));
 }
 
-async function loadNavCounts() {
-  if (S.navCounts.hid === S.hid && Date.now() - S.navCounts.at < 30_000) return;
-  const [chores, balances] = await Promise.all([api(`/households/${S.hid}/chores`), api(`/households/${S.hid}/balances`)]);
-  S.navCounts = {
-    overdue: chores.assignments.filter((a) => !a.isCompleted && a.status === 'overdue' && a.assignedUserId === S.user.userId).length,
-    owedCents: balances.mine.reduce((sum, b) => sum + Math.max(0, -toCents(b.signedAmount)), 0), at: Date.now(), hid: S.hid,
-  };
-}
-
-function accentInk(hex) {
-  const value = /^#[0-9a-f]{6}$/i.test(hex) ? hex : '#4338ca';
-  const rgb = [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16) / 255).map((c) => c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
-  return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2] > .45 ? '#171721' : '#ffffff';
-}
-
 function shell(page, body) {
-  const h = household();
-  const count = (key) => key === 'chores' && S.navCounts.overdue ? String(S.navCounts.overdue) : key === 'finances' && S.navCounts.owedCents ? `$${Math.ceil(S.navCounts.owedCents / 100)}` : '';
-  const items = NAV.map(([k, i, l]) => `<a href="#/${k}" class="nav-i ${k === page ? 'on' : ''}" ${k === page ? 'aria-current="page"' : ''}>${ico(i, 19)}<span>${l}</span>${count(k) ? `<span class="nav-count" aria-label="${k === 'chores' ? `${count(k)} overdue` : `${count(k)} owed`}">${count(k)}</span>` : ''}</a>`).join('');
-  const accent = h.themeColor || '#4338ca'; document.documentElement.style.setProperty('--accent', accent); document.documentElement.style.setProperty('--on-accent', accentInk(accent));
+  const items = NAV.map(([k, i, l]) => `<a href="#/${k}" class="nav-i ${k === page ? 'on' : ''}" ${k === page ? 'aria-current="page"' : ''}>${ico(i, 19)}<span>${l}</span></a>`).join('');
+  applyAppearance();
   const account = S.user.profilePhoto ? `<img class="acct-photo" src="${esc(S.user.profilePhoto)}" alt="" referrerpolicy="no-referrer">` : esc(((S.user.firstName || '?')[0]).toUpperCase());
   return `<div class="shell"><div class="main">
-    <header class="top"><div class="brand">${mark()}<div class="grow"><b>Roomie</b><small class="truncate">${esc(h.householdName)}</small></div></div>
+    <header class="top"><div class="brand"><a class="brand-home" href="/#/home" aria-label="Roomie home">${mark()}</a>${householdSwitcherHtml()}</div>
       <div class="row" style="gap:10px">${bellHtml()}
-      <button class="iconbtn acct" data-action="account" aria-label="Your account">${account}</button></div></header>
+      <button class="iconbtn acct" data-action="account" aria-label="Your profile and household">${account}</button></div></header>
     <nav class="pillnav" aria-label="Main">${items}</nav>
     <main class="page" id="page">${body}</main></div>
     <nav class="tabbar" aria-label="Main">${items}</nav></div>`;
@@ -64,22 +59,42 @@ function shell(page, body) {
 let seq = 0;
 export async function render() {
   const mine = ++seq;
+  let retainedPage;
   try {
-    if (!(await getToken())) { resetState(); root.innerHTML = authView(); return; }
+    if (isPasswordReset()) { stopFinancePolling(); stopChorePolling(); stopCalendarPolling(); stopAlertPolling(); root.innerHTML = authView(); return; }
+    if (!(await getToken())) { stopFinancePolling(); stopChorePolling(); stopCalendarPolling(); stopAlertPolling(); resetState(); applyAppearance(); root.innerHTML = authView(); return; }
     if (!S.user) { root.innerHTML = loading; await loadMe(); }
     if (mine !== seq) return;
-    if (!S.households.length) { root.innerHTML = onboardingView(); return; }
+    applyAppearance();
+    if (needsOnboarding()) { root.removeAttribute('data-page'); root.innerHTML = await onboardingView(); return; }
+    startAlertPolling();
+    const legacyActivity = location.hash.replace(/^#\/?/, '').split('/')[0] === 'notifications';
+    if (legacyActivity) history.replaceState(null, '', '#/home');
     const page = route();
-    await Promise.all([page !== 'notifications' ? loadAlerts().catch(() => {}) : Promise.resolve(), loadNavCounts().catch(() => {})]);
-    const keep = $('#page') && root.dataset.page === page; // soft refresh keeps the shell
-    if (!keep) root.innerHTML = shell(page, loading);
+    if (page !== 'finances') stopFinancePolling();
+    if (page !== 'chores') stopChorePolling();
+    if (page !== 'calendar') stopCalendarPolling();
+    await loadAlerts().catch(() => {});
+    const keep = $('#page') && root.dataset.page === page && root.dataset.hid === String(S.hid); // soft refresh keeps the shell
+    if (keep) retainedPage = $('#page');
+    else root.innerHTML = shell(page, loading);
     const body = pages[page] ? await pages[page]() : soonView(page);
     if (mine !== seq) return;
-    root.dataset.page = page;
+    root.dataset.page = page; root.dataset.hid = String(S.hid);
     if (keep) { $('#page').innerHTML = body; paintBell(); } else root.innerHTML = shell(page, body);
+    connectHomeLayout();
+    openPendingCalendarCreate(page);
+    openPendingActivity(page);
+    if (legacyActivity) await openActivityPanel();
   } catch (e) {
     if (mine !== seq) return;
-    if (e.status === 401) { resetState(); root.innerHTML = authView(); return; }
+    if (e.status === 401) { stopFinancePolling(); stopChorePolling(); stopCalendarPolling(); stopAlertPolling(); resetState(); root.innerHTML = authView(); return; }
+    if (retainedPage?.isConnected) {
+      if (!retainedPage.querySelector('[data-refresh-error]')) {
+        retainedPage.insertAdjacentHTML('afterbegin', '<div class="card row wrap" data-refresh-error><p role="status">Could not refresh this page. The information below may be out of date.</p><button type="button" class="btn" data-action="retry">Refresh page</button></div>');
+      }
+      return;
+    }
     root.innerHTML = `<div class="onb"><div class="box"><section class="card stack"><h2>Something went wrong</h2><p class="mute">${esc(e.message)}</p><button class="btn p" data-action="retry">Try again</button></section></div></div>`;
   }
 }
@@ -104,6 +119,7 @@ document.addEventListener('submit', async (e) => {
   const fn = form && forms[form.dataset.form];
   if (!fn) return;
   e.preventDefault();
+  if (form.getAttribute('aria-busy') === 'true') return;
   const btn = form.querySelector('[type=submit]');
   form.setAttribute('aria-busy', 'true'); if (btn) btn.disabled = true;
   showError(form, '');
@@ -120,13 +136,26 @@ for (const type of ['input', 'change']) document.addEventListener(type, (e) => {
 actions['close-modal'] = () => closeModal();
 actions.retry = () => render();
 actions.signout = async () => { closeModal(); await signOut(); resetState(); localStorage.removeItem('roomie.hid'); location.hash = ''; render(); };
-actions.account = () => openModal(`${mhead('Your account')}
-  <div class="item row">${avatar(S.user)}<div class="grow"><b>${esc(fullName(S.user))}</b><div class="mute" style="font-size:13px">${esc(S.user.email)}</div></div></div>
-  <div class="acts"><button class="btn d" data-action="signout">Sign out</button></div>`);
+actions.account = () => {
+  closeModal();
+
+  if (location.hash === '#/settings') {
+    render();
+  } else {
+    location.hash = '#/settings';
+  }
+};
 
 window.addEventListener('hashchange', render);
 window.addEventListener('roomie:render', render);
+window.addEventListener('roomie:profile-saved', () => {
+  const account = document.querySelector('.acct');
+  if (account) account.innerHTML = S.user.profilePhoto
+    ? `<img class="acct-photo" src="${esc(S.user.profilePhoto)}" alt="" referrerpolicy="no-referrer">`
+    : esc(((S.user.firstName || '?')[0]).toUpperCase());
+});
 window.addEventListener('roomie:signedin', () => { resetState(); render(); });
 window.addEventListener('roomie:reload', async () => { S.user = null; await render(); });
 
+applyAppearance();
 render();
