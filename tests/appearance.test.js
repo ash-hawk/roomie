@@ -1,18 +1,52 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { themes, onColor, contrastRatio } from '../src/lib/themes.js';
 import { appearanceView } from '../src/pages/appearance.js';
 import { S } from '../src/lib/state.js';
 import { inputs } from '../src/lib/events.js';
 import { applyAppearance, appearance, theme } from '../src/lib/appearance.js';
-beforeEach(() => { localStorage.clear(); S.user = {userId:1}; document.documentElement.className='';history.replaceState(null,'','#/appearance'); });
+const system = vi.hoisted(() => {
+  const media = new EventTarget();
+  media.matches = false;
+  vi.stubGlobal('matchMedia', vi.fn(() => media));
+  return media;
+});
+const setSystemDark = (matches) => {
+  system.matches = matches;
+  system.dispatchEvent(new Event('change'));
+};
+
+beforeEach(() => { localStorage.clear(); system.matches = false; S.user = {userId:1}; document.documentElement.className='';history.replaceState(null,'','#/appearance'); });
 describe('personal light and dark appearance', () => {
+  it('defaults to Orchid and follows the OS live until a manual mode is selected', () => {
+    S.user = null;
+    applyAppearance();
+    expect(document.documentElement.dataset.theme).toBe('orchid');
+    expect(document.documentElement.style.colorScheme).toBe('light');
+    setSystemDark(true);
+    expect(document.documentElement.style.colorScheme).toBe('dark');
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.orchid.dark.accent);
+
+    S.user = { userId: 1 };
+    inputs.appearance({ value: 'light', checked: true });
+    setSystemDark(false);
+    setSystemDark(true);
+    expect(document.documentElement.style.colorScheme).toBe('light');
+
+    inputs.appearance({ value: 'system', checked: true });
+    expect(document.documentElement.style.colorScheme).toBe('dark');
+    document.body.innerHTML = appearanceView();
+    expect(document.querySelector('[data-input=appearance]:checked').value).toBe('system');
+    setSystemDark(false);
+    expect(document.documentElement.style.colorScheme).toBe('light');
+  });
+
   it('persists on reload and keeps other users independent', () => {
     inputs.appearance({value:'dark',checked:true});
     expect(document.documentElement.classList.contains('dark')).toBe(true);
     applyAppearance(); expect(appearance()).toBe('dark');
     S.user = {userId:2}; applyAppearance();
-    expect(appearance()).toBe('light');
+    expect(appearance()).toBe('system');
     expect(document.documentElement.classList.contains('dark')).toBe(false);
     S.user = {userId:1}; applyAppearance();
     expect(document.documentElement.classList.contains('dark')).toBe(true);
@@ -21,8 +55,8 @@ describe('personal light and dark appearance', () => {
     inputs.appearance({value:'red',checked:true});
     document.documentElement.style.setProperty('--accent','#ff0000');
     applyAppearance();
-    expect(appearance()).toBe('light');
-    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.coastal.light.accent);
+    expect(appearance()).toBe('system');
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.orchid.light.accent);
   });
 });
 
@@ -34,7 +68,7 @@ describe('personal theme presets', () => {
     expect(theme()).toBe('berry');
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe(themes.berry.dark.accent);
     S.user={userId:2};applyAppearance();
-    expect(theme()).toBe('coastal');expect(appearance()).toBe('light');
+    expect(theme()).toBe('orchid');expect(appearance()).toBe('system');
     S.user={userId:1};applyAppearance();
     expect(theme()).toBe('berry');expect(appearance()).toBe('dark');
     inputs.appearance({value:'light',checked:true});
@@ -44,10 +78,10 @@ describe('personal theme presets', () => {
   it('falls back safely for invalid stored themes and ignores invalid selections', () => {
     localStorage.setItem('roomie.theme.1','bad-theme');
     inputs.theme({value:'__proto__',checked:true});applyAppearance();
-    expect(theme()).toBe('coastal');
+    expect(theme()).toBe('orchid');
     document.body.innerHTML=appearanceView();
     expect(document.querySelectorAll('[data-input=theme]')).toHaveLength(5);
-    expect(document.querySelector('[data-input=theme]:checked').value).toBe('coastal');
+    expect(document.querySelector('[data-input=theme]:checked').value).toBe('orchid');
     expect(document.querySelector('.theme-swatches')).toBeNull();
     expect(document.querySelectorAll('.theme-palette i')).toHaveLength(35);
     expect([...document.querySelectorAll('.theme-palette i')].map(el=>el.title)).toContain('#CC87D4');
