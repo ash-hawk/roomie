@@ -440,7 +440,7 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .month-nav{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;margin-bottom:10px}.month-nav>.row{justify-content:center;gap:10px}
 
 /* ---- slice (c): calendar + board ---- */
-.split.cal{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start}
+.split.cal{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:stretch}
 @media(max-width:900px){.split.cal{grid-template-columns:1fr}}
 .dayh{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:14px 0 2px}
 .dayh:first-child{margin-top:0}
@@ -795,7 +795,7 @@ button.home-drag-handle:focus-visible{outline:2px solid var(--accent);outline-of
 .home-dashboard[data-preset="focus-left"]{grid-template-columns:minmax(0,2fr) minmax(280px,1fr);grid-template-areas:"primary secondary" "primary tertiary";grid-template-rows:auto 1fr}
 .home-dashboard[data-preset="focus-right"]{grid-template-columns:minmax(280px,1fr) minmax(0,2fr);grid-template-areas:"secondary primary" "tertiary primary";grid-template-rows:auto 1fr}
 .home-dashboard[data-preset="equal"]{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"primary secondary tertiary";grid-template-rows:auto}
-.home-dashboard[data-preset]>.home-widget{display:flex;min-width:0;align-self:start;grid-column:auto}
+.home-dashboard[data-preset]>.home-widget{display:flex;min-width:0;align-self:stretch;grid-column:auto}
 .home-dashboard[data-preset]>.home-widget:nth-child(1){grid-area:primary}
 .home-dashboard[data-preset]>.home-widget:nth-child(2){grid-area:secondary}
 .home-dashboard[data-preset]>.home-widget:nth-child(3){grid-area:tertiary}
@@ -950,8 +950,9 @@ body::before,body::after{display:none}
 @container(max-width:700px){.calendar-secondary,.calendar-more-wide{display:none}.calendar-more-narrow{display:block}.schedule-calendar-item{font-size:10px;line-height:1.2;padding:2px 3px}.calendar-status{display:none}}
 @media(max-width:600px){.schedule-month-grid{grid-auto-rows:auto}.schedule-month-grid .schedule-calendar-more{display:none}}
 
-/* Content height is independent of neighbouring widgets, including empty lists. */
-.home-dashboard[data-preset]{align-items:start}
+/* Keep every desktop preset inside a clean rectangle by stretching panels to
+   their shared row height. Content remains visible instead of being clipped. */
+.home-dashboard[data-preset]{align-items:stretch}
 .home-widget.expanded .home-board-feed>.sticky>p,.home-widget.expanded .home-board-message{display:block;-webkit-line-clamp:unset;overflow:visible}
 #chore-schedule .empty{padding:24px 12px;min-height:0}
 .home-schedule-toolbar{min-width:0}
@@ -965,14 +966,12 @@ body::before,body::after{display:none}
 .mark{background:var(--accent);color:var(--on-accent)}
 .btn.d,.btn.d:hover,.doneb.on,.cr .doneb.on,.cr.completing .doneb,.bdot{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 
-/* Nest dashboard tiles by content height; never stretch a short card to its neighbour. */
+/* Desktop presets use shared grid rows so all widget edges line up. */
 @media(min-width:901px){
-  .home-dashboard[data-preset]{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:none;grid-template-rows:none;grid-auto-rows:8px;grid-auto-flow:row dense;gap:0 18px}
-  .home-dashboard[data-preset]>.home-widget:nth-child(n){grid-area:auto;margin-bottom:18px}
-  .home-dashboard[data-preset="focus-left"]>.home-widget:nth-child(1){grid-column:1 / span 2}
-  .home-dashboard[data-preset="focus-left"]>.home-widget:nth-child(n+2){grid-column:3}
-  .home-dashboard[data-preset="focus-right"]>.home-widget:nth-child(1){grid-column:2 / span 2}
-  .home-dashboard[data-preset="focus-right"]>.home-widget:nth-child(n+2){grid-column:1}
+  .home-dashboard[data-preset]{grid-template-columns:minmax(0,2fr) minmax(280px,1fr);grid-template-areas:"primary secondary" "primary tertiary";grid-template-rows:auto auto;grid-auto-rows:auto;gap:18px}
+  .home-dashboard[data-preset="focus-right"]{grid-template-columns:minmax(280px,1fr) minmax(0,2fr);grid-template-areas:"secondary primary" "tertiary primary"}
+  .home-dashboard[data-preset="equal"]{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"primary secondary tertiary";grid-template-rows:auto}
+  .home-dashboard[data-preset]>.home-widget:nth-child(n){margin-bottom:0}
 }
 
 /* Each palette supplies several interface roles, with neutral, opaque surfaces. */
@@ -999,6 +998,17 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .day2{background:var(--card)}
 .day2:hover{background:var(--surface-tile)}
 .home-widget-tools,.schedule-filter-panel{background:var(--surface-raised)}
+
+/* Desktop panels keep their outlines as content changes. */
+@media(min-width:901px){
+  .home-dashboard[data-preset],.split.cal{height:900px;grid-template-rows:minmax(0,1fr);min-height:0}
+  .home-dashboard[data-preset="focus-left"],.home-dashboard[data-preset="focus-right"]{grid-template-rows:repeat(2,minmax(0,1fr))}
+  .home-dashboard[data-preset]>.home-widget{min-height:0}
+  .home-dashboard[data-preset]>.home-widget>.card,.split.cal>#cal-main,.chore-schedule-column>#chore-schedule{min-height:0;overflow:auto}
+  .event-board-column,.chore-attention-board,.chore-schedule-column{min-height:0}
+  .event-board-column>.card:last-child,.chore-attention-board>.card:last-child,.chore-schedule-column>#chore-schedule{flex:1;min-height:0;overflow:auto}
+  .event-board-column>.card:first-child,.chore-attention-board>.card:first-child{flex:none;max-height:45%;overflow:auto}
+}
 
 .home-recap { margin: 0 0 12px; font-size: 0.95rem; }
 
