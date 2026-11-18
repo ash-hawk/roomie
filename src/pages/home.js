@@ -77,7 +77,7 @@ function monthList(items) {
 }
 function listView() {
   const items = upcomingMonthItems();
-  return `${monthNav('list')}${monthList(items.slice(0, 5))}${items.length > 5 ? `<button class="btn s" data-action="home-month-list">View all ${items.length} items</button>` : ''}`;
+  return `${monthNav('list')}${monthList(items)}`;
 }
 actions['home-month-list'] = () => {
   const title = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
@@ -92,14 +92,14 @@ function calendarView() {
     <div class="mgrid home-month">${monthDays(monthStart).map((day) => {
       const items = D.items.filter((item) => item.ymd === day);
       return `<button class="day2 ${day.slice(0, 7) !== monthStart.slice(0, 7) ? 'out' : ''} ${day === today ? 'today' : ''}" data-action="home-day" data-day="${day}" aria-label="${esc(dayLabel(day))}, ${items.length} items" ${day === today ? 'aria-current="date"' : ''}>
-        <span class="dn">${Number(day.slice(8))}</span>${compact ? `<span class="home-day-dots" aria-hidden="true">${items.slice(0, 3).map((item) => `<i style="background:${itemColor(item.kind)}"></i>`).join('')}</span>` : `${items.slice(0, 3).map((item) => `<span class="home-calendar-item ${item.completed ? 'completed' : ''}" style="--ev:${itemColor(item.kind)}"><span>${timeFmt(item.at)} · ${esc(item.label)}</span><b>${esc(item.name)}</b>${item.approval?.total ? `<span class="home-calendar-approval">${item.approval.label} · ${item.approval.approved}/${item.approval.total}</span>` : ''}</span>`).join('')}
-        ${items.length > 3 ? `<span class="home-more">+${items.length - 3} more</span>` : ''}<span class="home-mobile-count" aria-hidden="true">${items.length || ''}</span>` }</button>`;
+        <span class="dn">${Number(day.slice(8))}</span>${compact ? `<span class="home-day-dots" aria-hidden="true">${items.slice(0, 3).map((item) => `<i style="background:${itemColor(item.kind)}"></i>`).join('')}</span>` : `${items.slice(0, 1).map((item) => `<span class="home-calendar-item ${item.completed ? 'completed' : ''}" style="--ev:${itemColor(item.kind)}"><span>${timeFmt(item.at)} · ${esc(item.label)}</span><b>${esc(item.name)}</b></span>`).join('')}
+        ${items.length > 1 ? `<span class="home-more">+${items.length - 1} more</span>` : ''}<span class="home-mobile-count" aria-hidden="true">${items.length || ''}</span>` }</button>`;
     }).join('')}</div>${compact ? compactUpcoming() : ''}`;
 }
 
 function compactUpcoming() {
   const monthItems = D.items.filter((item) => item.ymd.slice(0, 7) === monthStart.slice(0, 7) && !item.completed && Date.parse(item.at) >= Date.now());
-  return `<div class="home-compact-upcoming"><h3>Coming up</h3>${monthItems.slice(0, layoutMode === 'equal' ? 2 : 1).map((item) => `<div><span class="hint">${esc(dayLabel(item.ymd))}</span>${row(item)}</div>`).join('') || '<p class="hint">Nothing else coming up this month.</p>'}${monthItems.length > (layoutMode === 'equal' ? 2 : 1) ? '<button class="btn s" data-action="home-month-list">View all upcoming</button>' : ''}</div>`;
+  return `<div class="home-compact-upcoming"><h3>Coming up</h3>${monthItems.map((item) => `<div><span class="hint">${esc(dayLabel(item.ymd))}</span>${row(item)}</div>`).join('') || '<p class="hint">Nothing else coming up this month.</p>'}</div>`;
 }
 
 // AI recap line: one call per sign-in and household (sessionStorage), hidden on any failure or when the server flag is off.
@@ -131,7 +131,7 @@ export async function homeView() {
   loadRecap();
   const recap = cachedRecap();
   const widgets = {
-    board: `<section class="card stack home-board" id="home-board" data-home-board-root>${householdBoard({ ...D, compact: widgetSize('board') === 'compact', archive: homeBoardArchive, limit: 3 })}</section>`,
+    board: `<section class="card stack home-board" id="home-board" data-home-board-root>${householdBoard({ ...D, compact: widgetSize('board') === 'compact', archive: homeBoardArchive })}</section>`,
     schedule: `<section class="card stack home-schedule" aria-label="Shared household schedule"><div class="${view === 'list' ? 'stack' : ''}" id="home-schedule-content" data-view="${view}">${view === 'calendar' ? calendarView() : listView()}</div></section>`,
     finances: homeFinances({ ...D, compact: widgetSize('finances') === 'compact' }),
   };
@@ -182,7 +182,7 @@ function paintHomeBoards() {
     const opened = [...board.querySelectorAll('details[open]')].map((el) => el.dataset.boardEntry);
     const drafts = [...board.querySelectorAll('form')].map((form) => ({ kind: form.dataset.form, id: form.dataset.id, message: form.elements.namedItem('messageText')?.value ?? '', eventId: form.elements.namedItem('eventId')?.value ?? '' }));
     const full = board.id === 'home-board-all';
-    board.innerHTML = householdBoard({ ...D, compact: !full && widgetSize('board') === 'compact', archive: homeBoardArchive, limit: full ? Infinity : 3 });
+    board.innerHTML = householdBoard({ ...D, compact: !full && widgetSize('board') === 'compact', archive: homeBoardArchive });
     board.querySelectorAll('details').forEach((el) => { el.open = opened.includes(el.dataset.boardEntry); });
     for (const form of board.querySelectorAll('form')) {
       const draft = drafts.find((d) => d.kind === form.dataset.form && d.id === form.dataset.id);
