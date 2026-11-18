@@ -157,4 +157,5 @@ window.addEventListener('roomie:profile-saved', () => {
 window.addEventListener('roomie:signedin', () => { resetState(); render(); });
 window.addEventListener('roomie:reload', async () => { S.user = null; await render(); });
 
+applyAppearance();
 render();
