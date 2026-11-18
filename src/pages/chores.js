@@ -294,7 +294,7 @@ actions['rotation-move'] = (button) => {
   if (button.dataset.direction === 'up') row.parentElement.insertBefore(row, neighbor);
   else row.parentElement.insertBefore(row, neighbor.nextElementSibling);
   updateRotation(row);
-  if (button.disabled) row.querySelector('[data-rotation-drag]').focus();
+  if (button.disabled) row.querySelector('.rotation-moves button:enabled')?.focus();
 };
 function wireRotation() {
   const list = document.querySelector('.rotation-list'); if (!list) return;

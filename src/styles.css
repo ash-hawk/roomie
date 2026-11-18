@@ -1050,3 +1050,23 @@ form[data-form="pay"] .chk>input, form[data-form="pay"] .chk>.amount {flex:none}
   .invite-card .rowline>.code {flex-basis:100%;min-width:0}
   .tabbar .nav-i {min-width:0}
 }
+
+
+@media (max-width: 520px) {
+  .top {position:relative}
+  .household-switcher {position:static}
+  .household-switcher-menu {
+    inset-inline-start:8px;
+    width:min(260px, calc(100% - 16px));
+    max-height:55dvh;
+    overflow:auto;
+    overflow-wrap:anywhere;
+  }
+}
+
+@media (max-width: 767px) and (pointer: coarse) {
+  /* Let the sheet scroll as one surface and use touch-sized step controls. */
+  .rotation-list {max-height:none;overflow:visible}
+  .rotation-row .rotation-grip {display:none}
+  .rotation-moves .btn {min-width:44px;min-height:44px}
+}

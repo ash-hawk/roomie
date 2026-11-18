@@ -194,14 +194,23 @@ function paintHomeBoards() {
 }
 actions['home-board-all'] = () => openModal(`${mhead('Household board')}<div class="stack home-board" id="home-board-all" data-home-board-root>${householdBoard({ ...D, archive: homeBoardArchive })}</div>`);
 
+function homeIsIdle() {
+  return !widgetDrag && !document.hidden && document.getElementById('root')?.dataset.page === 'home' &&
+    !document.getElementById('modal') && !document.activeElement?.closest?.('form,input,textarea,select,button') &&
+    !document.querySelector('#home-board [aria-busy=true]');
+}
+
 async function refreshHomeBoard(onlyChanged = false) {
-  const householdId = D.householdId;
+  const initial = D;
+  const householdId = initial.householdId;
   const [{ members }, { events }, chores, { notes }, balances, wishlist] = await Promise.all([
     api(`/households/${householdId}/members`), api(`/households/${householdId}/events`),
     api(`/households/${householdId}/chores`), api(`/households/${householdId}/board`),
     api(`/households/${householdId}/balances`), api(`/households/${householdId}/wishlist`),
   ]);
   if (hid() !== householdId || !document.getElementById('home-board')) return;
+  // Focus, modal state, or the rendered household snapshot can change while the requests are in flight.
+  if (onlyChanged && (D !== initial || !homeIsIdle())) return;
   const visible = currentHouseholdData(members, { events, chores, notes });
   const wish = wishlist.items ?? [];
   if (onlyChanged && JSON.stringify([members, visible, balances, wish]) === JSON.stringify([D.members, { events: D.events, chores: D.chores, notes: D.notes }, D.balances, D.wish])) return;
@@ -283,10 +292,12 @@ forms['home-note-new'] = (form) => postHomeNote(form, false);
 forms['home-note-reply'] = (form) => postHomeNote(form, true);
 
 // Like the Events board, refresh while idle; never interrupt editing or an in-flight response.
+let homePollPending = false;
 setInterval(async () => {
-  if (widgetDrag || document.hidden || document.getElementById('root')?.dataset.page !== 'home' || !D || document.getElementById('modal')) return;
-  if (document.activeElement?.closest?.('form,input,textarea,select,button') || document.querySelector('#home-board [aria-busy=true]')) return;
+  if (homePollPending || !D || !homeIsIdle()) return;
+  homePollPending = true;
   try { await refreshHomeBoard(true); } catch { /* Keep the last snapshot while offline. */ }
+  finally { homePollPending = false; }
 }, 15000);
 
 actions['home-chore-detail'] = (button) => openChoreDetails(D.householdId, Number(button.dataset.id));
