@@ -228,6 +228,7 @@ describe('chore rotation order', () => {
     const sam = list.lastElementChild;
     actions['rotation-move'](sam.querySelector('[data-direction=up]'));
     actions['rotation-move'](sam.querySelector('[data-direction=up]'));
+    expect(document.activeElement).toBe(sam.querySelector('[data-direction=down]'));
     expect([...new FormData(form).getAll('rot')]).toEqual(['3', '1', '2']);
     form.querySelector('[name=rot][value="1"]').checked = false;
     actions['rotation-move'](sam.querySelector('[data-direction=down]'));
