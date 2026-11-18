@@ -440,7 +440,7 @@ select.input{appearance:none;-webkit-appearance:none;padding-right:32px;backgrou
 .month-nav{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;margin-bottom:10px}.month-nav>.row{justify-content:center;gap:10px}
 
 /* ---- slice (c): calendar + board ---- */
-.split.cal{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start}
+.split.cal{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:stretch}
 @media(max-width:900px){.split.cal{grid-template-columns:1fr}}
 .dayh{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:14px 0 2px}
 .dayh:first-child{margin-top:0}
